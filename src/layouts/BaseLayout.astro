@@ -1,23 +1,86 @@
 ---
 import '../styles/global.css'
+import Footer from '../components/Footer.astro'
+import { AUTHOR, AUTHOR_SAME_AS, AUTHOR_X_URL, CF_ANALYTICS_TOKEN, SITE } from '../config/site'
 
 export interface Props {
   title: string
   description: string
-  /** Path only, e.g. "/morse-code-alphabet/". Canonical is built from it. */
+  /** Path only, e.g. "/morse-code-alphabet/". The canonical is built from it. */
   path?: string
-  /** JSON-LD objects to embed. */
+  /** Extra JSON-LD for this page, appended to the site-wide graph. */
   schema?: Record<string, unknown>[]
+  /** Hide the footer, e.g. on a full-screen challenge. */
+  hideFooter?: boolean
 }
 
-const { title, description, path = Astro.url.pathname, schema = [] } = Astro.props
+const {
+  title,
+  description,
+  path = Astro.url.pathname,
+  schema = [],
+  hideFooter = false,
+} = Astro.props
 
 const canonical = new URL(path, Astro.site).href
 const ogImage = new URL('/og/default.png', Astro.site).href
+
+/**
+ * Site-wide identity graph, emitted on every page.
+ *
+ * The stable `@id` values are what let a search engine or an LLM treat the
+ * app, the site and the author as one connected entity across pages rather
+ * than as unrelated mentions — and `sameAs` is what ties a brand-new domain to
+ * an author who already has a track record elsewhere.
+ */
+const identityGraph = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Person',
+      '@id': `${SITE.url}/#author`,
+      name: AUTHOR.name,
+      url: AUTHOR.url,
+      sameAs: AUTHOR_SAME_AS,
+    },
+    {
+      '@type': 'WebSite',
+      '@id': `${SITE.url}/#website`,
+      url: SITE.url,
+      name: SITE.name,
+      description: SITE.description,
+      inLanguage: SITE.locale,
+      publisher: { '@id': `${SITE.url}/#author` },
+    },
+    {
+      '@type': 'WebApplication',
+      '@id': `${SITE.url}/#app`,
+      name: SITE.name,
+      alternateName: `${SITE.name} — ${SITE.tagline}`,
+      url: SITE.url,
+      description: SITE.description,
+      applicationCategory: 'EducationalApplication',
+      operatingSystem: 'Any',
+      browserRequirements: 'Requires JavaScript and Web Audio support',
+      author: { '@id': `${SITE.url}/#author` },
+      isAccessibleForFree: true,
+      // A free product still needs an Offer, or rich results treat the price
+      // as unknown rather than as zero.
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+      featureList: [
+        'Interactive Morse code tree',
+        'Real CW audio with adjustable WPM and Farnsworth spacing',
+        'Keyboard straight key with dot and dash detection',
+        'Spaced repetition practice',
+        'Works offline, no account required',
+      ],
+    },
+  ],
+}
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang={SITE.locale}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -33,24 +96,45 @@ const ogImage = new URL('/og/default.png', Astro.site).href
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
     <meta property="og:image" content={ogImage} />
-    <meta property="og:site_name" content="MorseForge" />
+    <meta property="og:site_name" content={SITE.name} />
+    <meta property="og:locale" content="en_US" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:creator" content={`@${AUTHOR.x}`} />
+    <meta name="twitter:site" content={`@${AUTHOR.x}`} />
 
-    <meta name="author" content="Can Türk" />
-    <link rel="author" href="https://iamcanturk.dev" />
+    <meta name="author" content={AUTHOR.name} />
+    <link rel="author" href={AUTHOR.url} />
+    <link rel="me" href={AUTHOR_X_URL} />
     <link rel="sitemap" href="/sitemap-index.xml" />
 
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(identityGraph)} />
     {
       schema.map((entry) => (
         <script is:inline type="application/ld+json" set:html={JSON.stringify(entry)} />
       ))
     }
+
+    {
+      CF_ANALYTICS_TOKEN && (
+        /* `type="module"` matches the snippet Cloudflare currently issues.
+           Module scripts already defer, so this does not block rendering. */
+        <script
+          is:inline
+          type="module"
+          src="https://static.cloudflareinsights.com/beacon.min.js"
+          data-cf-beacon={JSON.stringify({ token: CF_ANALYTICS_TOKEN })}
+        />
+      )
+    }
   </head>
-  <body class="min-h-dvh bg-void text-ink antialiased">
-    <slot />
+  <body class="flex min-h-dvh flex-col bg-void text-ink antialiased">
+    <div class="flex-1">
+      <slot />
+    </div>
+    {!hideFooter && <Footer />}
   </body>
 </html>

@@ -1,0 +1,48 @@
+---
+import { AUTHOR, AUTHOR_X_URL, SITE } from '../config/site'
+
+/**
+ * `rel="me"` marks the links that are the *same person* — the author's own site
+ * and X profile — which is what IndieAuth and Mastodon read to verify identity.
+ * The repository link is a project, not an identity, so it deliberately does
+ * not carry it.
+ */
+---
+
+<footer class="mt-24 border-t border-line">
+  <div
+    class="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10 sm:flex-row sm:items-center sm:justify-between"
+  >
+    <p class="text-sm text-muted">
+      Built by
+      <a
+        href={AUTHOR.url}
+        rel="me"
+        class="text-ink underline decoration-signal/40 underline-offset-4 hover:decoration-signal"
+        >{AUTHOR.name}</a
+      >
+      — your progress stays on your device.
+    </p>
+
+    <nav aria-label="Project and author links" class="flex flex-wrap items-center gap-5">
+      <a
+        href={SITE.repo}
+        rel="noopener"
+        class="font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:text-signal"
+        >SOURCE ON GITHUB</a
+      >
+      <a
+        href={AUTHOR_X_URL}
+        rel="me noopener"
+        class="font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:text-signal"
+        >@{AUTHOR.x}</a
+      >
+      <a
+        href={AUTHOR.url}
+        rel="me noopener"
+        class="font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:text-signal"
+        >IAMCANTURK.DEV</a
+      >
+    </nav>
+  </div>
+</footer>
