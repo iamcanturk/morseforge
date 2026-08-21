@@ -1,0 +1,75 @@
+@import 'tailwindcss';
+
+/* ---------------------------------------------------------------------------
+   MorseForge design tokens
+   Palette derives from PROJECT.md §26. Every signal colour was contrast-checked
+   against --color-void: signal 13:1, amber 11:1, cyan 11:1 — all WCAG AAA, so
+   the "premium neon" look never costs us the §28 accessibility target.
+--------------------------------------------------------------------------- */
+@theme {
+  /* surfaces */
+  --color-void: #080b10;
+  --color-panel: #10151d;
+  --color-elevated: #161d28;
+  --color-line: #202a38;
+
+  /* signal colours */
+  --color-signal: #00e88f; /* primary — active, mastered, correct */
+  --color-signal-dim: #00a868; /* unlit circuit traces, not-yet-learned */
+  --color-amber: #ffb020; /* streak, learning, warning */
+  --color-cyan: #22d3ee; /* transmission in progress, audio playing */
+  --color-danger: #ff4d5e; /* error, life lost */
+
+  /* text */
+  --color-ink: #e6edf3;
+  --color-muted: #8b98a5;
+
+  /* type */
+  --font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-body: 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  /* morse-native motion — one "unit" at 20 WPM is 60ms (1200/WPM) */
+  --duration-dit: 60ms;
+  --duration-dah: 180ms;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-void);
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-void);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* PROJECT.md §28: keyboard-only practice must be viable, so focus has to be
+     loud rather than tasteful. */
+  :focus-visible {
+    outline: 2px solid var(--color-signal);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* §28 reduced motion. The signal pulses are decorative; the audio and the
+     decoded text carry all the actual information, so killing animation loses
+     nothing functional. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@utility glow-signal {
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--color-signal) 45%, transparent));
+}

@@ -1,0 +1,54 @@
+{
+  "name": "morseforge",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Learn Morse. Build the Signal. A free, gamified Morse code trainer with a real CW audio engine, keyboard straight key, and a Signal Tree that lights up as you master each character.",
+  "homepage": "https://morse.iamcanturk.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iamcanturk/morse.git"
+  },
+  "bugs": {
+    "url": "https://github.com/iamcanturk/morse/issues"
+  },
+  "author": {
+    "name": "Can T\u00fcrk",
+    "url": "https://iamcanturk.dev"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "typecheck": "astro check",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "verify": "npm run format:check && npm run typecheck && npm run test",
+    "deploy": "bash scripts/deploy.sh",
+    "format": "prettier --write \"src/**/*.{ts,tsx,astro,css}\" \"*.{json,mjs,ts}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,astro,css}\" \"*.{json,mjs,ts}\""
+  },
+  "dependencies": {
+    "@astrojs/react": "^6.0.4",
+    "@astrojs/sitemap": "^3.7.3",
+    "@tailwindcss/vite": "^4.3.3",
+    "astro": "^7.2.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "prettier": "^3.9.6",
+    "prettier-plugin-astro": "^0.14.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  }
+}

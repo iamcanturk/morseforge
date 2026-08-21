@@ -1,0 +1,56 @@
+---
+import '../styles/global.css'
+
+export interface Props {
+  title: string
+  description: string
+  /** Path only, e.g. "/morse-code-alphabet/". Canonical is built from it. */
+  path?: string
+  /** JSON-LD objects to embed. */
+  schema?: Record<string, unknown>[]
+}
+
+const { title, description, path = Astro.url.pathname, schema = [] } = Astro.props
+
+const canonical = new URL(path, Astro.site).href
+const ogImage = new URL('/og/default.png', Astro.site).href
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="theme-color" content="#080B10" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:site_name" content="MorseForge" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <meta name="author" content="Can Türk" />
+    <link rel="author" href="https://iamcanturk.dev" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+
+    {
+      schema.map((entry) => (
+        <script is:inline type="application/ld+json" set:html={JSON.stringify(entry)} />
+      ))
+    }
+  </head>
+  <body class="min-h-dvh bg-void text-ink antialiased">
+    <slot />
+  </body>
+</html>

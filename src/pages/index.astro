@@ -1,0 +1,23 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import { Logo } from '../components/brand/Logo'
+
+const title = 'MorseForge — Learn Morse Code as a Game'
+const description =
+  'Learn Morse code for free with a real CW audio engine, a keyboard straight key, and a Signal Tree that lights up as you master each character. No account, no ads, works offline.'
+---
+
+<BaseLayout title={title} description={description} path="/">
+  <main class="mx-auto flex min-h-dvh max-w-3xl flex-col items-center justify-center gap-10 px-6">
+    <Logo size={56} tagline glow />
+
+    <p class="max-w-xl text-center text-lg leading-relaxed text-muted">
+      Turn Morse code into a game. Learn it, send it, hear it, decode it — and watch the signal
+      network come online one character at a time.
+    </p>
+
+    <p class="font-mono text-xs tracking-[0.2em] text-signal-dim">
+      SIGNAL NETWORK · UNDER CONSTRUCTION
+    </p>
+  </main>
+</BaseLayout>
