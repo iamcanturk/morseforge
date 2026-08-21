@@ -14,8 +14,13 @@ export interface MorseKeyProps {
   pending: string
   /** What `pending` would decode to, shown live as a hint. */
   preview: string | null
+  /** 0..1 toward auto-commit. Ignored when `autoCommit` is false. */
+  commitProgress: number
+  autoCommit: boolean
   /** Label for the bound key, e.g. "SPACE". */
   keyLabel?: string
+  /** Label for the manual commit key, e.g. "CTRL". */
+  commitLabel?: string
   disabled?: boolean
   pointerHandlers: {
     onPointerDown: (event: React.PointerEvent) => void
@@ -29,22 +34,47 @@ export function MorseKey({
   isDown,
   pending,
   preview,
+  commitProgress,
+  autoCommit,
   keyLabel = 'SPACE',
+  commitLabel = 'CTRL',
   disabled = false,
   pointerHandlers,
 }: MorseKeyProps) {
+  const showCountdown = autoCommit && pending !== '' && !isDown
+
   return (
     <div className="flex flex-col items-center gap-5">
-      {/* The character in progress. Reserved height, so resolving a character
-          does not shift the key underneath the user's finger mid-send. */}
-      <div className="flex h-16 flex-col items-center justify-center gap-1">
+      {/* Reserved height, so resolving a character never shifts the key out
+          from under the user's finger mid-send. */}
+      <div className="flex h-24 w-full max-w-md flex-col items-center justify-center gap-2">
         {pending ? (
           <>
             <span className="font-mono text-3xl tracking-[0.25em] text-cyan">
               {prettify(pending)}
             </span>
             <span className="font-mono text-xs tracking-[0.16em] text-muted">
-              {preview ? `= ${preview}` : '…'}
+              {preview ? `= ${preview}` : 'NOT A CHARACTER YET'}
+            </span>
+
+            {/* The countdown is the only way the user can learn how long a
+                pause they are allowed. Without it the character just vanishes
+                and the app reads as broken. */}
+            <span
+              aria-hidden="true"
+              className="mt-1 h-0.5 w-40 overflow-hidden rounded-full"
+              style={{ background: 'var(--color-line)' }}
+            >
+              {showCountdown && (
+                <span
+                  className="block h-full rounded-full"
+                  style={{
+                    width: `${(1 - commitProgress) * 100}%`,
+                    background:
+                      commitProgress > 0.75 ? 'var(--color-amber)' : 'var(--color-signal-dim)',
+                  }}
+                />
+              )}
             </span>
           </>
         ) : (
@@ -90,9 +120,11 @@ export function MorseKey({
         </span>
       </button>
 
-      <p className="text-center text-xs text-muted">
-        Short press sends a dot, long press sends a dash. Pause to end a character, pause longer to
-        end a word.
+      <p className="max-w-md text-center text-xs leading-relaxed text-muted">
+        Short press sends a dot, long press sends a dash.{' '}
+        {autoCommit
+          ? 'Pause to finish the character — the bar above shows how long you have.'
+          : `Take as long as you like, then press ${commitLabel} to finish the character.`}
       </p>
     </div>
   )

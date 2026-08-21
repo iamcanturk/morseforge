@@ -238,3 +238,78 @@ describe('KeyEngine + LiveDecoder', () => {
     expect(live.text).toBe('E T ')
   })
 })
+
+describe('autoCommit', () => {
+  it('is on by default', () => {
+    expect(resolveThresholds().autoCommit).toBe(true)
+  })
+
+  it('when off, a pause never ends a character or a word', () => {
+    // The point of manual mode: a beginner may hesitate for as long as they
+    // like mid-character without the app deciding they finished.
+    const onCharacterGap = vi.fn()
+    const onWordGap = vi.fn()
+    const harness = createTestClock()
+    const engine = new KeyEngine(
+      { wpm: 20, autoCommit: false },
+      { onCharacterGap, onWordGap },
+      harness.clock,
+    )
+
+    engine.press()
+    harness.advance(60)
+    engine.release()
+    harness.advance(60_000)
+
+    expect(onCharacterGap).not.toHaveBeenCalled()
+    expect(onWordGap).not.toHaveBeenCalled()
+  })
+
+  it('still emits elements when off — only the commit is suppressed', () => {
+    const onElement = vi.fn()
+    const harness = createTestClock()
+    const engine = new KeyEngine({ wpm: 20, autoCommit: false }, { onElement }, harness.clock)
+
+    engine.press()
+    harness.advance(60)
+    engine.release()
+
+    expect(onElement).toHaveBeenCalledWith('.', 60)
+  })
+
+  it('can be turned back on mid-session via configure', () => {
+    const onCharacterGap = vi.fn()
+    const harness = createTestClock()
+    const engine = new KeyEngine({ wpm: 20, autoCommit: false }, { onCharacterGap }, harness.clock)
+
+    engine.configure({ wpm: 20, autoCommit: true })
+    engine.press()
+    harness.advance(60)
+    engine.release()
+    harness.advance(200)
+
+    expect(onCharacterGap).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('explicit gap overrides', () => {
+  it('lets the character gap be set independently of WPM', () => {
+    // Sending speed and thinking time are unrelated — see the autoCommit note.
+    const onCharacterGap = vi.fn()
+    const harness = createTestClock()
+    const engine = new KeyEngine(
+      { wpm: 20, characterGapMs: 1600 },
+      { onCharacterGap },
+      harness.clock,
+    )
+
+    engine.press()
+    harness.advance(60)
+    engine.release()
+
+    harness.advance(1599)
+    expect(onCharacterGap).not.toHaveBeenCalled()
+    harness.advance(1)
+    expect(onCharacterGap).toHaveBeenCalledTimes(1)
+  })
+})

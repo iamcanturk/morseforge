@@ -30,7 +30,42 @@ export const LIMITS = {
   frequency: { min: 300, max: 1000 },
   volume: { min: 0, max: 1 },
   dotDashThresholdMs: { min: 60, max: 600 },
+  characterGapMs: { min: 120, max: 5000 },
+  wordGapMs: { min: 300, max: 12_000 },
 } as const
+
+/**
+ * How patient the decoder is while the user is keying.
+ *
+ * This is deliberately separate from WPM. How fast someone *sends* and how
+ * long they need to *think* are unrelated: at 15 WPM a character ends after
+ * 240ms of silence, which is right for a competent operator and hopeless for
+ * a beginner, who means to send S and — three seconds of hesitation later —
+ * has sent E E E. Nothing about that is a speed problem, so nothing about the
+ * fix belongs in the speed setting.
+ */
+export const KEYER_PRESETS = {
+  learning: { label: 'Learning', characterGapMs: 1600, wordGapMs: 3500, autoCommit: true },
+  relaxed: { label: 'Relaxed', characterGapMs: 900, wordGapMs: 2200, autoCommit: true },
+  standard: { label: 'Standard', characterGapMs: 240, wordGapMs: 560, autoCommit: true },
+  manual: { label: 'Manual', characterGapMs: 1600, wordGapMs: 3500, autoCommit: false },
+} as const
+
+export type KeyerPreset = keyof typeof KEYER_PRESETS
+
+/** Which preset the current values correspond to, or null if hand-tuned. */
+export function matchKeyerPreset(timing: SettingsRecord['timing']): KeyerPreset | null {
+  for (const [name, preset] of Object.entries(KEYER_PRESETS)) {
+    if (
+      preset.characterGapMs === timing.characterGapMs &&
+      preset.wordGapMs === timing.wordGapMs &&
+      preset.autoCommit === timing.autoCommit
+    ) {
+      return name as KeyerPreset
+    }
+  }
+  return null
+}
 
 export type MotionPreference = 'system' | 'reduce' | 'full'
 
@@ -50,6 +85,12 @@ export interface SettingsRecord {
     farnsworthWpm: number
     /** Hold longer than this and the key sends a dash (§9). */
     dotDashThresholdMs: number
+    /** Silence this long ends the character being keyed. */
+    characterGapMs: number
+    /** Silence this long ends the word. */
+    wordGapMs: number
+    /** When false, the user ends each character explicitly instead. */
+    autoCommit: boolean
   }
   keys: KeyBindings
   /**
@@ -74,6 +115,12 @@ export function defaultSettings(): SettingsRecord {
       // needs the gaps stretched or they never get time to recall a character.
       farnsworthWpm: WPM_PRESETS.beginner,
       dotDashThresholdMs: 200,
+      // Defaults to the most forgiving preset. A first-time user who finds
+      // their character committed before they finished it does not conclude
+      // "I should adjust the timing" — they conclude the app is broken.
+      characterGapMs: KEYER_PRESETS.learning.characterGapMs,
+      wordGapMs: KEYER_PRESETS.learning.wordGapMs,
+      autoCommit: KEYER_PRESETS.learning.autoCommit,
     },
     keys: { ...DEFAULT_KEY_BINDINGS },
     motion: 'system',
@@ -122,6 +169,24 @@ function validateSettings(value: unknown): SettingsRecord | null {
         LIMITS.dotDashThresholdMs.min,
         LIMITS.dotDashThresholdMs.max,
       ),
+      characterGapMs: num(
+        timing['characterGapMs'],
+        fallback.timing.characterGapMs,
+        LIMITS.characterGapMs.min,
+        LIMITS.characterGapMs.max,
+      ),
+      // A word gap at or below the character gap would end every word the
+      // instant it ended a character, so the text would be all single letters.
+      wordGapMs: Math.max(
+        num(
+          timing['wordGapMs'],
+          fallback.timing.wordGapMs,
+          LIMITS.wordGapMs.min,
+          LIMITS.wordGapMs.max,
+        ),
+        num(timing['characterGapMs'], fallback.timing.characterGapMs) * 1.5,
+      ),
+      autoCommit: bool(timing['autoCommit'], fallback.timing.autoCommit),
     },
     keys: {
       key: str(keys['key'], fallback.keys.key),

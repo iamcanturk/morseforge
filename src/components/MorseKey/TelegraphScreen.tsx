@@ -1,9 +1,16 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { MorseKey, SignalTrace } from './MorseKey'
+import { KeyerSpeedPicker } from './KeyerSpeedPicker'
 import { useMorseKey } from './useMorseKey'
 import { encode } from '../../engine/morseEncoder'
 import { UNKNOWN_CHARACTER } from '../../engine/morseDecoder'
-import { createSettingsStore, defaultSettings, type SettingsRecord } from '../../storage/settings'
+import {
+  KEYER_PRESETS,
+  type KeyerPreset,
+  type SettingsRecord,
+  createSettingsStore,
+  defaultSettings,
+} from '../../storage/settings'
 
 /**
  * The real-time telegraph (PROJECT.md §14, §15).
@@ -24,15 +31,37 @@ export function TelegraphScreen() {
     return store.subscribe(setSettings)
   }, [store])
 
-  const { state, cancelPending, reset, pointerHandlers } = useMorseKey({
-    wpm: settings.timing.wpm,
-    dotDashThresholdMs: settings.timing.dotDashThresholdMs,
-    bindings: settings.keys,
-    frequency: settings.audio.frequency,
-    volume: settings.audio.enabled ? settings.audio.volume : 0,
-  })
+  const { state, commitCharacter, commitWord, cancelPending, reset, pointerHandlers } = useMorseKey(
+    {
+      wpm: settings.timing.wpm,
+      dotDashThresholdMs: settings.timing.dotDashThresholdMs,
+      characterGapMs: settings.timing.characterGapMs,
+      wordGapMs: settings.timing.wordGapMs,
+      autoCommit: settings.timing.autoCommit,
+      bindings: settings.keys,
+      frequency: settings.audio.frequency,
+      volume: settings.audio.enabled ? settings.audio.volume : 0,
+    },
+  )
+
+  const applyPreset = useCallback(
+    (name: KeyerPreset) => {
+      const preset = KEYER_PRESETS[name]
+      store.update((current) => ({
+        ...current,
+        timing: {
+          ...current.timing,
+          characterGapMs: preset.characterGapMs,
+          wordGapMs: preset.wordGapMs,
+          autoCommit: preset.autoCommit,
+        },
+      }))
+    },
+    [store],
+  )
 
   const keyLabel = settings.keys.key === ' ' ? 'SPACE' : settings.keys.key.toUpperCase()
+  const commitLabel = (settings.keys.submit ?? 'Control').toUpperCase()
   const decoded = state.text.trimEnd()
   const hasUnknown = decoded.includes(UNKNOWN_CHARACTER)
 
@@ -43,9 +72,39 @@ export function TelegraphScreen() {
           isDown={state.isDown}
           pending={state.pending}
           preview={state.preview}
+          commitProgress={state.commitProgress}
+          autoCommit={settings.timing.autoCommit}
           keyLabel={keyLabel}
+          commitLabel={commitLabel}
           pointerHandlers={pointerHandlers}
         />
+
+        {/* Always available, not only in manual mode: even with auto-commit on,
+            a learner who knows they are finished should not have to sit and
+            wait out a timer they have already beaten. */}
+        <div className="mx-auto mt-6 flex max-w-md gap-3">
+          <button
+            type="button"
+            onClick={commitCharacter}
+            disabled={state.pending === ''}
+            className="flex-1 rounded-lg border px-4 py-2.5 font-mono text-xs tracking-[0.14em] transition-colors disabled:opacity-30"
+            style={{ borderColor: 'var(--color-signal)', color: 'var(--color-signal)' }}
+          >
+            FINISH CHARACTER
+          </button>
+          <button
+            type="button"
+            onClick={commitWord}
+            disabled={state.text === '' && state.pending === ''}
+            className="flex-1 rounded-lg border border-line px-4 py-2.5 font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:border-cyan hover:text-cyan disabled:opacity-30"
+          >
+            SPACE / NEW WORD
+          </button>
+        </div>
+
+        <div className="mt-10 rounded-xl border border-line bg-panel p-5">
+          <KeyerSpeedPicker timing={settings.timing} onChange={applyPreset} />
+        </div>
 
         <div className="mt-8">
           <div className="mb-2 font-mono text-[10px] tracking-[0.18em] text-muted">SIGNAL</div>
@@ -76,8 +135,9 @@ export function TelegraphScreen() {
 
         {hasUnknown && (
           <p className="mt-4 text-xs leading-relaxed text-amber">
-            {UNKNOWN_CHARACTER} marks a sequence that is not a character. Usually an extra element
-            slipped in — try leaving a slightly longer gap between characters.
+            {UNKNOWN_CHARACTER} marks a sequence that is not a character — usually an extra element
+            slipped in. Give yourself more time per character, or switch to Manual so nothing
+            finishes until you say so.
           </p>
         )}
 
@@ -85,14 +145,16 @@ export function TelegraphScreen() {
           <button
             type="button"
             onClick={cancelPending}
-            className="flex-1 rounded-lg border border-line px-4 py-2.5 font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:border-amber hover:text-amber"
+            disabled={state.pending === ''}
+            className="flex-1 rounded-lg border border-line px-4 py-2.5 font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:border-amber hover:text-amber disabled:opacity-30"
           >
             UNDO CHAR
           </button>
           <button
             type="button"
             onClick={reset}
-            className="flex-1 rounded-lg border border-line px-4 py-2.5 font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:border-danger hover:text-danger"
+            disabled={state.text === '' && state.pending === ''}
+            className="flex-1 rounded-lg border border-line px-4 py-2.5 font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:border-danger hover:text-danger disabled:opacity-30"
           >
             CLEAR ALL
           </button>

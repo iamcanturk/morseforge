@@ -1,0 +1,279 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import {
+  CURRICULUM,
+  CURRICULUM_TOTAL_MINUTES,
+  charactersThroughDay,
+  codeFor,
+} from '../data/curriculum'
+import { prettify } from '../engine/morseEncoder'
+import { SITE } from '../config/site'
+
+const path = '/learn-morse-code-in-7-days/'
+const title = 'Learn Morse Code in 7 Days — A Day-by-Day Plan | MorseForge'
+const description =
+  'A free seven-day plan to learn the full Morse code alphabet. Two characters on day one, all 26 letters and 10 digits by day seven, with practice drills and audio for each step.'
+
+const hours = Math.round((CURRICULUM_TOTAL_MINUTES / 60) * 10) / 10
+
+/**
+ * One list, used for both the FAQPage schema and the visible section.
+ *
+ * Google penalises structured data that does not match what a human sees on
+ * the page, so these must come from the same source rather than being written
+ * twice.
+ */
+interface Faq {
+  question: string
+  answer: string
+}
+
+const FAQ: Faq[] = [
+  {
+    question: 'Can you really learn Morse code in 7 days?',
+    answer: `You can learn to recognise all 26 letters and 10 digits in seven days at about ${CURRICULUM_TOTAL_MINUTES} minutes of practice total. Reaching conversational speed takes months of listening beyond that. Knowing the alphabet and reading it at speed are different skills, and only the first fits in a week.`,
+  },
+  {
+    question: 'What order should you learn Morse code letters in?',
+    answer:
+      'Learn by code length, not alphabetically. Start with E (one dot) and T (one dash), then the four two-element characters I, A, N and M, then the eight three-element characters, then the twelve four-element ones. Morse is a binary tree, and this order walks it one layer at a time.',
+  },
+  {
+    question: 'Should you learn Morse code by sight or by sound?',
+    answer:
+      'By sound. Learning the written dots and dashes first creates a translation step — you hear the beeps, picture the dots, then recall the letter — and that step becomes the ceiling on your speed. Learn each character as a rhythm you recognise directly.',
+  },
+  {
+    question: 'What is Farnsworth timing?',
+    answer:
+      'Farnsworth timing sends each character at full speed but leaves longer gaps between characters. It stops you learning a slowed-down character as a sequence of countable beeps, which is the habit that stalls most learners around 10 words per minute.',
+  },
+]
+
+/**
+ * Course, HowTo and FAQPage together.
+ *
+ * Course establishes what this is, HowTo gives the day-by-day steps a shape a
+ * machine can follow, and FAQPage answers the questions people actually type.
+ * Each targets a different surface — an LLM summarising "how do I learn Morse",
+ * a rich result, and a People Also Ask box — and none of the three substitutes
+ * for the others.
+ */
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Course',
+    name: 'Learn Morse Code in 7 Days',
+    description,
+    url: new URL(path, SITE.url).href,
+    provider: { '@id': `${SITE.url}/#app` },
+    author: { '@id': `${SITE.url}/#author` },
+    isAccessibleForFree: true,
+    inLanguage: 'en',
+    educationalLevel: 'Beginner',
+    teaches: 'International Morse code, ITU-R M.1677-1',
+    timeRequired: `PT${CURRICULUM_TOTAL_MINUTES}M`,
+    hasCourseInstance: {
+      '@type': 'CourseInstance',
+      courseMode: 'online',
+      courseWorkload: `PT${CURRICULUM_TOTAL_MINUTES}M`,
+    },
+    syllabusSections: CURRICULUM.map((day) => ({
+      '@type': 'Syllabus',
+      name: `Day ${day.day}: ${day.title}`,
+      description: day.summary,
+      timeRequired: `PT${day.minutes}M`,
+    })),
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'HowTo',
+    name: 'How to learn Morse code in 7 days',
+    description,
+    totalTime: `PT${CURRICULUM_TOTAL_MINUTES}M`,
+    step: CURRICULUM.map((day) => ({
+      '@type': 'HowToStep',
+      position: day.day,
+      name: `Day ${day.day}: ${day.title}`,
+      text: day.summary,
+      url: `${new URL(path, SITE.url).href}#day-${day.day}`,
+    })),
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: FAQ.map((entry) => ({
+      '@type': 'Question',
+      name: entry.question,
+      acceptedAnswer: { '@type': 'Answer', text: entry.answer },
+    })),
+  },
+]
+---
+
+<BaseLayout title={title} description={description} path={path} schema={schema}>
+  <main class="mx-auto max-w-3xl px-6 py-14">
+    <article>
+      <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+        Learn Morse code in 7 days
+      </h1>
+
+      {
+        /* Answer-first: the direct answer sits above everything else, because
+          this is the paragraph a search snippet lifts and an LLM quotes. */
+      }
+      <p class="mt-5 text-lg leading-relaxed">
+        You can learn the whole Morse alphabet in a week by learning it in the order the code is
+        actually built — shortest characters first, one layer of the Morse tree per day. This plan
+        takes about <strong class="text-signal">{hours} hours</strong> of practice in total, spread across
+        seven days, and ends with all 26 letters and 10 digits.
+      </p>
+
+      <p class="mt-4 leading-relaxed text-muted">
+        It is free, there is no account, and every character on this page can be played and
+        practised in the browser. Codes follow
+        <a
+          href="https://www.itu.int/rec/R-REC-M.1677/en"
+          rel="noopener"
+          class="underline decoration-signal/40 underline-offset-4 hover:decoration-signal"
+          >ITU-R M.1677-1</a
+        >, the international standard for Morse code.
+      </p>
+
+      <div class="mt-8 flex flex-wrap gap-3">
+        <a
+          href="/telegraph/"
+          class="rounded-lg px-5 py-2.5 font-mono text-xs tracking-[0.14em] text-void"
+          style="background: var(--color-signal)">START WITH DAY 1</a
+        >
+        <a
+          href="/tree/"
+          class="rounded-lg border border-line px-5 py-2.5 font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:border-signal hover:text-signal"
+          >SEE THE TREE</a
+        >
+      </div>
+
+      <nav aria-label="The seven days" class="mt-12 rounded-xl border border-line bg-panel p-5">
+        <h2 class="font-mono text-[10px] tracking-[0.18em] text-muted">THE PLAN</h2>
+        <ol class="mt-3 space-y-1.5">
+          {
+            CURRICULUM.map((day) => (
+              <li class="text-sm">
+                <a href={`#day-${day.day}`} class="text-muted hover:text-signal">
+                  <span class="font-mono text-signal-dim">Day {day.day}</span> — {day.title}
+                  <span class="text-muted/60"> · {day.characters.join(' ')}</span>
+                </a>
+              </li>
+            ))
+          }
+        </ol>
+      </nav>
+
+      {
+        CURRICULUM.map((day) => {
+          const known = charactersThroughDay(day.day).length
+          return (
+            <section id={`day-${day.day}`} class="mt-14 scroll-mt-6">
+              <h2 class="font-display text-2xl font-bold tracking-tight">
+                Day {day.day}: {day.title}
+              </h2>
+
+              {/* Answer-first again at section level: heading, then the direct
+                  answer, then the supporting detail. */}
+              <p class="mt-3 leading-relaxed">{day.summary}</p>
+
+              <div class="mt-6 overflow-hidden rounded-xl border border-line">
+                <table class="w-full text-left">
+                  <caption class="sr-only">
+                    Characters introduced on day {day.day} and their Morse codes
+                  </caption>
+                  <thead>
+                    <tr class="border-b border-line bg-panel">
+                      <th
+                        scope="col"
+                        class="px-4 py-2.5 font-mono text-[10px] tracking-[0.16em] text-muted"
+                      >
+                        CHARACTER
+                      </th>
+                      <th
+                        scope="col"
+                        class="px-4 py-2.5 font-mono text-[10px] tracking-[0.16em] text-muted"
+                      >
+                        MORSE
+                      </th>
+                      <th
+                        scope="col"
+                        class="px-4 py-2.5 font-mono text-[10px] tracking-[0.16em] text-muted"
+                      >
+                        ELEMENTS
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {day.characters.map((character) => (
+                      <tr class="border-b border-line/60 last:border-0">
+                        <th
+                          scope="row"
+                          class="px-4 py-2.5 font-display text-lg font-bold text-signal"
+                        >
+                          {character}
+                        </th>
+                        <td class="px-4 py-2.5 font-mono tracking-[0.2em] text-cyan">
+                          {prettify(codeFor(character))}
+                        </td>
+                        <td class="px-4 py-2.5 font-mono text-sm text-muted">
+                          {codeFor(character).length}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <h3 class="mt-7 font-display text-base font-semibold">Why these characters now</h3>
+              <p class="mt-2 leading-relaxed text-muted">{day.rationale}</p>
+
+              <h3 class="mt-6 font-display text-base font-semibold">Practice</h3>
+              <p class="mt-2 leading-relaxed text-muted">{day.drill}</p>
+
+              <h3 class="mt-6 font-display text-base font-semibold">
+                Words you can send after day {day.day}
+              </h3>
+              <ul class="mt-3 flex flex-wrap gap-2">
+                {day.words.map((word) => (
+                  <li class="rounded-lg border border-line bg-panel px-3 py-1.5 font-mono text-sm text-ink">
+                    {word}
+                  </li>
+                ))}
+              </ul>
+
+              <p class="mt-5 font-mono text-[11px] tracking-[0.14em] text-signal-dim">
+                {known} / 36 CHARACTERS · ~{day.minutes} MIN
+              </p>
+
+              <a
+                href="/tree/"
+                class="mt-4 inline-block rounded-lg border border-line px-4 py-2 font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:border-signal hover:text-signal"
+              >
+                PRACTISE DAY {day.day} →
+              </a>
+            </section>
+          )
+        })
+      }
+
+      <section class="mt-16 border-t border-line pt-10">
+        <h2 class="font-display text-2xl font-bold tracking-tight">Common questions</h2>
+
+        {
+          FAQ.map((entry) => (
+            <div class="mt-7">
+              <h3 class="font-display text-base font-semibold">{entry.question}</h3>
+              <p class="mt-2 leading-relaxed text-muted">{entry.answer}</p>
+            </div>
+          ))
+        }
+      </section>
+    </article>
+  </main>
+</BaseLayout>

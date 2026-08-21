@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { SignalTree } from './SignalTree'
+import { CharacterDrill } from './CharacterDrill'
 import { MORSE_ALPHABET } from '../../data/morseAlphabet'
 import { levelToNodeState, pathTo } from '../../data/tree'
 import type { NodeState } from '../../data/tree'
 import { ALL_LETTERS } from '../../data/morseAlphabet'
 import { AudioEngine } from '../../engine/audioEngine'
 import { prettify } from '../../engine/morseEncoder'
-import { masteryLevel } from '../../game/mastery'
+import { type Skill, masteryLevel } from '../../game/mastery'
 import {
   type ProgressRecord,
+  answer,
   createProgressStore,
   getCharacter,
+  markSeen,
   overallMastery,
 } from '../../storage/progress'
+import { type SettingsRecord, createSettingsStore, defaultSettings } from '../../storage/settings'
 
 /**
  * The Signal Tree screen (PROJECT.md §3, §16, §17).
@@ -22,12 +26,14 @@ import {
  */
 export function SignalTreeScreen() {
   const store = useMemo(() => createProgressStore(), [])
+  const settingsStore = useMemo(() => createSettingsStore(), [])
   const audio = useRef<AudioEngine | null>(null)
 
   // Progress starts empty rather than being read during render: this component
   // is prerendered at build time, where there is no localStorage, and rendering
   // different markup on the client than the server would tear the hydration.
   const [progress, setProgress] = useState<ProgressRecord>({ characters: {} })
+  const [settings, setSettings] = useState<SettingsRecord>(defaultSettings)
   const [selected, setSelected] = useState<string | null>(null)
   const [playing, setPlaying] = useState(false)
 
@@ -35,6 +41,11 @@ export function SignalTreeScreen() {
     setProgress(store.read())
     return store.subscribe(setProgress)
   }, [store])
+
+  useEffect(() => {
+    setSettings(settingsStore.read())
+    return settingsStore.subscribe(setSettings)
+  }, [settingsStore])
 
   useEffect(() => {
     return () => void audio.current?.dispose()
@@ -71,9 +82,19 @@ export function SignalTreeScreen() {
   const select = useCallback(
     (character: string) => {
       setSelected(character)
+      // Opening a character counts as meeting it (§5 level 1 "Seen"), which is
+      // what lights the node before any attempt has been made.
+      store.update((current) => markSeen(current, character, Date.now()))
       void play(character)
     },
-    [play],
+    [play, store],
+  )
+
+  const recordAttempt = useCallback(
+    (character: string, skill: Skill, correct: boolean) => {
+      store.update((current) => answer(current, character, skill, correct, Date.now()))
+    },
+    [store],
   )
 
   const code = selected ? MORSE_ALPHABET[selected] : null
@@ -121,6 +142,8 @@ export function SignalTreeScreen() {
                 ))}
               </ol>
             </div>
+
+            <CharacterDrill character={selected} settings={settings} onAttempt={recordAttempt} />
           </>
         ) : (
           <p className="font-mono text-xs leading-relaxed tracking-[0.1em] text-muted">

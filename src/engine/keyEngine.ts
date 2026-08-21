@@ -26,6 +26,17 @@ export interface KeyEngineOptions {
   wordGapMs?: number
   /** Target speed used to derive any threshold not given explicitly. */
   wpm?: number
+  /**
+   * When false, releasing the key never ends a character or a word on its own —
+   * the caller decides when, via its own commit control.
+   *
+   * This exists because how fast someone *sends* and how long they need to
+   * *think* are unrelated. At 15 WPM a character ends after 240ms of silence,
+   * which is correct for a competent operator and hopeless for a beginner:
+   * they mean to send S and, three seconds of hesitation later, have sent
+   * E E E. Manual commit removes the clock from the learning entirely.
+   */
+  autoCommit?: boolean
 }
 
 export interface KeyEngineCallbacks {
@@ -40,6 +51,7 @@ export interface ResolvedThresholds {
   dotDashThresholdMs: number
   characterGapMs: number
   wordGapMs: number
+  autoCommit: boolean
 }
 
 /**
@@ -55,6 +67,7 @@ export function resolveThresholds(options: KeyEngineOptions = {}): ResolvedThres
     dotDashThresholdMs: options.dotDashThresholdMs ?? unit * 2,
     characterGapMs: options.characterGapMs ?? unit * 3,
     wordGapMs: options.wordGapMs ?? unit * 7,
+    autoCommit: options.autoCommit ?? true,
   }
 }
 
@@ -110,7 +123,11 @@ export class KeyEngine {
     this.#callbacks.onKeyDown?.()
   }
 
-  /** Key up. Emits the element, then arms the character/word gap timers. */
+  /**
+   * Key up. Emits the element, then arms the character/word gap timers —
+   * unless auto-commit is off, in which case the caller decides when a
+   * character ends.
+   */
   release(): void {
     if (this.#pressedAt === null) return
 
@@ -120,6 +137,8 @@ export class KeyEngine {
 
     const element = heldMs < this.#thresholds.dotDashThresholdMs ? '.' : '-'
     this.#callbacks.onElement?.(element, heldMs)
+
+    if (!this.#thresholds.autoCommit) return
 
     this.#characterTimer = this.#clock.setTimeout(() => {
       this.#characterTimer = null
@@ -179,6 +198,8 @@ export function bindKeyboard(
   engine: KeyEngine,
   bindings: KeyBindings = DEFAULT_KEY_BINDINGS,
   target: Pick<Window, 'addEventListener' | 'removeEventListener'> = window,
+  /** Fired by the `submit` binding — the manual "this character is finished". */
+  onSubmit?: () => void,
 ): () => void {
   const isKeyingKey = (key: string) => key === bindings.key || key === bindings.alternative
 
@@ -194,6 +215,11 @@ export function bindKeyboard(
     if (bindings.cancel && e.key === bindings.cancel) {
       e.preventDefault()
       engine.reset()
+      return
+    }
+    if (onSubmit && bindings.submit && e.key === bindings.submit) {
+      e.preventDefault()
+      onSubmit()
     }
   }
 
