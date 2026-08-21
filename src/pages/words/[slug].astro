@@ -1,0 +1,199 @@
+---
+import type { GetStaticPaths } from 'astro'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { MorsePlayer } from '../../components/MorsePlayer/MorsePlayer'
+import { WORDS, WORD_CATEGORIES, breakdown, morseFor, type MorseWord } from '../../data/words'
+import { prettify } from '../../engine/morseEncoder'
+import { CURRICULUM, charactersThroughDay } from '../../data/curriculum'
+import { SITE } from '../../config/site'
+
+/**
+ * One prerendered page per word. Nothing is generated at request time — the
+ * whole point of these pages is that a crawler with JavaScript disabled sees
+ * the full breakdown, and only the player hydrates.
+ *
+ * The player uses `client:idle` rather than `client:visible`: it sits above the
+ * fold and is the main reason anyone opens the page, so deferring it until an
+ * IntersectionObserver fires buys nothing and risks it never hydrating at all
+ * in an unusual viewport.
+ */
+export const getStaticPaths = (() =>
+  WORDS.map((word) => ({ params: { slug: word.slug }, props: { word } }))) satisfies GetStaticPaths
+
+interface Props {
+  word: MorseWord
+}
+
+const { word } = Astro.props
+
+const morse = morseFor(word)
+const rows = breakdown(word)
+const path = `/words/${word.slug}/`
+const title = `${word.text} in Morse Code — ${morse} | MorseForge`
+const description = `${word.text} in Morse code is ${morse}. Hear it, see the character-by-character breakdown, and learn to send it yourself.`
+
+/** The earliest day of the 7-day plan by which every letter is known. */
+const readyOnDay =
+  CURRICULUM.find((day) => {
+    const known = new Set(charactersThroughDay(day.day))
+    return [...word.text.replace(/\s/g, '')].every((character) => known.has(character))
+  })?.day ?? null
+
+const related = WORDS.filter(
+  (other) => other.category === word.category && other.slug !== word.slug,
+)
+
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: `${word.text} in Morse code`,
+    description,
+    url: new URL(path, SITE.url).href,
+    author: { '@id': `${SITE.url}/#author` },
+    publisher: { '@id': `${SITE.url}/#author` },
+    isPartOf: { '@id': `${SITE.url}/#website` },
+    inLanguage: 'en',
+    // The answer, restated as a machine-readable claim. This is the sentence
+    // an assistant lifts when asked "what is X in Morse code".
+    about: { '@type': 'Thing', name: `${word.text} in Morse code`, description: morse },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: SITE.url },
+      { '@type': 'ListItem', position: 2, name: 'Words', item: `${SITE.url}/words/` },
+      { '@type': 'ListItem', position: 3, name: word.text },
+    ],
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: [
+      {
+        '@type': 'Question',
+        name: `What is ${word.text} in Morse code?`,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: `${word.text} in Morse code is ${morse}. ${word.note}`,
+        },
+      },
+    ],
+  },
+]
+---
+
+<BaseLayout title={title} description={description} path={path} schema={schema}>
+  <main class="mx-auto max-w-2xl px-6 py-14">
+    <nav aria-label="Breadcrumb" class="font-mono text-[10px] tracking-[0.16em] text-muted">
+      <a href="/words/" class="hover:text-signal">WORDS</a>
+      <span aria-hidden="true"> / </span>
+      <span class="text-signal-dim">{WORD_CATEGORIES[word.category].label.toUpperCase()}</span>
+    </nav>
+
+    <article class="mt-5">
+      <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+        {word.text} in Morse code
+      </h1>
+
+      {/* Answer-first: the entire answer, in one sentence, above everything. */}
+      <p class="mt-5 text-lg leading-relaxed">
+        <strong class="text-ink">{word.text}</strong> in Morse code is
+        <strong class="font-mono break-all text-signal">{prettify(morse)}</strong>.
+      </p>
+
+      <div class="mt-6">
+        <MorsePlayer client:idle morse={morse} label={word.text} />
+      </div>
+
+      <h2 class="mt-12 font-display text-xl font-bold tracking-tight">
+        Why {word.text} is worth knowing
+      </h2>
+      <p class="mt-3 leading-relaxed text-muted">{word.note}</p>
+
+      <h2 class="mt-12 font-display text-xl font-bold tracking-tight">
+        {word.text} letter by letter
+      </h2>
+      <div class="mt-4 overflow-hidden rounded-xl border border-line">
+        <table class="w-full text-left">
+          <caption class="sr-only">Each character of {word.text} and its Morse code</caption>
+          <thead>
+            <tr class="border-b border-line bg-panel">
+              <th scope="col" class="px-4 py-2.5 font-mono text-[10px] tracking-[0.16em] text-muted"
+                >CHARACTER</th
+              >
+              <th scope="col" class="px-4 py-2.5 font-mono text-[10px] tracking-[0.16em] text-muted"
+                >MORSE</th
+              >
+            </tr>
+          </thead>
+          <tbody>
+            {
+              rows.map((row) => (
+                <tr class="border-b border-line/60 last:border-0">
+                  <th scope="row" class="px-4 py-2.5 font-display text-lg font-bold text-signal">
+                    {row.character}
+                  </th>
+                  <td class="px-4 py-2.5 font-mono tracking-[0.2em] text-cyan">
+                    {prettify(row.code)}
+                  </td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+
+      {
+        readyOnDay && (
+          <p class="mt-6 rounded-xl border border-line bg-panel p-5 leading-relaxed text-muted">
+            You can send {word.text} yourself by
+            <a
+              href={`/learn-morse-code-in-7-days/#day-${readyOnDay}`}
+              class="text-signal underline decoration-signal/40 underline-offset-4"
+            >
+              day {readyOnDay} of the seven-day plan
+            </a>
+            — that is when the last of its letters is taught.
+          </p>
+        )
+      }
+
+      <div class="mt-8 flex flex-wrap gap-3">
+        <a
+          href="/telegraph/"
+          class="rounded-lg px-5 py-2.5 font-mono text-xs tracking-[0.14em] text-void"
+          style="background: var(--color-signal)">SEND IT YOURSELF</a
+        >
+        <a
+          href="/tree/"
+          class="rounded-lg border border-line px-5 py-2.5 font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:border-signal hover:text-signal"
+          >SEE THE TREE</a
+        >
+      </div>
+
+      {
+        related.length > 0 && (
+          <section class="mt-14 border-t border-line pt-8">
+            <h2 class="font-display text-lg font-semibold">
+              More {WORD_CATEGORIES[word.category].label.toLowerCase()} words
+            </h2>
+            <ul class="mt-4 flex flex-wrap gap-2">
+              {related.map((other) => (
+                <li>
+                  <a
+                    href={`/words/${other.slug}/`}
+                    class="inline-block rounded-lg border border-line bg-panel px-3 py-1.5 font-mono text-sm text-muted transition-colors hover:border-signal hover:text-signal"
+                  >
+                    {other.text}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )
+      }
+    </article>
+  </main>
+</BaseLayout>

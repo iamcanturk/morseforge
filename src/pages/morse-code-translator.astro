@@ -1,0 +1,156 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import { Translator } from '../components/Translator/Translator'
+import { SITE } from '../config/site'
+
+const path = '/morse-code-translator/'
+const title = 'Morse Code Translator — Text to Morse, With Sound | MorseForge'
+const description =
+  'Free two-way Morse code translator. Convert text to Morse or Morse back to text, hear it at any speed from 5 to 40 WPM, and watch it as a signal lamp. No account, works offline.'
+
+const FAQ = [
+  {
+    question: 'How do you write Morse code?',
+    answer:
+      'Write a dot as a period and a dash as a hyphen, with no space between the elements of one character. Put a single space between characters and a forward slash between words. So SOS is "... --- ..." and HI THERE is ".... .. / - .... . .-. .".',
+  },
+  {
+    question: 'Why does the translator use a slash between words?',
+    answer:
+      'A slash survives copy and paste, URLs and chat apps, all of which collapse repeated spaces. The older convention of a double space is still accepted as input here, but it silently breaks the moment the text is pasted anywhere.',
+  },
+  {
+    question: 'Can Morse code handle punctuation and numbers?',
+    answer:
+      'Yes. ITU-R M.1677-1 defines all ten digits and common punctuation including period, comma, question mark, slash and at-sign. It does not define an exclamation mark in the international standard, though "-.-.--" is widely used. Morse has no upper and lower case.',
+  },
+  {
+    question: 'Is this translator accurate?',
+    answer:
+      'The codes follow ITU-R M.1677-1, the international standard, and timing follows the PARIS convention where one unit lasts 1200 divided by the speed in words per minute. The same engine generates the audio, so what you hear is correctly timed rather than approximated.',
+  },
+]
+
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'Morse Code Translator',
+    url: new URL(path, SITE.url).href,
+    applicationCategory: 'UtilitiesApplication',
+    operatingSystem: 'Any',
+    description,
+    author: { '@id': `${SITE.url}/#author` },
+    isAccessibleForFree: true,
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    featureList: [
+      'Text to Morse code',
+      'Morse code to text',
+      'Audio playback from 5 to 40 words per minute',
+      'Visual signal lamp mode',
+    ],
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: FAQ.map((entry) => ({
+      '@type': 'Question',
+      name: entry.question,
+      acceptedAnswer: { '@type': 'Answer', text: entry.answer },
+    })),
+  },
+]
+---
+
+<BaseLayout title={title} description={description} path={path} schema={schema}>
+  <main class="mx-auto max-w-4xl px-6 py-14">
+    <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+      Morse code translator
+    </h1>
+
+    <p class="mt-5 max-w-2xl text-lg leading-relaxed">
+      Type text to get Morse, or paste Morse to get text back. Both directions work as you type, and
+      anything in the Morse box can be played as sound or as a signal lamp at any speed from 5 to 40
+      words per minute.
+    </p>
+
+    <div class="mt-8">
+      <Translator client:load />
+    </div>
+
+    <section class="mt-16">
+      <h2 class="font-display text-2xl font-bold tracking-tight">How to read the output</h2>
+      <p class="mt-3 leading-relaxed text-muted">
+        Morse is written with three levels of separation, and getting them right is the difference
+        between readable and meaningless.
+      </p>
+
+      <div class="mt-5 overflow-hidden rounded-xl border border-line">
+        <table class="w-full text-left">
+          <caption class="sr-only">How Morse code separates elements, characters and words</caption>
+          <thead>
+            <tr class="border-b border-line bg-panel">
+              <th scope="col" class="px-4 py-2.5 font-mono text-[10px] tracking-[0.16em] text-muted"
+                >SEPARATOR</th
+              >
+              <th scope="col" class="px-4 py-2.5 font-mono text-[10px] tracking-[0.16em] text-muted"
+                >MEANS</th
+              >
+              <th scope="col" class="px-4 py-2.5 font-mono text-[10px] tracking-[0.16em] text-muted"
+                >LENGTH</th
+              >
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="border-b border-line/60">
+              <th scope="row" class="px-4 py-2.5 font-mono text-cyan">(nothing)</th>
+              <td class="px-4 py-2.5 text-sm text-muted">Elements of the same character</td>
+              <td class="px-4 py-2.5 font-mono text-sm text-muted">1 unit</td>
+            </tr>
+            <tr class="border-b border-line/60">
+              <th scope="row" class="px-4 py-2.5 font-mono text-cyan">space</th>
+              <td class="px-4 py-2.5 text-sm text-muted">Between two characters</td>
+              <td class="px-4 py-2.5 font-mono text-sm text-muted">3 units</td>
+            </tr>
+            <tr>
+              <th scope="row" class="px-4 py-2.5 font-mono text-cyan">/</th>
+              <td class="px-4 py-2.5 text-sm text-muted">Between two words</td>
+              <td class="px-4 py-2.5 font-mono text-sm text-muted">7 units</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="mt-5 leading-relaxed text-muted">
+        A unit is the length of one dot. At 20 words per minute that is 60 milliseconds, from the
+        PARIS standard: the word PARIS is exactly 50 units long including its trailing word space,
+        so one unit is 1200 divided by the speed in words per minute.
+      </p>
+    </section>
+
+    <section class="mt-16">
+      <h2 class="font-display text-2xl font-bold tracking-tight">Common questions</h2>
+      {
+        FAQ.map((entry) => (
+          <div class="mt-7">
+            <h3 class="font-display text-base font-semibold">{entry.question}</h3>
+            <p class="mt-2 leading-relaxed text-muted">{entry.answer}</p>
+          </div>
+        ))
+      }
+    </section>
+
+    <aside class="mt-16 rounded-xl border border-line bg-panel p-6">
+      <h2 class="font-display text-lg font-semibold">Translating is not the same as knowing it</h2>
+      <p class="mt-2 leading-relaxed text-muted">
+        A translator is useful once. Actually reading Morse by ear takes about two hours spread over
+        a week — and it is the only way to use Morse without a screen in front of you.
+      </p>
+      <a
+        href="/learn-morse-code-in-7-days/"
+        class="mt-5 inline-block rounded-lg px-5 py-2.5 font-mono text-xs tracking-[0.14em] text-void"
+        style="background: var(--color-signal)">LEARN IT IN 7 DAYS</a
+      >
+    </aside>
+  </main>
+</BaseLayout>

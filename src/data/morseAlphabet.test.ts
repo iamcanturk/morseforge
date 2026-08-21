@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   ALL_LETTERS,
+  DIGITS,
+  PUNCTUATION,
   CODE_TO_CHARACTER,
   LEARNING_ORDER,
   LEARNING_STAGES,
@@ -94,5 +96,49 @@ describe('helpers', () => {
     expect(isEncodable(' ')).toBe(true)
     expect(isEncodable('a')).toBe(true)
     expect(isEncodable('🚀')).toBe(false)
+  })
+})
+
+/**
+ * Claims made in prose on the public pages, asserted here so they cannot
+ * quietly become false. Every one of these sentences appears on
+ * /morse-code-alphabet/ or /morse-code-translator/, and a wrong factual claim
+ * on a page whose whole pitch is accuracy is worse than no page.
+ */
+describe('claims made on the public pages', () => {
+  it('every letter is between one and four elements', () => {
+    for (const [character, code] of Object.entries(LETTERS)) {
+      expect(code.length, character).toBeGreaterThanOrEqual(1)
+      expect(code.length, character).toBeLessThanOrEqual(4)
+    }
+  })
+
+  it('every digit is exactly five elements', () => {
+    for (const [character, code] of Object.entries(DIGITS)) {
+      expect(code.length, character).toBe(5)
+    }
+  })
+
+  it('punctuation runs from five to seven elements', () => {
+    const lengths = Object.values(PUNCTUATION).map((code) => code.length)
+    expect(Math.min(...lengths)).toBe(5)
+    expect(Math.max(...lengths)).toBe(7)
+  })
+
+  it('the digits follow the dots-in-then-out rule', () => {
+    // "1 is one dot then four dashes, 2 is two dots then three dashes, until 5
+    // is five dots, then back out to 0 which is five dashes."
+    for (let n = 1; n <= 5; n++) {
+      expect(DIGITS[String(n) as keyof typeof DIGITS]).toBe('.'.repeat(n) + '-'.repeat(5 - n))
+    }
+    for (let n = 6; n <= 9; n++) {
+      expect(DIGITS[String(n) as keyof typeof DIGITS]).toBe('-'.repeat(n - 5) + '.'.repeat(10 - n))
+    }
+    expect(DIGITS['0']).toBe('-----')
+  })
+
+  it('E and T are the only single-element characters', () => {
+    const single = Object.entries(LETTERS).filter(([, code]) => code.length === 1)
+    expect(single.map(([character]) => character).sort()).toEqual(['E', 'T'])
   })
 })

@@ -1,0 +1,158 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import { AlphabetChart } from '../components/Alphabet/AlphabetChart'
+import { DIGITS, LETTERS, PUNCTUATION } from '../data/morseAlphabet'
+import { prettify } from '../engine/morseEncoder'
+import { SITE } from '../config/site'
+
+const path = '/morse-code-alphabet/'
+const title = 'Morse Code Alphabet — Full A–Z Chart With Sound | MorseForge'
+const description =
+  'The complete Morse code alphabet: all 26 letters, 10 digits and punctuation, per ITU-R M.1677-1. Click any character to hear it at your own speed. Free, no account.'
+
+const toEntries = (source: Record<string, string>) =>
+  Object.entries(source).map(([character, code]) => ({ character, code }))
+
+const letters = toEntries(LETTERS)
+const digits = toEntries(DIGITS)
+const punctuation = toEntries(PUNCTUATION)
+
+const FAQ = [
+  {
+    question: 'How many characters are in the Morse code alphabet?',
+    answer: `International Morse code covers 26 letters, 10 digits and around 18 punctuation and procedural characters, defined in ITU-R M.1677-1. Letters run from one element (E and T) to four; digits are all exactly five elements long; punctuation runs from five to seven.`,
+  },
+  {
+    question: 'Why is E just one dot?',
+    answer:
+      'Because E is the most common letter in English. Morse assigned the shortest codes to the most frequent letters, which is a form of frequency encoding — the same principle behind modern compression. Q and Z are long precisely because they are rare.',
+  },
+  {
+    question: 'Is there a Morse code for lowercase letters?',
+    answer:
+      'No. Morse has no case at all. It also has no way to indicate a paragraph or a new line beyond the prosign BT. Anything sent in Morse arrives as uppercase by convention, not because it was sent that way.',
+  },
+  {
+    question: 'What is the difference between American and International Morse?',
+    answer:
+      'American Morse, the original, used variable-length internal gaps inside some characters. Those gaps were readable on a landline sounder but not over radio, where fading and interference blur them. International Morse replaced it worldwide and is what every modern reference means by "Morse code".',
+  },
+]
+
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: 'The Morse code alphabet',
+    description,
+    url: new URL(path, SITE.url).href,
+    author: { '@id': `${SITE.url}/#author` },
+    isPartOf: { '@id': `${SITE.url}/#website` },
+    inLanguage: 'en',
+    citation: {
+      '@type': 'CreativeWork',
+      name: 'ITU-R M.1677-1: International Morse code',
+      url: 'https://www.itu.int/rec/R-REC-M.1677/en',
+    },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: FAQ.map((entry) => ({
+      '@type': 'Question',
+      name: entry.question,
+      acceptedAnswer: { '@type': 'Answer', text: entry.answer },
+    })),
+  },
+]
+
+const sections = [
+  { id: 'letters', heading: 'Letters', entries: letters },
+  { id: 'numbers', heading: 'Numbers', entries: digits },
+  { id: 'punctuation', heading: 'Punctuation', entries: punctuation },
+]
+---
+
+<BaseLayout title={title} description={description} path={path} schema={schema}>
+  <main class="mx-auto max-w-4xl px-6 py-14">
+    <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+      The Morse code alphabet
+    </h1>
+
+    <p class="mt-5 max-w-2xl text-lg leading-relaxed">
+      All {letters.length} letters, {digits.length} digits and {punctuation.length} punctuation marks,
+      following
+      <a
+        href="https://www.itu.int/rec/R-REC-M.1677/en"
+        rel="noopener"
+        class="underline decoration-signal/40 underline-offset-4 hover:decoration-signal"
+        >ITU-R M.1677-1</a
+      >, the international standard. Click any character to hear it.
+    </p>
+
+    {
+      /* Rendered by Astro so the full chart is in the HTML with JavaScript off;
+        the interactive version below replaces it once React hydrates. */
+    }
+    <div class="mt-10 space-y-14">
+      {
+        sections.map((section) => (
+          <section id={section.id}>
+            <h2 class="font-display text-xl font-bold tracking-tight">{section.heading}</h2>
+
+            <noscript>
+              <ul class="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                {section.entries.map(({ character, code }) => (
+                  <li class="flex items-center gap-3 rounded-lg border border-line bg-panel px-3 py-2.5">
+                    <span class="w-5 font-display text-lg font-bold text-signal">{character}</span>
+                    <span class="font-mono text-sm tracking-[0.18em] text-cyan">
+                      {prettify(code)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </noscript>
+
+            <div class="mt-5">
+              <AlphabetChart client:visible entries={section.entries} />
+            </div>
+          </section>
+        ))
+      }
+    </div>
+
+    <section class="mt-16">
+      <h2 class="font-display text-2xl font-bold tracking-tight">
+        Why the codes are what they are
+      </h2>
+      <p class="mt-3 leading-relaxed text-muted">
+        The alphabet is not arbitrary. Morse is a prefix tree: from a starting point, a dot branches
+        one way and a dash the other, and every character sits where its own sequence lands. E is
+        one dot because E is the most common letter in English, and the shortest codes went to the
+        letters that would be sent most often.
+      </p>
+      <p class="mt-4 leading-relaxed text-muted">
+        The digits give this away most clearly. 1 is one dot then four dashes, 2 is two dots then
+        three dashes, and so on until 5 is five dots — then the pattern reverses back out to 0,
+        which is five dashes. It is a rule you can derive rather than a table you have to memorise.
+      </p>
+      <a
+        href="/tree/"
+        class="mt-6 inline-block rounded-lg border border-line px-5 py-2.5 font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:border-signal hover:text-signal"
+        >SEE THE TREE</a
+      >
+    </section>
+
+    <section class="mt-16">
+      <h2 class="font-display text-2xl font-bold tracking-tight">Common questions</h2>
+      {
+        FAQ.map((entry) => (
+          <div class="mt-7">
+            <h3 class="font-display text-base font-semibold">{entry.question}</h3>
+            <p class="mt-2 leading-relaxed text-muted">{entry.answer}</p>
+          </div>
+        ))
+      }
+    </section>
+  </main>
+</BaseLayout>

@@ -13,9 +13,12 @@ import { Logo } from './brand/Logo'
  * home page.
  */
 const links = [
-  { href: '/learn-morse-code-in-7-days/', label: '7-DAY PLAN' },
+  { href: '/learn-morse-code-in-7-days/', label: 'LEARN' },
+  { href: '/morse-code-translator/', label: 'TRANSLATE' },
+  { href: '/morse-code-alphabet/', label: 'ALPHABET' },
+  { href: '/words/', label: 'WORDS' },
+  { href: '/telegraph/', label: 'KEY' },
   { href: '/tree/', label: 'TREE' },
-  { href: '/telegraph/', label: 'TELEGRAPH' },
 ]
 
 const current = Astro.url.pathname
@@ -27,7 +30,7 @@ const current = Astro.url.pathname
       <Logo size={24} />
     </a>
 
-    <nav aria-label="Main" class="flex items-center gap-6">
+    <nav aria-label="Main" class="flex flex-wrap items-center gap-x-5 gap-y-2">
       {
         links.map(({ href, label }) => (
           <a
