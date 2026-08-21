@@ -1,10 +1,47 @@
 @import 'tailwindcss';
 
 /* ---------------------------------------------------------------------------
-   MorseForge design tokens
+   Fonts.
+
+   Self-hosted rather than loaded from Google: this is an offline-first PWA, and
+   a font fetched from a third party is a font the service worker cannot cache
+   and a request that leaves the origin on every cold visit.
+
+   Only the two brand faces are hosted. Body text uses the system stack, which
+   costs nothing, is already installed, and reads better on every platform than
+   a webfont chosen to look neutral. 80KB total rather than 200.
+--------------------------------------------------------------------------- */
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/fonts/space-grotesk-700.woff2') format('woff2');
+  /* One weight, covering 500–700. The 500 file was being shipped for a single
+     label; the browser synthesises the difference at no download cost, and
+     24KB is a third of the total font payload. */
+  font-weight: 500 700;
+  font-style: normal;
+  /* swap, not block: a heading that arrives late is better than a heading
+     that is invisible for 3 seconds on a slow connection. */
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains-mono-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ---------------------------------------------------------------------------
+   MorseForge design tokens.
+
    Palette derives from PROJECT.md §26. Every signal colour was contrast-checked
-   against --color-void: signal 13:1, amber 11:1, cyan 11:1 — all WCAG AAA, so
-   the "premium neon" look never costs us the §28 accessibility target.
+   against the background in both themes, so the "premium neon" look never costs
+   us the §28 accessibility target.
+
+   The tokens are *semantic* — `--color-panel`, not `--color-dark-grey` — which
+   is what makes a second theme a matter of redefining eight values rather than
+   auditing every component.
 --------------------------------------------------------------------------- */
 @theme {
   /* surfaces */
@@ -16,8 +53,8 @@
   /* signal colours */
   --color-signal: #00e88f; /* primary — active, mastered, correct */
   --color-signal-dim: #00a868; /* unlit circuit traces, not-yet-learned */
-  --color-amber: #ffb020; /* streak, learning, warning */
-  --color-cyan: #22d3ee; /* transmission in progress, audio playing */
+  --color-amber: #ffb020; /* streak, learning, in progress */
+  --color-cyan: #22d3ee; /* transmission, audio playing, revealed answer */
   --color-danger: #ff4d5e; /* error, life lost */
 
   /* text */
@@ -27,17 +64,55 @@
   /* type */
   --font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-  --font-body: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-body: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   /* morse-native motion — one "unit" at 20 WPM is 60ms (1200/WPM) */
   --duration-dit: 60ms;
   --duration-dah: 180ms;
 }
 
+/* ---------------------------------------------------------------------------
+   Light theme (PROJECT.md §26: dark is the primary mode, light comes later).
+
+   Not a simple inversion. The signal green that reads as a glowing LED on near
+   black becomes illegible on white — it needs to go considerably darker to keep
+   its contrast, which is why these are hand-picked rather than computed.
+
+   Applied by a `data-theme` attribute rather than a media query alone, so the
+   user's explicit choice beats the system's.
+--------------------------------------------------------------------------- */
 @layer base {
+  [data-theme='light'] {
+    --color-void: #fbfcfd;
+    --color-panel: #f2f5f7;
+    --color-elevated: #e8edf1;
+    --color-line: #d3dbe2;
+
+    /* Darkened until each clears 4.5:1 on the light background — the dark-theme
+       values sit around 1.4:1 there, visible but nowhere near readable.
+       Measured: ink 18.2, muted 6.0, signal 5.3, dim 5.0, amber 5.8, cyan 6.0,
+       danger 5.8. */
+    --color-signal: #00794c;
+    /* "Dim" cannot mean "lighter" here without failing contrast, and it cannot
+       mean "much darker" without reading as *stronger* than the primary. On a
+       light background the way to say quieter is to desaturate: this is 30% of
+       the primary's saturation at a comparable lightness. */
+    --color-signal-dim: #527565;
+    --color-amber: #8a5a00;
+    --color-cyan: #0b6b7d;
+    --color-danger: #c02333;
+
+    --color-ink: #0d1319;
+    --color-muted: #55636f;
+  }
+
   html {
     background-color: var(--color-void);
     color-scheme: dark;
+  }
+
+  html[data-theme='light'] {
+    color-scheme: light;
   }
 
   body {

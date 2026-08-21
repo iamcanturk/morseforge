@@ -49,7 +49,7 @@ const STATE_STYLE: Record<
   mastered: {
     fill: 'color-mix(in srgb, var(--color-signal) 26%, var(--color-panel))',
     stroke: 'var(--color-signal)',
-    text: '#fff',
+    text: 'var(--color-ink)',
     glow: true,
   },
 }

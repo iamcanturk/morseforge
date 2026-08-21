@@ -15,7 +15,7 @@ export function Row({
     <div className="border-b border-line py-5 last:border-0">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="min-w-0">
-          <span className="font-display text-sm font-medium text-ink">{label}</span>
+          <span className="font-display text-sm font-semibold text-ink">{label}</span>
           {hint && <p className="mt-1 max-w-md text-xs leading-relaxed text-muted">{hint}</p>}
         </div>
         <div className="shrink-0">{children}</div>

@@ -83,6 +83,37 @@ const identityGraph = {
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
 
+    {
+      /* Blocking on purpose, and tiny. Deferring this is what causes the flash
+        of the wrong theme that every site with a dark mode gets wrong once. */
+    }
+    <script is:inline>
+      ;(() => {
+        try {
+          const choice = localStorage.getItem('morseforge_theme') ?? 'system'
+          const light =
+            choice === 'light' ||
+            (choice === 'system' && window.matchMedia('(prefers-color-scheme: light)').matches)
+          document.documentElement.dataset.theme = light ? 'light' : 'dark'
+          document.documentElement.dataset.themeChoice = choice
+        } catch {
+          document.documentElement.dataset.theme = 'dark'
+        }
+      })()
+    </script>
+
+    {
+      /* Preloaded because the display face renders the first heading on every
+        page — discovering it from the stylesheet costs a round trip. */
+    }
+    <link
+      rel="preload"
+      href="/fonts/space-grotesk-700.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />

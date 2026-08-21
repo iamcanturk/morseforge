@@ -1,0 +1,143 @@
+---
+/**
+ * Theme switch (PROJECT.md §26).
+ *
+ * Three states rather than two: system, dark, light. "System" has to be a real
+ * option, not just the initial default — someone who switches their OS to light
+ * in the evening expects the site to follow, and a two-state toggle strands
+ * them on whatever they last picked.
+ *
+ * No JavaScript framework: this is one attribute on `<html>` and one value in
+ * localStorage, so it is an inline script. That also means it works before any
+ * island hydrates, which matters because a theme that arrives late is a flash
+ * of the wrong one.
+ */
+---
+
+<div
+  class="flex items-center gap-0.5 rounded-lg border border-line p-0.5"
+  role="radiogroup"
+  aria-label="Colour theme"
+  data-theme-toggle
+>
+  <button
+    type="button"
+    role="radio"
+    data-theme-value="system"
+    aria-label="Follow system theme"
+    title="System"
+    class="rounded px-1.5 py-1 text-muted transition-colors"
+  >
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      aria-hidden="true"
+    >
+      <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+      <path d="M8 21h8M12 17v4"></path>
+    </svg>
+  </button>
+
+  <button
+    type="button"
+    role="radio"
+    data-theme-value="dark"
+    aria-label="Dark theme"
+    title="Dark"
+    class="rounded px-1.5 py-1 text-muted transition-colors"
+  >
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      aria-hidden="true"
+    >
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"></path>
+    </svg>
+  </button>
+
+  <button
+    type="button"
+    role="radio"
+    data-theme-value="light"
+    aria-label="Light theme"
+    title="Light"
+    class="rounded px-1.5 py-1 text-muted transition-colors"
+  >
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="4"></circle>
+      <path
+        d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"
+      ></path>
+    </svg>
+  </button>
+</div>
+
+<script is:inline>
+  ;(() => {
+    const KEY = 'morseforge_theme'
+    const root = document.documentElement
+
+    const resolve = (choice) =>
+      choice === 'system'
+        ? window.matchMedia('(prefers-color-scheme: light)').matches
+          ? 'light'
+          : 'dark'
+        : choice
+
+    const apply = (choice) => {
+      root.dataset.theme = resolve(choice)
+      root.dataset.themeChoice = choice
+      for (const button of document.querySelectorAll('[data-theme-value]')) {
+        const selected = button.dataset.themeValue === choice
+        button.setAttribute('aria-checked', String(selected))
+        button.style.color = selected ? 'var(--color-signal)' : 'var(--color-muted)'
+        button.style.background = selected ? 'var(--color-elevated)' : 'transparent'
+      }
+      // The browser chrome should match, or a light page keeps a black status
+      // bar on mobile.
+      const meta = document.querySelector('meta[name="theme-color"]')
+      if (meta) meta.setAttribute('content', root.dataset.theme === 'light' ? '#FBFCFD' : '#080B10')
+    }
+
+    let choice = 'system'
+    try {
+      choice = localStorage.getItem(KEY) ?? 'system'
+    } catch {
+      // Private mode. System default is a fine place to be.
+    }
+    apply(choice)
+
+    for (const button of document.querySelectorAll('[data-theme-value]')) {
+      button.addEventListener('click', () => {
+        const next = button.dataset.themeValue
+        try {
+          localStorage.setItem(KEY, next)
+        } catch {
+          // Not persisting is survivable; not applying is not.
+        }
+        apply(next)
+      })
+    }
+
+    // Only follow the OS while the user is actually on "system".
+    window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+      if (root.dataset.themeChoice === 'system') apply('system')
+    })
+  })()
+</script>

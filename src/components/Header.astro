@@ -1,5 +1,6 @@
 ---
 import { Logo } from './brand/Logo'
+import ThemeToggle from './ThemeToggle.astro'
 import { AUTHOR, AUTHOR_GITHUB_URL, AUTHOR_X_URL, SITE } from '../config/site'
 
 /**
@@ -131,6 +132,8 @@ const linkColour = (href: string) =>
         </a>
 
         <a href={AUTHOR_GITHUB_URL} rel="me noopener" class="sr-only">{AUTHOR.name} on GitHub</a>
+
+        <ThemeToggle />
 
         <a
           href="/settings/"

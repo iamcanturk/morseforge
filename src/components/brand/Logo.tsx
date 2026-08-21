@@ -45,7 +45,7 @@ export function Logo({ size = 36, glow = true, tagline = false, className }: Log
       <LogoMark size={size} glow={glow} />
       <span className="flex flex-col leading-none">
         <span
-          className="font-display font-bold tracking-[0.16em] text-white"
+          className="font-display font-bold tracking-[0.16em] text-ink"
           style={{ fontSize: size * 0.58 }}
         >
           MORSEFORGE
