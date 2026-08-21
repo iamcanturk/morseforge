@@ -1,0 +1,22 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import { TelegraphScreen } from '../components/MorseKey/TelegraphScreen'
+
+const title = 'Morse Code Key — Send Morse With Your Keyboard | MorseForge'
+const description =
+  'Use your keyboard as a Morse straight key. Hold Space for a dash, tap it for a dot, and watch your signal decode in real time with authentic CW audio.'
+---
+
+<BaseLayout title={title} description={description} path="/telegraph/">
+  <main class="mx-auto max-w-6xl px-6 py-14">
+    <header class="mb-12">
+      <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Telegraph</h1>
+      <p class="mt-3 max-w-2xl leading-relaxed text-muted">
+        Your keyboard is the key. Tap Space for a dot, hold it for a dash, and pause to finish a
+        character. Everything decodes as you send it — no account, nothing saved to a server.
+      </p>
+    </header>
+
+    <TelegraphScreen client:load />
+  </main>
+</BaseLayout>

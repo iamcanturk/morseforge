@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css'
 import Footer from '../components/Footer.astro'
+import Header from '../components/Header.astro'
 import { AUTHOR, AUTHOR_SAME_AS, AUTHOR_X_URL, CF_ANALYTICS_TOKEN, SITE } from '../config/site'
 
 export interface Props {
@@ -10,17 +11,11 @@ export interface Props {
   path?: string
   /** Extra JSON-LD for this page, appended to the site-wide graph. */
   schema?: Record<string, unknown>[]
-  /** Hide the footer, e.g. on a full-screen challenge. */
-  hideFooter?: boolean
+  /** Hide the header and footer, e.g. on a full-screen challenge. */
+  bare?: boolean
 }
 
-const {
-  title,
-  description,
-  path = Astro.url.pathname,
-  schema = [],
-  hideFooter = false,
-} = Astro.props
+const { title, description, path = Astro.url.pathname, schema = [], bare = false } = Astro.props
 
 const canonical = new URL(path, Astro.site).href
 const ogImage = new URL('/og/default.png', Astro.site).href
@@ -132,9 +127,15 @@ const identityGraph = {
     }
   </head>
   <body class="flex min-h-dvh flex-col bg-void text-ink antialiased">
-    <div class="flex-1">
+    <a
+      href="#main"
+      class="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:rounded focus:bg-panel focus:px-4 focus:py-2 focus:text-signal"
+      >Skip to content</a
+    >
+    {!bare && <Header />}
+    <div id="main" class="flex-1">
       <slot />
     </div>
-    {!hideFooter && <Footer />}
+    {!bare && <Footer />}
   </body>
 </html>

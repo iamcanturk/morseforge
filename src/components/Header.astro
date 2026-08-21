@@ -1,0 +1,44 @@
+---
+import { Logo } from './brand/Logo'
+
+/**
+ * Site header.
+ *
+ * `Logo` is a React component rendered with no client directive, so Astro
+ * renders it to static HTML at build time and ships zero JavaScript for it.
+ *
+ * The nav doubles as internal linking: every page reaching every other page in
+ * one hop is what lets a crawler discover the whole site from any entry point,
+ * which matters when most arrivals will land on a content page rather than the
+ * home page.
+ */
+const links = [
+  { href: '/tree/', label: 'TREE' },
+  { href: '/telegraph/', label: 'TELEGRAPH' },
+]
+
+const current = Astro.url.pathname
+---
+
+<header class="border-b border-line">
+  <div class="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-4">
+    <a href="/" class="shrink-0" aria-label="MorseForge home">
+      <Logo size={24} />
+    </a>
+
+    <nav aria-label="Main" class="flex items-center gap-6">
+      {
+        links.map(({ href, label }) => (
+          <a
+            href={href}
+            aria-current={current === href ? 'page' : undefined}
+            class="font-mono text-xs tracking-[0.16em] transition-colors"
+            style={current === href ? 'color: var(--color-signal)' : 'color: var(--color-muted)'}
+          >
+            {label}
+          </a>
+        ))
+      }
+    </nav>
+  </div>
+</header>
