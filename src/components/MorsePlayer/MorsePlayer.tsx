@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AudioEngine, type Playback } from '../../engine/audioEngine'
 import { buildTimeline, timelineDuration, type TimedElement } from '../../engine/timingEngine'
 import { prettify } from '../../engine/morseEncoder'
+import { canVibrate, stopVibration, vibrateTimeline } from '../../engine/vibrationEngine'
 
 /**
  * Plays a Morse string as sound and as light.
@@ -58,6 +59,8 @@ export function MorsePlayer({
   const [wpm, setWpm] = useState(initialWpm)
   const [flash, setFlash] = useState(initialFlash)
   const [sound, setSound] = useState(true)
+  const [buzz, setBuzz] = useState(false)
+  const [vibrationSupported, setVibrationSupported] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [lit, setLit] = useState(false)
 
@@ -76,6 +79,7 @@ export function MorsePlayer({
   }, [])
 
   const stop = useCallback(() => {
+    stopVibration()
     playback.current?.stop()
     playback.current = null
     if (endTimer.current !== null) clearTimeout(endTimer.current)
@@ -84,8 +88,11 @@ export function MorsePlayer({
     setPlaying(false)
   }, [stopVisuals])
 
+  useEffect(() => setVibrationSupported(canVibrate()), [])
+
   useEffect(() => {
     return () => {
+      stopVibration()
       playback.current?.stop()
       if (frame.current !== null) cancelAnimationFrame(frame.current)
       if (endTimer.current !== null) clearTimeout(endTimer.current)
@@ -117,6 +124,11 @@ export function MorsePlayer({
       playback.current = await audio.current.playTimeline(timeline)
     }
 
+    // Fired once for the whole message rather than per element: the API takes
+    // the entire pattern and runs it on the device, which stays in step even
+    // if the main thread stalls.
+    if (buzz) vibrateTimeline(timeline)
+
     // Completion is driven by a timer, not by the animation frame loop.
     // requestAnimationFrame does not run at all in a hidden tab, so a listener
     // who switches away mid-playback would come back to a player stuck showing
@@ -141,7 +153,7 @@ export function MorsePlayer({
       frame.current = requestAnimationFrame(tick)
     }
     frame.current = requestAnimationFrame(tick)
-  }, [playing, stop, sound, timeline, durationMs, stopVisuals])
+  }, [playing, stop, sound, buzz, timeline, durationMs, stopVisuals])
 
   const seconds = (durationMs / 1000).toFixed(1)
 
@@ -198,6 +210,21 @@ export function MorsePlayer({
         >
           SOUND
         </button>
+
+        {vibrationSupported && (
+          <button
+            type="button"
+            aria-pressed={buzz}
+            onClick={() => setBuzz((on) => !on)}
+            className="rounded-lg border px-3 py-2.5 font-mono text-xs tracking-[0.14em]"
+            style={{
+              borderColor: buzz ? 'var(--color-amber)' : 'var(--color-line)',
+              color: buzz ? 'var(--color-amber)' : 'var(--color-muted)',
+            }}
+          >
+            BUZZ
+          </button>
+        )}
 
         <button
           type="button"

@@ -8,12 +8,7 @@ import { AudioEngine } from '../../engine/audioEngine'
 import { prettify } from '../../engine/morseEncoder'
 import { LEARNING_STAGES, MORSE_ALPHABET } from '../../data/morseAlphabet'
 import { createSettingsStore, defaultSettings, type SettingsRecord } from '../../storage/settings'
-import {
-  answer as recordAnswer,
-  createProgressStore,
-  markSeen,
-  type ProgressRecord,
-} from '../../storage/progress'
+import { answer as recordAnswer, createProgressStore, markSeen } from '../../storage/progress'
 
 /**
  * The guided lesson (PROJECT.md §4.1, §45, §46, §48).
@@ -27,7 +22,6 @@ export function LessonScreen() {
   const progressStore = useMemo(() => createProgressStore(), [])
   const settingsStore = useMemo(() => createSettingsStore(), [])
 
-  const [progress, setProgress] = useState<ProgressRecord>({ characters: {} })
   const [settings, setSettings] = useState<SettingsRecord>(defaultSettings)
   const [ready, setReady] = useState(false)
 
@@ -39,13 +33,14 @@ export function LessonScreen() {
 
   const audio = useRef<AudioEngine | null>(null)
 
+  // Read once on mount rather than subscribing: the lesson deliberately does
+  // not jump the learner forward mid-session because an answer happened to
+  // complete a stage. Where they are up to is resolved when they arrive.
   useEffect(() => {
     const loaded = progressStore.read()
-    setProgress(loaded)
     setStage(Math.min(currentStageIndex(loaded, Date.now()), LEARNING_STAGES.length - 1))
     setSettings(settingsStore.read())
     setReady(true)
-    return progressStore.subscribe(setProgress)
   }, [progressStore, settingsStore])
 
   useEffect(() => () => void audio.current?.dispose(), [])
