@@ -14,14 +14,16 @@ import { AUTHOR, AUTHOR_X_URL, SITE } from '../config/site'
     class="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10 sm:flex-row sm:items-center sm:justify-between"
   >
     <p class="text-sm text-muted">
-      Built by
-      <a
+      {
+        /* Explicit entities: the newlines the formatter introduces around the
+          link collapse to nothing, so the words run together. */
+      }
+      Built by&#32;<a
         href={AUTHOR.url}
         rel="me"
         class="text-ink underline decoration-signal/40 underline-offset-4 hover:decoration-signal"
         >{AUTHOR.name}</a
-      >
-      — your progress stays on your device.
+      >&#32;— your progress stays on your device.
     </p>
 
     <nav aria-label="Project and author links" class="flex flex-wrap items-center gap-5">

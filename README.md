@@ -13,7 +13,7 @@ character.
 **[morse.iamcanturk.dev →](https://morse.iamcanturk.dev)**
 
 [![Live](https://img.shields.io/badge/live-morse.iamcanturk.dev-00E88F?style=flat-square)](https://morse.iamcanturk.dev)
-[![Tests](https://img.shields.io/badge/tests-245%20passing-00E88F?style=flat-square)](#testing)
+[![Tests](https://img.shields.io/badge/tests-259%20passing-00E88F?style=flat-square)](#testing)
 [![License](https://img.shields.io/badge/license-MIT-8B98A5?style=flat-square)](LICENSE)
 [![Astro](https://img.shields.io/badge/Astro-7-8B98A5?style=flat-square)](https://astro.build)
 
@@ -67,8 +67,10 @@ manual mode that removes the clock entirely.
 
 **Every page is prerendered to real HTML.** GPTBot, ClaudeBot and PerplexityBot
 do not execute JavaScript. A client-rendered app is invisible to them, so the
-whole site is static and only the interactive parts hydrate. The landing page
-ships **zero bytes of JavaScript**.
+whole site is static and only the interactive parts hydrate — the seven-day
+plan, the blog and the word index ship **zero bytes of JavaScript**, and pages
+that do load React only do so because there is genuinely something to interact
+with.
 
 **Nothing is written twice.** The alphabet is one object. The tree, the
 curriculum, the word pages, the translator, `llms.txt` and every code printed
@@ -130,7 +132,7 @@ Requires Node 20.11+.
 
 ### Testing
 
-245 tests, covering the parts where being wrong is silent:
+259 tests, covering the parts where being wrong is silent:
 
 - **Timing** — sending PARIS once takes exactly `60/WPM` seconds, checked at
   5/12/20/35 WPM and under Farnsworth. Every speed readout depends on it.

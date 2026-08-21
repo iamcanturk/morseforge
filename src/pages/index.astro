@@ -1,65 +1,155 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { Logo } from '../components/brand/Logo'
+import { DecodeChallenge } from '../components/Decode/DecodeChallenge'
+import { FeatureDemos } from '../components/Demo/FeatureDemos'
+import { CURRICULUM_TOTAL_MINUTES } from '../data/curriculum'
+import { WORDS } from '../data/words'
 import { SITE } from '../config/site'
 
 const title = 'MorseForge — Learn Morse Code as a Game'
 const description = SITE.description
 
-const routes = [
+const hours = Math.round((CURRICULUM_TOTAL_MINUTES / 60) * 10) / 10
+
+/**
+ * PROJECT.md §57: do not open with four paragraphs explaining what Morse is.
+ * Open with a signal the visitor can try to read. Everything below the fold is
+ * for the people who did that and want more.
+ */
+const tools = [
+  {
+    href: '/learn-morse-code-in-7-days/',
+    label: 'Learn it in 7 days',
+    blurb: `The alphabet in the order the code is built, one layer of the tree per day. About ${hours} hours in total.`,
+  },
   {
     href: '/telegraph/',
-    label: 'Telegraph',
-    blurb: 'Use your keyboard as a straight key. Tap for a dot, hold for a dash, decode live.',
+    label: 'Send it yourself',
+    blurb: 'Your keyboard becomes a straight key. Tap for a dot, hold for a dash, decoded live.',
   },
   {
     href: '/tree/',
-    label: 'Signal Tree',
-    blurb: 'See why every letter has the code it has — a dot branches left, a dash branches right.',
+    label: 'See why',
+    blurb: 'Morse is a binary tree. Every letter sits exactly where its own code spells it out.',
   },
+  {
+    href: '/morse-code-translator/',
+    label: 'Translate',
+    blurb: 'Text to Morse and back, with real CW audio and a signal lamp at 5–40 WPM.',
+  },
+  {
+    href: '/morse-code-alphabet/',
+    label: 'The alphabet',
+    blurb: 'Every letter, digit and punctuation mark per ITU-R M.1677-1. Click any to hear it.',
+  },
+  {
+    href: '/words/',
+    label: 'Words in Morse',
+    blurb: `${WORDS.length} words and phrases, each playable and each with something worth knowing.`,
+  },
+]
+
+const promises = [
+  'No account',
+  'No ads',
+  'Works offline',
+  'Progress stays on your device',
+  'Open source',
 ]
 ---
 
 <BaseLayout title={title} description={description} path="/">
-  <main class="mx-auto max-w-4xl px-6 py-20">
-    <div class="flex flex-col items-center text-center">
-      <Logo size={56} tagline glow />
+  <main class="mx-auto max-w-4xl px-6 py-16">
+    <section class="flex flex-col items-center text-center">
+      <Logo size={52} tagline glow />
 
-      <p class="mt-10 max-w-xl text-lg leading-relaxed text-muted">
+      <h1 class="sr-only">MorseForge — learn Morse code as a game</h1>
+
+      <p class="mt-8 max-w-xl text-lg leading-relaxed text-muted">
         Turn Morse code into a game. Learn it, send it, hear it, decode it — and watch the signal
         network come online one character at a time.
       </p>
+    </section>
 
-      <div class="mt-10 flex flex-wrap items-center justify-center gap-4">
-        <a
-          href="/telegraph/"
-          class="rounded-lg px-6 py-3 font-mono text-xs tracking-[0.16em] text-void"
-          style="background: var(--color-signal)">SEND YOUR FIRST SIGNAL</a
-        >
-        <a
-          href="/tree/"
-          class="rounded-lg border border-line px-6 py-3 font-mono text-xs tracking-[0.16em] text-muted transition-colors hover:border-signal hover:text-signal"
-          >EXPLORE THE TREE</a
-        >
-      </div>
+    {/* The signal, before any explanation of what a signal is. */}
+    <section class="mt-12">
+      <DecodeChallenge client:load />
+    </section>
 
-      <p class="mt-8 font-mono text-[10px] tracking-[0.18em] text-signal-dim">
-        NO ACCOUNT · NO ADS · PROGRESS STAYS ON YOUR DEVICE
-      </p>
-    </div>
+    <section class="mt-8 flex flex-wrap items-center justify-center gap-4">
+      <a
+        href="/learn-morse-code-in-7-days/"
+        class="rounded-lg px-6 py-3 font-mono text-xs tracking-[0.16em] text-void"
+        style="background: var(--color-signal)">START LEARNING</a
+      >
+      <a
+        href="/telegraph/"
+        class="rounded-lg border border-line px-6 py-3 font-mono text-xs tracking-[0.16em] text-muted transition-colors hover:border-signal hover:text-signal"
+        >SEND YOUR FIRST SIGNAL</a
+      >
+    </section>
 
-    <div class="mt-20 grid gap-5 sm:grid-cols-2">
+    <ul class="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
       {
-        routes.map(({ href, label, blurb }) => (
-          <a
-            href={href}
-            class="rounded-xl border border-line bg-panel p-6 transition-colors hover:border-signal-dim"
-          >
-            <h2 class="font-display text-lg font-semibold">{label}</h2>
-            <p class="mt-2 text-sm leading-relaxed text-muted">{blurb}</p>
-          </a>
+        promises.map((promise) => (
+          <li class="font-mono text-[10px] tracking-[0.16em] text-signal-dim">{promise}</li>
         ))
       }
-    </div>
+    </ul>
+
+    <section class="mt-20">
+      <h2 class="font-display text-2xl font-bold tracking-tight">What it looks like</h2>
+      <p class="mt-2 text-sm text-muted">
+        Silent previews, running on the real timing engine. Pick one to try it properly.
+      </p>
+      <div class="mt-6">
+        <FeatureDemos client:visible />
+      </div>
+    </section>
+
+    <section class="mt-20">
+      <h2 class="font-display text-2xl font-bold tracking-tight">Everything here is free</h2>
+      <ul class="mt-6 grid gap-3 sm:grid-cols-2">
+        {
+          tools.map(({ href, label, blurb }) => (
+            <li>
+              <a
+                href={href}
+                class="block h-full rounded-xl border border-line bg-panel p-5 transition-colors hover:border-signal-dim"
+              >
+                <h3 class="font-display text-lg font-semibold text-ink">{label}</h3>
+                <p class="mt-2 text-sm leading-relaxed text-muted">{blurb}</p>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <section class="mt-20">
+      <h2 class="font-display text-2xl font-bold tracking-tight">Why this one works</h2>
+
+      <div class="mt-6 space-y-6 leading-relaxed text-muted">
+        <p>
+          Most people learn Morse from a chart, memorise twenty-six patterns of dots and dashes, and
+          hit a wall around ten words per minute that no amount of practice moves. The chart caused
+          it: it taught them to translate rather than to hear, and that extra step is a fixed cost
+          the speed eventually outruns.
+        </p>
+        <p>
+          MorseForge teaches each character as a sound from the first minute, in the order the code
+          is actually structured, and makes you send it back as well as read it. It tracks
+          recognising, hearing and sending separately, because they are different abilities — and a
+          character is only mastered when all three hold up.
+        </p>
+      </div>
+
+      <a
+        href="/blog/why-a-morse-code-chart-does-not-work/"
+        class="mt-6 inline-block font-mono text-xs tracking-[0.14em] text-signal underline decoration-signal/40 underline-offset-4"
+        >READ THE LONGER VERSION →</a
+      >
+    </section>
   </main>
 </BaseLayout>

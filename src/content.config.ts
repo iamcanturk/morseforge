@@ -1,4 +1,6 @@
-import { defineCollection, z } from 'astro:content'
+import { defineCollection } from 'astro:content'
+// `z` from 'astro:content' is deprecated and removed in Astro 7.
+import { z } from 'astro/zod'
 import { glob } from 'astro/loaders'
 
 /**
