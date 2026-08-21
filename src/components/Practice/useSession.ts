@@ -10,6 +10,8 @@ import {
 } from '../../game/session'
 import { SESSION_MODES } from '../../game/session'
 import { answer as recordAnswer, createProgressStore, getCharacter } from '../../storage/progress'
+import { applySession, createStatsStore } from '../../storage/stats'
+import { xpForAnswer } from '../../game/progression'
 import type { ReviewState } from '../../game/spacedRepetition'
 
 /**
@@ -39,6 +41,7 @@ export interface UseSessionResult {
 
 export function useSession(config: SessionConfig): UseSessionResult {
   const progressStore = useMemo(() => createProgressStore(), [])
+  const statsStore = useMemo(() => createStatsStore(), [])
 
   const [status, setStatus] = useState<SessionStatus>('idle')
   const [current, setCurrent] = useState<string | null>(null)
@@ -65,11 +68,21 @@ export function useSession(config: SessionConfig): UseSessionResult {
     (finalAttempts: readonly Attempt[]) => {
       stopTimer()
       const elapsed = startedAt.current === null ? 0 : performance.now() - startedAt.current
-      setSummary(summarize(finalAttempts, elapsed))
+      const result = summarize(finalAttempts, elapsed)
+
+      // XP is earned per correct answer, weighted by difficulty, so a session
+      // of E and T does not pay the same as one that included Q and Z.
+      const xpEarned = finalAttempts
+        .filter((attempt) => attempt.correct)
+        .reduce((sum, attempt) => sum + xpForAnswer(attempt.character), 0)
+
+      statsStore.update((stats) => applySession(stats, result, xpEarned, Date.now()))
+
+      setSummary(result)
       setStatus('finished')
       setCurrent(null)
     },
-    [stopTimer],
+    [stopTimer, statsStore],
   )
 
   /** Schedules per character, so prompts go to whatever is closest to forgotten. */

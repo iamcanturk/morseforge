@@ -1,5 +1,6 @@
 ---
 import { Logo } from './brand/Logo'
+import { AUTHOR, AUTHOR_GITHUB_URL, AUTHOR_X_URL, SITE } from '../config/site'
 
 /**
  * Site header.
@@ -7,55 +8,172 @@ import { Logo } from './brand/Logo'
  * `Logo` is a React component rendered with no client directive, so Astro
  * renders it to static HTML at build time and ships zero JavaScript for it.
  *
- * The nav doubles as internal linking: every page reaching every other page in
- * one hop is what lets a crawler discover the whole site from any entry point,
- * which matters when most arrivals will land on a content page rather than the
- * home page. That is also why it stays a plain list of links on mobile and
- * scrolls sideways rather than collapsing behind a menu button: a disclosure
- * needs JavaScript, and six links do not earn it.
+ * The nav is grouped rather than flat. Nine links in a row is a list to be
+ * scanned; three groups of three is a structure to be understood, and the
+ * grouping is the product's own shape — learn it, practise it, look things up.
+ *
+ * It also doubles as internal linking: every page reaching every other in one
+ * hop is what lets a crawler discover the site from any entry point, which
+ * matters when most arrivals land on a content page rather than the home page.
  */
-const links = [
-  { href: '/learn-morse-code-in-7-days/', label: 'LEARN' },
-  { href: '/morse-code-translator/', label: 'TRANSLATE' },
-  { href: '/morse-code-alphabet/', label: 'ALPHABET' },
-  { href: '/words/', label: 'WORDS' },
-  { href: '/blog/', label: 'NOTES' },
-  { href: '/practice/', label: 'PRACTICE' },
-  { href: '/telegraph/', label: 'KEY' },
-  { href: '/tree/', label: 'TREE' },
-  { href: '/settings/', label: 'SETTINGS' },
+const groups = [
+  {
+    title: 'Learn',
+    links: [
+      { href: '/learn-morse-code-in-7-days/', label: '7-day plan' },
+      { href: '/tree/', label: 'The tree' },
+      { href: '/morse-code-alphabet/', label: 'Alphabet' },
+    ],
+  },
+  {
+    title: 'Practise',
+    links: [
+      { href: '/practice/', label: 'Practice' },
+      { href: '/challenge/', label: '60s challenge' },
+      { href: '/telegraph/', label: 'Telegraph' },
+    ],
+  },
+  {
+    title: 'Look up',
+    links: [
+      { href: '/morse-code-translator/', label: 'Translator' },
+      { href: '/words/', label: 'Words' },
+      { href: '/blog/', label: 'Notes' },
+    ],
+  },
 ]
 
+/** Flat list for the mobile strip, where the grouping does not fit. */
+const flat = [...groups.flatMap((group) => group.links), { href: '/settings/', label: 'Settings' }]
+
 const current = Astro.url.pathname
+const isCurrent = (href: string) => current === href
+const linkColour = (href: string) =>
+  isCurrent(href) ? 'color: var(--color-signal)' : 'color: var(--color-muted)'
 ---
 
 <header class="border-b border-line">
-  <div class="mx-auto flex max-w-6xl items-center gap-5 px-6 py-4">
-    <a href="/" class="shrink-0" aria-label="MorseForge home">
-      <Logo size={24} />
-    </a>
+  <div class="mx-auto max-w-6xl px-6">
+    <div class="flex items-center justify-between gap-6 py-4">
+      <a href="/" class="shrink-0" aria-label="MorseForge home">
+        <Logo size={24} />
+      </a>
+
+      <nav aria-label="Main" class="hidden lg:block">
+        <ul class="flex items-start gap-8">
+          {
+            groups.map((group) => (
+              <li>
+                <span class="block font-mono text-[9px] tracking-[0.18em] text-signal-dim">
+                  {group.title.toUpperCase()}
+                </span>
+                <ul class="mt-1.5 flex gap-4">
+                  {group.links.map(({ href, label }) => (
+                    <li>
+                      <a
+                        href={href}
+                        aria-current={isCurrent(href) ? 'page' : undefined}
+                        class="text-xs transition-colors hover:text-signal"
+                        style={linkColour(href)}
+                      >
+                        {label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))
+          }
+        </ul>
+      </nav>
+
+      {
+        /* Author credit lives in the header as well as the footer: on a long
+          content page the footer is a scroll away and is never seen. */
+      }
+      <div class="flex shrink-0 items-center gap-3">
+        <a
+          href={AUTHOR.url}
+          rel="me"
+          class="hidden text-xs whitespace-nowrap text-muted transition-colors hover:text-signal sm:block"
+          >by {AUTHOR.name}</a
+        >
+
+        <span class="hidden h-4 w-px bg-line sm:block" aria-hidden="true"></span>
+
+        <a
+          href={SITE.repo}
+          rel="noopener"
+          aria-label="Source code on GitHub"
+          title="Source on GitHub"
+          class="text-muted transition-colors hover:text-signal"
+        >
+          <svg width="17" height="17" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path
+              d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"
+            ></path>
+          </svg>
+        </a>
+
+        <a
+          href={AUTHOR_X_URL}
+          rel="me noopener"
+          aria-label={`${AUTHOR.name} on X`}
+          title={`@${AUTHOR.x} on X`}
+          class="text-muted transition-colors hover:text-signal"
+        >
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path
+              d="M9.52 6.77 15.48 0h-1.41L8.89 5.88 4.75 0H0l6.25 8.9L0 16h1.41l5.46-6.21L11.25 16H16L9.52 6.77ZM7.59 8.98l-.63-.89L1.92 1.04h2.17l4.07 5.7.63.89 5.29 7.4h-2.17L7.59 8.98Z"
+            ></path>
+          </svg>
+        </a>
+
+        <a href={AUTHOR_GITHUB_URL} rel="me noopener" class="sr-only">{AUTHOR.name} on GitHub</a>
+
+        <a
+          href="/settings/"
+          aria-label="Settings"
+          title="Settings"
+          class="hidden text-muted transition-colors hover:text-signal lg:block"
+        >
+          <svg
+            width="17"
+            height="17"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="3"></circle>
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
+            ></path>
+          </svg>
+        </a>
+      </div>
+    </div>
 
     {
-      /* Sideways scroll rather than wrapping: six links wrapped to four rows on
-        a 375px screen and pushed the page heading below the fold. */
+      /* Flat, sideways-scrolling strip on mobile: ten links wrapped to four rows
+        on a 375px screen and pushed the page heading below the fold. */
     }
     <nav
       aria-label="Main"
-      class="-mr-6 min-w-0 flex-1 overflow-x-auto pr-6 [scrollbar-width:none] sm:mr-0 sm:pr-0 [&::-webkit-scrollbar]:hidden"
+      class="-mx-6 overflow-x-auto px-6 pb-3 [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden"
     >
-      <ul class="flex items-center gap-5 whitespace-nowrap sm:justify-end">
+      <ul class="flex items-center gap-5 whitespace-nowrap">
         {
-          links.map(({ href, label }) => (
+          flat.map(({ href, label }) => (
             <li>
               <a
                 href={href}
-                aria-current={current === href ? 'page' : undefined}
-                class="font-mono text-xs tracking-[0.16em] transition-colors"
-                style={
-                  current === href ? 'color: var(--color-signal)' : 'color: var(--color-muted)'
-                }
+                aria-current={isCurrent(href) ? 'page' : undefined}
+                class="font-mono text-[11px] tracking-[0.12em] transition-colors"
+                style={linkColour(href)}
               >
-                {label}
+                {label.toUpperCase()}
               </a>
             </li>
           ))

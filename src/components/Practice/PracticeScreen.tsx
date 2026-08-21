@@ -40,7 +40,18 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
   const [mode, setMode] = useState<SessionMode>('listening')
   const [poolId, setPoolId] = useState<(typeof POOLS)[number]['id']>('stage2')
   const [guess, setGuess] = useState('')
-  const [flash, setFlash] = useState<'right' | 'wrong' | null>(null)
+  /**
+   * What just happened, held long enough to be read.
+   *
+   * A wrong answer used to flash a red border for 260ms and move on, so the
+   * learner never found out what the character actually was — which is the one
+   * thing they needed. Being told is the entire point of getting it wrong.
+   */
+  const [feedback, setFeedback] = useState<{
+    correct: boolean
+    expected: string
+    given: string
+  } | null>(null)
 
   const audio = useRef<AudioEngine | null>(null)
   const input = useRef<HTMLInputElement>(null)
@@ -98,13 +109,16 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
 
   const answer = useCallback(
     (given: string) => {
+      const expected = current ?? ''
       const correct = submit(given)
-      setFlash(correct ? 'right' : 'wrong')
+      setFeedback({ correct, expected, given: given.trim().toUpperCase() })
       setGuess('')
-      setTimeout(() => setFlash(null), 260)
+      // A correct answer only needs an acknowledgement; a wrong one has
+      // something to read, so it stays up nearly three times as long.
+      setTimeout(() => setFeedback(null), correct ? 500 : 1400)
       input.current?.focus()
     },
-    [submit],
+    [submit, current],
   )
 
   const key = useMorseKey({
@@ -256,32 +270,57 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
       </div>
 
       <div
-        className="mt-8 flex min-h-32 flex-col items-center justify-center rounded-xl border transition-colors"
+        aria-live="polite"
+        className="mt-8 flex min-h-36 flex-col items-center justify-center gap-2 rounded-xl border px-4 text-center transition-colors"
         style={{
-          borderColor:
-            flash === 'right'
+          borderColor: feedback
+            ? feedback.correct
               ? 'var(--color-signal)'
-              : flash === 'wrong'
-                ? 'var(--color-danger)'
-                : 'var(--color-line)',
+              : 'var(--color-danger)'
+            : 'var(--color-line)',
         }}
       >
-        {config.mode === 'listening' && current && (
-          <button
-            type="button"
-            onClick={() => void play(current)}
-            className="rounded-lg border border-cyan/40 px-6 py-3 font-mono text-xs tracking-[0.14em] text-cyan"
-          >
-            ▶ PLAY AGAIN
-          </button>
-        )}
+        {feedback ? (
+          feedback.correct ? (
+            <>
+              <span className="font-display text-4xl font-bold text-signal">
+                {feedback.expected}
+              </span>
+              <span className="font-mono text-xs tracking-[0.16em] text-signal-dim">CORRECT</span>
+            </>
+          ) : (
+            <>
+              <span className="font-mono text-xs tracking-[0.16em] text-danger">
+                {feedback.given ? `YOU SAID ${feedback.given}` : 'MISSED'}
+              </span>
+              <span className="font-display text-4xl font-bold text-ink">{feedback.expected}</span>
+              <span className="font-mono text-lg tracking-[0.2em] text-cyan">
+                {prettify(MORSE_ALPHABET[feedback.expected] ?? '')}
+              </span>
+            </>
+          )
+        ) : (
+          <>
+            {config.mode === 'listening' && current && (
+              <button
+                type="button"
+                onClick={() => void play(current)}
+                className="rounded-lg border border-cyan/40 px-6 py-3 font-mono text-xs tracking-[0.14em] text-cyan"
+              >
+                ▶ PLAY AGAIN
+              </button>
+            )}
 
-        {config.mode === 'recognition' && code && (
-          <span className="font-mono text-4xl tracking-[0.2em] text-cyan">{prettify(code)}</span>
-        )}
+            {config.mode === 'recognition' && code && (
+              <span className="font-mono text-4xl tracking-[0.2em] text-cyan">
+                {prettify(code)}
+              </span>
+            )}
 
-        {config.mode === 'sending' && current && (
-          <span className="font-display text-5xl font-bold text-signal">{current}</span>
+            {config.mode === 'sending' && current && (
+              <span className="font-display text-5xl font-bold text-signal">{current}</span>
+            )}
+          </>
         )}
       </div>
 

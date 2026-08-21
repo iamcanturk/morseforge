@@ -1,8 +1,12 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { SessionSummary } from '../../game/session'
-import { AUTHOR, SITE } from '../../config/site'
+import { AUTHOR } from '../../config/site'
 import { prettify } from '../../engine/morseEncoder'
-import { MORSE_ALPHABET } from '../../data/morseAlphabet'
+import { ALL_LETTERS, MORSE_ALPHABET } from '../../data/morseAlphabet'
+import { ShareCard } from '../Share/ShareCard'
+import { currentStreak } from '../../game/progression'
+import { createStatsStore } from '../../storage/stats'
+import { createProgressStore, masteredCharacters } from '../../storage/progress'
 
 /**
  * The result screen (PROJECT.md §20, §35).
@@ -23,15 +27,29 @@ export function SessionResult({
   const accuracy = Math.round(summary.accuracy * 100)
   const wpm = Math.round(summary.wpm * 10) / 10
 
-  const shareText = useMemo(
-    () =>
-      challenge
-        ? `I decoded ${summary.correct} Morse signals in 60 seconds at ${accuracy}% accuracy.\n\nCan you beat me?\n\n⚡ ${SITE.url}/challenge/`
-        : `${summary.correct} characters at ${accuracy}% accuracy on MorseForge.\n\n⚡ ${SITE.url}`,
-    [challenge, summary.correct, accuracy],
-  )
+  // Read after mount: the stores are empty during prerender, and the session
+  // that just finished has already written into them by the time this renders.
+  const [streak, setStreak] = useState(0)
+  const [mastered, setMastered] = useState(0)
 
-  const shareUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(shareText)}`
+  useEffect(() => {
+    const stats = createStatsStore().read()
+    setStreak(currentStreak(stats.streak, Date.now()))
+    setMastered(masteredCharacters(createProgressStore().read(), ALL_LETTERS).length)
+  }, [])
+
+  const cardData = useMemo(
+    () => ({
+      accuracy: summary.accuracy,
+      correct: summary.correct,
+      total: summary.total,
+      wpm: summary.wpm,
+      streak,
+      mastered,
+      challenge,
+    }),
+    [summary, streak, mastered, challenge],
+  )
 
   return (
     <div className="rounded-2xl border border-line bg-panel p-6 sm:p-8">
@@ -56,9 +74,11 @@ export function SessionResult({
           <dd className="mt-1 font-display text-xl font-semibold text-ink">{summary.score}</dd>
         </div>
         <div>
-          <dt className="font-mono text-[10px] tracking-[0.16em] text-muted">TIME</dt>
+          <dt className="font-mono text-[10px] tracking-[0.16em] text-muted">
+            {streak > 0 ? 'STREAK' : 'TIME'}
+          </dt>
           <dd className="mt-1 font-display text-xl font-semibold text-ink">
-            {Math.round(summary.elapsedMs / 1000)}s
+            {streak > 0 ? `🔥 ${streak}` : `${Math.round(summary.elapsedMs / 1000)}s`}
           </dd>
         </div>
       </dl>
@@ -91,6 +111,15 @@ export function SessionResult({
         </p>
       )}
 
+      {summary.total > 0 && (
+        <section className="mt-8 border-t border-line pt-6">
+          <h3 className="font-mono text-[10px] tracking-[0.18em] text-muted">SHARE IT</h3>
+          <div className="mt-4">
+            <ShareCard data={cardData} />
+          </div>
+        </section>
+      )}
+
       <div className="mt-8 flex flex-wrap gap-3">
         <button
           type="button"
@@ -100,17 +129,6 @@ export function SessionResult({
         >
           AGAIN
         </button>
-
-        {summary.total > 0 && (
-          <a
-            href={shareUrl}
-            target="_blank"
-            rel="noopener"
-            className="rounded-lg border border-line px-6 py-3 font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:border-cyan hover:text-cyan"
-          >
-            SHARE ON X
-          </a>
-        )}
 
         <a
           href="/learn-morse-code-in-7-days/"
