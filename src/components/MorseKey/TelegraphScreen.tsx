@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { MorseKey, SignalTrace } from './MorseKey'
 import { KeyerSpeedPicker } from './KeyerSpeedPicker'
+import { SignalTree } from '../SignalTree/SignalTree'
 import { useMorseKey } from './useMorseKey'
 import { encode } from '../../engine/morseEncoder'
 import { UNKNOWN_CHARACTER } from '../../engine/morseDecoder'
@@ -25,6 +26,7 @@ export function TelegraphScreen() {
   // Settings start at defaults rather than being read during render: this is
   // prerendered in Node, and differing markup would tear hydration.
   const [settings, setSettings] = useState<SettingsRecord>(defaultSettings)
+  const [showTree, setShowTree] = useState(true)
 
   useEffect(() => {
     setSettings(store.read())
@@ -109,6 +111,28 @@ export function TelegraphScreen() {
         <div className="mt-8">
           <div className="mb-2 font-mono text-[10px] tracking-[0.18em] text-muted">SIGNAL</div>
           <SignalTrace elements={state.recent} thresholdMs={settings.timing.dotDashThresholdMs} />
+        </div>
+
+        {/* The tree, walking itself as you key. Watching the path light up is
+            how the structure stops being a diagram and starts being something
+            you can feel where you are inside. */}
+        <div className="mt-8">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="font-mono text-[10px] tracking-[0.18em] text-muted">
+              WHERE YOU ARE
+            </span>
+            <button
+              type="button"
+              aria-pressed={showTree}
+              onClick={() => setShowTree((on) => !on)}
+              className="font-mono text-[10px] tracking-[0.14em] transition-colors"
+              style={{ color: showTree ? 'var(--color-signal)' : 'var(--color-muted)' }}
+            >
+              {showTree ? 'HIDE TREE' : 'SHOW TREE'}
+            </button>
+          </div>
+
+          {showTree && <SignalTree livePath={state.pending} highlight={null} className="min-w-0" />}
         </div>
       </section>
 

@@ -1,0 +1,36 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import { LessonScreen } from '../components/Lesson/LessonScreen'
+
+const title = 'Learn Morse Code — Guided, Hands-On Lessons | MorseForge'
+const description =
+  'Learn Morse code one character at a time: see it, hear it, send it, then drill everything so far. Free, no account, and you send your first signal in under a minute.'
+---
+
+<BaseLayout title={title} description={description} path="/learn/">
+  <main class="mx-auto max-w-2xl px-6 py-14">
+    <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Learn</h1>
+    <p class="mt-3 leading-relaxed text-muted">
+      Every character three ways — see it, hear it, send it — then a drill on everything taught so
+      far. It picks up wherever you left off, because the lesson reads your progress rather than
+      keeping its own count of it.
+    </p>
+
+    <div class="mt-10">
+      <LessonScreen client:load />
+    </div>
+
+    <section class="mt-14 border-t border-line pt-8">
+      <h2 class="font-display text-xl font-bold tracking-tight">Prefer to read the whole plan?</h2>
+      <p class="mt-3 leading-relaxed text-muted">
+        The seven-day plan lays out every stage, why the characters come in that order, and what to
+        practise on each day.
+      </p>
+      <a
+        href="/learn-morse-code-in-7-days/"
+        class="mt-5 inline-block rounded-lg border border-line px-5 py-2.5 font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:border-signal hover:text-signal"
+        >SEE THE 7-DAY PLAN</a
+      >
+    </section>
+  </main>
+</BaseLayout>

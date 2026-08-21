@@ -8,6 +8,20 @@ import { MORSE_ALPHABET, ALL_LETTERS, LEARNING_STAGES } from '../../data/morseAl
 import { prettify } from '../../engine/morseEncoder'
 import { SESSION_MODES, type SessionConfig, type SessionMode } from '../../game/session'
 import { createSettingsStore, defaultSettings, type SettingsRecord } from '../../storage/settings'
+import { SignalTree } from '../SignalTree/SignalTree'
+import { levelToNodeState, type NodeState } from '../../data/tree'
+import { masteryLevel } from '../../game/mastery'
+import { createProgressStore, getCharacter, type ProgressRecord } from '../../storage/progress'
+
+/**
+ * How the prompt is answered.
+ *
+ * `flat` types the letter. `tree` answers by picking the node on the Signal
+ * Tree, which means a session doubles as practice at reading the tree — the
+ * structure stops being a diagram you looked at once and becomes the thing you
+ * navigate under time pressure.
+ */
+export type PracticeLayout = 'flat' | 'tree'
 
 /**
  * Free practice (PROJECT.md §7, §12).
@@ -39,6 +53,7 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
 
   const [mode, setMode] = useState<SessionMode>('listening')
   const [poolId, setPoolId] = useState<(typeof POOLS)[number]['id']>('stage2')
+  const [layout, setLayout] = useState<PracticeLayout>('flat')
   const [guess, setGuess] = useState('')
   /**
    * What just happened, held long enough to be read.
@@ -56,10 +71,18 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
   const audio = useRef<AudioEngine | null>(null)
   const input = useRef<HTMLInputElement>(null)
 
+  const progressStore = useMemo(() => createProgressStore(), [])
+  const [progress, setProgress] = useState<ProgressRecord>({ characters: {} })
+
   useEffect(() => {
     setSettings(settingsStore.read())
     return settingsStore.subscribe(setSettings)
   }, [settingsStore])
+
+  useEffect(() => {
+    setProgress(progressStore.read())
+    return progressStore.subscribe(setProgress)
+  }, [progressStore])
 
   useEffect(() => () => void audio.current?.dispose(), [])
 
@@ -121,6 +144,17 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
     [submit, current],
   )
 
+  /** Mastery-derived node states, so the tree shows progress while you drill. */
+  const nodeStates = useMemo<Record<string, NodeState>>(() => {
+    const now = Date.now()
+    return Object.fromEntries(
+      ALL_LETTERS.map((character) => {
+        const entry = getCharacter(progress, character, now)
+        return [character, levelToNodeState(masteryLevel(entry.skills, entry.seen))]
+      }),
+    )
+  }, [progress])
+
   const key = useMorseKey({
     wpm: settings.timing.wpm,
     dotDashThresholdMs: settings.timing.dotDashThresholdMs,
@@ -130,7 +164,9 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
     bindings: settings.keys,
     frequency: settings.audio.frequency,
     volume: settings.audio.enabled ? settings.audio.volume : 0,
-    disabled: status !== 'running' || config.mode !== 'sending',
+    // In tree layout the key is always live: keying a character back is a
+    // legitimate way to say you recognised it, not only a sending exercise.
+    disabled: status !== 'running' || (layout !== 'tree' && config.mode !== 'sending'),
     onCharacter: (sent) => answer(sent),
   })
 
@@ -190,6 +226,36 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
                       <span className="mt-0.5 block text-[11px] opacity-70">
                         {SESSION_MODES[id].prompt}
                       </span>
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+
+              <fieldset>
+                <legend className="font-mono text-[10px] tracking-[0.18em] text-muted">
+                  ANSWER BY
+                </legend>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {[
+                    { id: 'flat' as const, label: 'TYPING', hint: 'Type the letter' },
+                    { id: 'tree' as const, label: 'THE TREE', hint: 'Pick it on the tree' },
+                  ].map((entry) => (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      aria-pressed={layout === entry.id}
+                      onClick={() => setLayout(entry.id)}
+                      className="rounded-lg border px-4 py-2.5 text-left transition-colors"
+                      style={{
+                        borderColor:
+                          layout === entry.id ? 'var(--color-signal)' : 'var(--color-line)',
+                        color: layout === entry.id ? 'var(--color-signal)' : 'var(--color-muted)',
+                      }}
+                    >
+                      <span className="block font-mono text-xs tracking-[0.12em]">
+                        {entry.label}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] opacity-70">{entry.hint}</span>
                     </button>
                   ))}
                 </div>
@@ -324,7 +390,47 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
         )}
       </div>
 
-      {config.mode === 'sending' ? (
+      {layout === 'tree' && !challenge ? (
+        <div className="mt-6">
+          <SignalTree
+            states={nodeStates}
+            // Highlighted only during feedback. Lighting the target while the
+            // prompt is still up would answer the question for them.
+            highlight={feedback ? feedback.expected : null}
+            // The path being keyed right now, so the learner watches themselves
+            // walk the tree rather than being told about it afterwards.
+            livePath={key.state.pending}
+            onSelect={answer}
+            className="min-w-0"
+          />
+
+          <p className="mt-3 text-center text-xs leading-relaxed text-muted">
+            Answer however you like — tap a node, or key it and watch the path light up as you go.
+          </p>
+
+          <div className="mt-6">
+            <MorseKey
+              isDown={key.state.isDown}
+              pending={key.state.pending}
+              preview={key.state.preview}
+              commitProgress={key.state.commitProgress}
+              autoCommit={settings.timing.autoCommit}
+              keyLabel={settings.keys.key === ' ' ? 'SPACE' : settings.keys.key.toUpperCase()}
+              commitLabel={(settings.keys.submit ?? 'Control').toUpperCase()}
+              pointerHandlers={key.pointerHandlers}
+            />
+            <button
+              type="button"
+              onClick={key.commitCharacter}
+              disabled={key.state.pending === ''}
+              className="mx-auto mt-5 block w-full max-w-md rounded-lg border px-4 py-2.5 font-mono text-xs tracking-[0.14em] disabled:opacity-30"
+              style={{ borderColor: 'var(--color-signal)', color: 'var(--color-signal)' }}
+            >
+              FINISH CHARACTER
+            </button>
+          </div>
+        </div>
+      ) : config.mode === 'sending' ? (
         <div className="mt-8">
           <MorseKey
             isDown={key.state.isDown}

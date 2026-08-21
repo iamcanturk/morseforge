@@ -65,6 +65,15 @@ export interface SignalTreeProps {
    */
   highlight?: string | null
   /**
+   * A partial code being keyed right now, e.g. ".-" while the user is mid
+   * character. Lights the prefix path from the root.
+   *
+   * Separate from `highlight` because they mean opposite things: `highlight`
+   * reveals an answer, this shows where the learner currently *is*. Colouring
+   * them the same would make "here is the answer" and "here is you" identical.
+   */
+  livePath?: string
+  /**
    * Called when a character node is picked. When omitted the tree renders as a
    * static diagram — nodes stay non-focusable so a keyboard user is not made to
    * tab through 26 inert circles (PROJECT.md §28).
@@ -82,6 +91,7 @@ export function SignalTree({
   states = {},
   power,
   highlight = null,
+  livePath,
   onSelect,
   className,
 }: SignalTreeProps) {
@@ -102,6 +112,17 @@ export function SignalTree({
     if (!highlight) return new Set<string>()
     return new Set(pathTo(highlight).map((node) => node.code))
   }, [highlight])
+
+  /** Every prefix of the code being keyed, including the root. */
+  const liveCodes = useMemo(() => {
+    const codes = new Set<string>()
+    if (!livePath) return codes
+    codes.add('')
+    for (let length = 1; length <= livePath.length; length++) {
+      codes.add(livePath.slice(0, length))
+    }
+    return codes
+  }, [livePath])
 
   const stateFor = (character: string | null): NodeState =>
     character ? (states[character] ?? 'locked') : 'active'
@@ -137,6 +158,7 @@ export function SignalTree({
               const parent = byCode.get(entry.node.code.slice(0, -1))
               if (!parent) return null
 
+              const live = liveCodes.has(entry.node.code) && liveCodes.has(parent.node.code)
               const lit =
                 highlightedCodes.has(entry.node.code) && highlightedCodes.has(parent.node.code)
               const state = stateFor(entry.node.character)
@@ -150,13 +172,15 @@ export function SignalTree({
                   x2={entry.cx}
                   y2={entry.cy}
                   stroke={
-                    lit
-                      ? 'var(--color-cyan)'
-                      : energised
-                        ? 'var(--color-signal-dim)'
-                        : 'color-mix(in srgb, var(--color-line) 90%, transparent)'
+                    live
+                      ? 'var(--color-amber)'
+                      : lit
+                        ? 'var(--color-cyan)'
+                        : energised
+                          ? 'var(--color-signal-dim)'
+                          : 'color-mix(in srgb, var(--color-line) 90%, transparent)'
                   }
-                  strokeWidth={lit ? 3 : 2}
+                  strokeWidth={live || lit ? 3 : 2}
                   strokeLinecap="round"
                 />
               )
@@ -169,6 +193,7 @@ export function SignalTree({
               const state = stateFor(character)
               const style = STATE_STYLE[state]
               const lit = highlightedCodes.has(code)
+              const live = liveCodes.has(code)
 
               // The root is the power core rather than a character.
               const isRoot = nodeDepth === 0
@@ -199,13 +224,19 @@ export function SignalTree({
                     // under the 44px touch target minimum (§28).
                     <circle cx={entry.cx} cy={entry.cy} r={24} fill="transparent" />
                   )}
-                  {(style.glow || lit) && (
+                  {(style.glow || lit || live) && (
                     <circle
                       cx={entry.cx}
                       cy={entry.cy}
                       r={NODE_RADIUS + 7}
-                      fill={lit ? 'var(--color-cyan)' : 'var(--color-signal)'}
-                      opacity={lit ? 0.22 : 0.14}
+                      fill={
+                        live
+                          ? 'var(--color-amber)'
+                          : lit
+                            ? 'var(--color-cyan)'
+                            : 'var(--color-signal)'
+                      }
+                      opacity={live || lit ? 0.22 : 0.14}
                     />
                   )}
                   <circle
@@ -214,9 +245,15 @@ export function SignalTree({
                     r={isRoot ? NODE_RADIUS + 4 : NODE_RADIUS}
                     fill={isRoot ? 'var(--color-panel)' : style.fill}
                     stroke={
-                      lit ? 'var(--color-cyan)' : isRoot ? 'var(--color-signal)' : style.stroke
+                      live
+                        ? 'var(--color-amber)'
+                        : lit
+                          ? 'var(--color-cyan)'
+                          : isRoot
+                            ? 'var(--color-signal)'
+                            : style.stroke
                     }
-                    strokeWidth={lit || isRoot ? 3 : 2}
+                    strokeWidth={live || lit || isRoot ? 3 : 2}
                   />
                   {isRoot ? (
                     <circle cx={entry.cx} cy={entry.cy} r={6} fill="var(--color-cyan)" />
@@ -228,7 +265,7 @@ export function SignalTree({
                       dominantBaseline="central"
                       fontSize={16}
                       fontWeight={600}
-                      fill={lit ? 'var(--color-cyan)' : style.text}
+                      fill={live ? 'var(--color-amber)' : lit ? 'var(--color-cyan)' : style.text}
                       style={{ fontFamily: 'var(--font-mono)' }}
                     >
                       {character}
