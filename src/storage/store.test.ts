@@ -210,3 +210,25 @@ describe('validation helpers', () => {
     expect(oneOf('neon', modes, 'light')).toBe('light')
   })
 })
+
+describe('validateOrDefault', () => {
+  it('accepts data that passes the validator', () => {
+    const { store } = make()
+    expect(store.validateOrDefault({ name: 'can', score: 3 })).toEqual({ name: 'can', score: 3 })
+  })
+
+  it('falls back to the default for anything else', () => {
+    // The §22 import path runs user-supplied files through this, so it has to
+    // behave exactly like a normal read of corrupt data.
+    const { store } = make()
+    expect(store.validateOrDefault({ name: 123 })).toEqual({ name: 'default', score: 0 })
+    expect(store.validateOrDefault(null)).toEqual({ name: 'default', score: 0 })
+    expect(store.validateOrDefault('nonsense')).toEqual({ name: 'default', score: 0 })
+  })
+
+  it('does not write anything by itself', () => {
+    const { store, driver } = make()
+    store.validateOrDefault({ name: 'can', score: 1 })
+    expect(driver.getItem('test_doc')).toBeNull()
+  })
+})

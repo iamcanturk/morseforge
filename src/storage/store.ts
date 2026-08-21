@@ -183,6 +183,17 @@ export class Store<T> {
     this.#notify(this.read())
   }
 
+  /**
+   * Run arbitrary data through this store's own validator.
+   *
+   * Exists for the §22 import: a file the user hand-edited must go through
+   * exactly the same checks as a normal read, rather than being trusted because
+   * it arrived by a different door.
+   */
+  validateOrDefault(value: unknown): T {
+    return this.#validate(value) ?? this.#createDefault()
+  }
+
   /** Drop the cache so the next read hits storage. */
   invalidate(): void {
     this.#cache = null

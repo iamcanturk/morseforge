@@ -13,7 +13,7 @@ character.
 **[morse.iamcanturk.dev →](https://morse.iamcanturk.dev)**
 
 [![Live](https://img.shields.io/badge/live-morse.iamcanturk.dev-00E88F?style=flat-square)](https://morse.iamcanturk.dev)
-[![Tests](https://img.shields.io/badge/tests-259%20passing-00E88F?style=flat-square)](#testing)
+[![Tests](https://img.shields.io/badge/tests-285%20passing-00E88F?style=flat-square)](#testing)
 [![License](https://img.shields.io/badge/license-MIT-8B98A5?style=flat-square)](LICENSE)
 [![Astro](https://img.shields.io/badge/Astro-7-8B98A5?style=flat-square)](https://astro.build)
 
@@ -132,7 +132,7 @@ Requires Node 20.11+.
 
 ### Testing
 
-259 tests, covering the parts where being wrong is silent:
+285 tests, covering the parts where being wrong is silent:
 
 - **Timing** — sending PARIS once takes exactly `60/WPM` seconds, checked at
   5/12/20/35 WPM and under Farnsworth. Every speed readout depends on it.
