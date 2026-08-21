@@ -12,8 +12,19 @@ const description =
     <header class="mb-12">
       <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Telegraph</h1>
       <p class="mt-3 max-w-2xl leading-relaxed text-muted">
-        Your keyboard is the key. Tap Space for a dot, hold it for a dash, and pause to finish a
-        character. Everything decodes as you send it — no account, nothing saved to a server.
+        {
+          /* A phone has no Space bar. Both variants ship in the HTML and CSS
+            picks one by pointer type, so a crawler still reads a full sentence
+            and nothing flashes the wrong instruction on load. */
+        }
+        <span class="pointer-coarse:hidden"
+          >Your keyboard is the key. Tap Space for a dot, hold it for a dash, and pause to finish a
+          character.</span
+        >
+        <span class="hidden pointer-coarse:inline"
+          >Your thumb is the key. Tap the button for a dot, hold it for a dash, and pause to finish
+          a character.</span
+        >&#32;Everything decodes as you send it — no account, nothing saved to a server.
       </p>
     </header>
 

@@ -111,126 +111,135 @@ export function SignalTree({
 
   return (
     <figure className={className}>
-      <svg
-        viewBox={`0 0 ${VIEWBOX.width} ${VIEWBOX.height}`}
-        className="h-auto w-full"
-        role="img"
-        aria-labelledby="signal-tree-title signal-tree-desc"
-      >
-        <title id="signal-tree-title">Morse signal tree</title>
-        <desc id="signal-tree-desc">
-          {`The Morse code binary tree across ${depth} levels. From the centre, a dot branches left and a dash branches right. ${
-            Object.values(states).filter((s) => s === 'mastered').length
-          } of 26 characters are mastered.`}
-        </desc>
+      {/* The deepest level packs twelve nodes across. Squeezed into a 375px
+          screen each node is under 6px wide — unreadable, and well below any
+          usable touch target. Scrolling sideways keeps the nodes at a real size
+          and, more importantly, keeps dots-left/dashes-right intact; rotating
+          the tree to fit would fit better and teach the wrong thing. */}
+      <div className="-mx-6 overflow-x-auto px-6 [scrollbar-width:thin] sm:mx-0 sm:px-0">
+        <svg
+          viewBox={`0 0 ${VIEWBOX.width} ${VIEWBOX.height}`}
+          className="h-auto w-full min-w-[640px]"
+          role="img"
+          aria-labelledby="signal-tree-title signal-tree-desc"
+        >
+          <title id="signal-tree-title">Morse signal tree</title>
+          <desc id="signal-tree-desc">
+            {`The Morse code binary tree across ${depth} levels. From the centre, a dot branches left and a dash branches right. ${
+              Object.values(states).filter((s) => s === 'mastered').length
+            } of 26 characters are mastered.`}
+          </desc>
 
-        {/* Traces first so nodes sit on top of them. */}
-        <g>
-          {placed.map((entry) => {
-            if (entry.node.depth === 0) return null
-            const parent = byCode.get(entry.node.code.slice(0, -1))
-            if (!parent) return null
+          {/* Traces first so nodes sit on top of them. */}
+          <g>
+            {placed.map((entry) => {
+              if (entry.node.depth === 0) return null
+              const parent = byCode.get(entry.node.code.slice(0, -1))
+              if (!parent) return null
 
-            const lit =
-              highlightedCodes.has(entry.node.code) && highlightedCodes.has(parent.node.code)
-            const state = stateFor(entry.node.character)
-            const energised = state === 'mastered' || state === 'active'
+              const lit =
+                highlightedCodes.has(entry.node.code) && highlightedCodes.has(parent.node.code)
+              const state = stateFor(entry.node.character)
+              const energised = state === 'mastered' || state === 'active'
 
-            return (
-              <line
-                key={`trace-${entry.node.code}`}
-                x1={parent.cx}
-                y1={parent.cy}
-                x2={entry.cx}
-                y2={entry.cy}
-                stroke={
-                  lit
-                    ? 'var(--color-cyan)'
-                    : energised
-                      ? 'var(--color-signal-dim)'
-                      : 'color-mix(in srgb, var(--color-line) 90%, transparent)'
-                }
-                strokeWidth={lit ? 3 : 2}
-                strokeLinecap="round"
-              />
-            )
-          })}
-        </g>
+              return (
+                <line
+                  key={`trace-${entry.node.code}`}
+                  x1={parent.cx}
+                  y1={parent.cy}
+                  x2={entry.cx}
+                  y2={entry.cy}
+                  stroke={
+                    lit
+                      ? 'var(--color-cyan)'
+                      : energised
+                        ? 'var(--color-signal-dim)'
+                        : 'color-mix(in srgb, var(--color-line) 90%, transparent)'
+                  }
+                  strokeWidth={lit ? 3 : 2}
+                  strokeLinecap="round"
+                />
+              )
+            })}
+          </g>
 
-        <g>
-          {placed.map((entry) => {
-            const { character, code, depth: nodeDepth } = entry.node
-            const state = stateFor(character)
-            const style = STATE_STYLE[state]
-            const lit = highlightedCodes.has(code)
+          <g>
+            {placed.map((entry) => {
+              const { character, code, depth: nodeDepth } = entry.node
+              const state = stateFor(character)
+              const style = STATE_STYLE[state]
+              const lit = highlightedCodes.has(code)
 
-            // The root is the power core rather than a character.
-            const isRoot = nodeDepth === 0
-            const selectable = Boolean(onSelect) && character !== null
+              // The root is the power core rather than a character.
+              const isRoot = nodeDepth === 0
+              const selectable = Boolean(onSelect) && character !== null
 
-            return (
-              <g
-                key={`node-${code || 'root'}`}
-                {...(selectable
-                  ? {
-                      role: 'button',
-                      tabIndex: 0,
-                      'aria-label': `${character}, Morse ${code}, ${state}`,
-                      style: { cursor: 'pointer' },
-                      onClick: () => onSelect?.(character!),
-                      onKeyDown: (event: React.KeyboardEvent) => {
-                        if (event.key !== 'Enter' && event.key !== ' ') return
-                        // Space is the Morse key everywhere else in the app, so
-                        // it must not also scroll the page here.
-                        event.preventDefault()
-                        onSelect?.(character!)
-                      },
-                    }
-                  : {})}
-              >
-                {selectable && (
-                  // A generous invisible hit area: the 17px circles are well
-                  // under the 44px touch target minimum (§28).
-                  <circle cx={entry.cx} cy={entry.cy} r={24} fill="transparent" />
-                )}
-                {(style.glow || lit) && (
+              return (
+                <g
+                  key={`node-${code || 'root'}`}
+                  {...(selectable
+                    ? {
+                        role: 'button',
+                        tabIndex: 0,
+                        'aria-label': `${character}, Morse ${code}, ${state}`,
+                        style: { cursor: 'pointer' },
+                        onClick: () => onSelect?.(character!),
+                        onKeyDown: (event: React.KeyboardEvent) => {
+                          if (event.key !== 'Enter' && event.key !== ' ') return
+                          // Space is the Morse key everywhere else in the app, so
+                          // it must not also scroll the page here.
+                          event.preventDefault()
+                          onSelect?.(character!)
+                        },
+                      }
+                    : {})}
+                >
+                  {selectable && (
+                    // A generous invisible hit area: the 17px circles are well
+                    // under the 44px touch target minimum (§28).
+                    <circle cx={entry.cx} cy={entry.cy} r={24} fill="transparent" />
+                  )}
+                  {(style.glow || lit) && (
+                    <circle
+                      cx={entry.cx}
+                      cy={entry.cy}
+                      r={NODE_RADIUS + 7}
+                      fill={lit ? 'var(--color-cyan)' : 'var(--color-signal)'}
+                      opacity={lit ? 0.22 : 0.14}
+                    />
+                  )}
                   <circle
                     cx={entry.cx}
                     cy={entry.cy}
-                    r={NODE_RADIUS + 7}
-                    fill={lit ? 'var(--color-cyan)' : 'var(--color-signal)'}
-                    opacity={lit ? 0.22 : 0.14}
+                    r={isRoot ? NODE_RADIUS + 4 : NODE_RADIUS}
+                    fill={isRoot ? 'var(--color-panel)' : style.fill}
+                    stroke={
+                      lit ? 'var(--color-cyan)' : isRoot ? 'var(--color-signal)' : style.stroke
+                    }
+                    strokeWidth={lit || isRoot ? 3 : 2}
                   />
-                )}
-                <circle
-                  cx={entry.cx}
-                  cy={entry.cy}
-                  r={isRoot ? NODE_RADIUS + 4 : NODE_RADIUS}
-                  fill={isRoot ? 'var(--color-panel)' : style.fill}
-                  stroke={lit ? 'var(--color-cyan)' : isRoot ? 'var(--color-signal)' : style.stroke}
-                  strokeWidth={lit || isRoot ? 3 : 2}
-                />
-                {isRoot ? (
-                  <circle cx={entry.cx} cy={entry.cy} r={6} fill="var(--color-cyan)" />
-                ) : (
-                  <text
-                    x={entry.cx}
-                    y={entry.cy}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fontSize={16}
-                    fontWeight={600}
-                    fill={lit ? 'var(--color-cyan)' : style.text}
-                    style={{ fontFamily: 'var(--font-mono)' }}
-                  >
-                    {character}
-                  </text>
-                )}
-              </g>
-            )
-          })}
-        </g>
-      </svg>
+                  {isRoot ? (
+                    <circle cx={entry.cx} cy={entry.cy} r={6} fill="var(--color-cyan)" />
+                  ) : (
+                    <text
+                      x={entry.cx}
+                      y={entry.cy}
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fontSize={16}
+                      fontWeight={600}
+                      fill={lit ? 'var(--color-cyan)' : style.text}
+                      style={{ fontFamily: 'var(--font-mono)' }}
+                    >
+                      {character}
+                    </text>
+                  )}
+                </g>
+              )
+            })}
+          </g>
+        </svg>
+      </div>
 
       {powerPercent !== null && (
         <figcaption className="mt-4 flex items-center gap-3 font-mono text-xs tracking-[0.18em] text-muted">

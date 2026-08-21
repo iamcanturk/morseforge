@@ -10,7 +10,9 @@ import { Logo } from './brand/Logo'
  * The nav doubles as internal linking: every page reaching every other page in
  * one hop is what lets a crawler discover the whole site from any entry point,
  * which matters when most arrivals will land on a content page rather than the
- * home page.
+ * home page. That is also why it stays a plain list of links on mobile and
+ * scrolls sideways rather than collapsing behind a menu button: a disclosure
+ * needs JavaScript, and six links do not earn it.
  */
 const links = [
   { href: '/learn-morse-code-in-7-days/', label: 'LEARN' },
@@ -25,24 +27,37 @@ const current = Astro.url.pathname
 ---
 
 <header class="border-b border-line">
-  <div class="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-4">
+  <div class="mx-auto flex max-w-6xl items-center gap-5 px-6 py-4">
     <a href="/" class="shrink-0" aria-label="MorseForge home">
       <Logo size={24} />
     </a>
 
-    <nav aria-label="Main" class="flex flex-wrap items-center gap-x-5 gap-y-2">
-      {
-        links.map(({ href, label }) => (
-          <a
-            href={href}
-            aria-current={current === href ? 'page' : undefined}
-            class="font-mono text-xs tracking-[0.16em] transition-colors"
-            style={current === href ? 'color: var(--color-signal)' : 'color: var(--color-muted)'}
-          >
-            {label}
-          </a>
-        ))
-      }
+    {
+      /* Sideways scroll rather than wrapping: six links wrapped to four rows on
+        a 375px screen and pushed the page heading below the fold. */
+    }
+    <nav
+      aria-label="Main"
+      class="-mr-6 min-w-0 flex-1 overflow-x-auto pr-6 [scrollbar-width:none] sm:mr-0 sm:pr-0 [&::-webkit-scrollbar]:hidden"
+    >
+      <ul class="flex items-center gap-5 whitespace-nowrap sm:justify-end">
+        {
+          links.map(({ href, label }) => (
+            <li>
+              <a
+                href={href}
+                aria-current={current === href ? 'page' : undefined}
+                class="font-mono text-xs tracking-[0.16em] transition-colors"
+                style={
+                  current === href ? 'color: var(--color-signal)' : 'color: var(--color-muted)'
+                }
+              >
+                {label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
     </nav>
   </div>
 </header>

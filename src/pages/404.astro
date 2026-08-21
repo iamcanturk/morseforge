@@ -1,0 +1,46 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import { WORDS } from '../data/words'
+
+const title = 'Page Not Found | MorseForge'
+const description = 'That page does not exist. Here is the way back.'
+
+/** A handful of real destinations beats a bare "go home" link. */
+const routes = [
+  { href: '/learn-morse-code-in-7-days/', label: 'Learn Morse in 7 days' },
+  { href: '/morse-code-translator/', label: 'Morse code translator' },
+  { href: '/morse-code-alphabet/', label: 'The full alphabet' },
+  { href: '/words/', label: `${WORDS.length} words in Morse` },
+  { href: '/telegraph/', label: 'Send Morse yourself' },
+  { href: '/tree/', label: 'The Morse tree' },
+]
+---
+
+<BaseLayout title={title} description={description} path="/404/">
+  <main class="mx-auto flex max-w-2xl flex-col items-center px-6 py-24 text-center">
+    {/* "?" in Morse. A 404 is the one place a puzzle is welcome. */}
+    <p class="font-mono text-2xl tracking-[0.3em] text-signal-dim" aria-hidden="true">··−−··</p>
+
+    <h1 class="mt-6 font-display text-3xl font-bold tracking-tight">No signal here</h1>
+
+    <p class="mt-4 leading-relaxed text-muted">
+      That page does not exist. The dots and dashes above are a question mark — which is roughly
+      what the server said too.
+    </p>
+
+    <ul class="mt-10 grid w-full gap-3 sm:grid-cols-2">
+      {
+        routes.map(({ href, label }) => (
+          <li>
+            <a
+              href={href}
+              class="block rounded-xl border border-line bg-panel px-4 py-3 text-left text-sm text-muted transition-colors hover:border-signal hover:text-signal"
+            >
+              {label}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </main>
+</BaseLayout>

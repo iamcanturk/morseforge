@@ -84,7 +84,12 @@ const identityGraph = {
     <link rel="canonical" href={canonical} />
 
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#080B10" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="MorseForge" />
 
     <meta property="og:type" content="website" />
     <meta property="og:title" content={title} />
@@ -127,6 +132,20 @@ const identityGraph = {
     }
   </head>
   <body class="flex min-h-dvh flex-col bg-void text-ink antialiased">
+    {
+      /* Registered after load so it never competes with the first render for
+        bandwidth. The app works fully without it; the worker only adds offline. */
+    }
+    <script is:inline>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {
+            // Unsupported, blocked by policy, or a private window. Offline is
+            // an enhancement here, so there is nothing to tell the user.
+          })
+        })
+      }
+    </script>
     <a
       href="#main"
       class="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:rounded focus:bg-panel focus:px-4 focus:py-2 focus:text-signal"

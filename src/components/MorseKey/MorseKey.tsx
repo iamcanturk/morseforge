@@ -85,7 +85,9 @@ export function MorseKey({
       <button
         type="button"
         disabled={disabled}
-        aria-label={`Morse key. Hold ${keyLabel}, or press and hold here. Short press sends a dot, long press sends a dash.`}
+        // Names both inputs rather than assuming a keyboard: the same control
+        // is a Space bar on a laptop and a thumb on a phone.
+        aria-label={`Morse key. Press and hold this button, or hold the ${keyLabel} key. A short press sends a dot, a long press sends a dash.`}
         aria-pressed={isDown}
         className="w-full max-w-md touch-none select-none rounded-2xl border-2 px-8 py-10 disabled:opacity-40"
         style={{
@@ -115,16 +117,34 @@ export function MorseKey({
             className="font-mono text-sm tracking-[0.2em]"
             style={{ color: isDown ? 'var(--color-signal)' : 'var(--color-muted)' }}
           >
-            {isDown ? 'TRANSMITTING' : `HOLD ${keyLabel}`}
+            {isDown ? (
+              'TRANSMITTING'
+            ) : (
+              <>
+                {/* A phone has no Space bar and no Ctrl key. Swapping the copy
+                    by pointer type in CSS keeps both variants in the prerendered
+                    HTML, so there is no hydration mismatch and no flash of the
+                    wrong instruction. */}
+                <span className="pointer-coarse:hidden">HOLD {keyLabel}</span>
+                <span className="hidden pointer-coarse:inline">HOLD TO SEND</span>
+              </>
+            )}
           </span>
         </span>
       </button>
 
       <p className="max-w-md text-center text-xs leading-relaxed text-muted">
-        Short press sends a dot, long press sends a dash.{' '}
-        {autoCommit
-          ? 'Pause to finish the character — the bar above shows how long you have.'
-          : `Take as long as you like, then press ${commitLabel} to finish the character.`}
+        Tap for a dot, hold for a dash.{' '}
+        {autoCommit ? (
+          'Pause to finish the character — the bar above shows how long you have.'
+        ) : (
+          <>
+            Take as long as you like, then
+            <span className="pointer-coarse:hidden"> press {commitLabel} </span>
+            <span className="hidden pointer-coarse:inline"> use the button below </span>
+            to finish the character.
+          </>
+        )}
       </p>
     </div>
   )

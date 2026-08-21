@@ -3,6 +3,7 @@ import { defineConfig } from 'astro/config'
 import react from '@astrojs/react'
 import sitemap from '@astrojs/sitemap'
 import tailwindcss from '@tailwindcss/vite'
+import { pwa } from './src/pwa/integration'
 
 export const SITE_URL = 'https://morse.iamcanturk.dev'
 
@@ -21,7 +22,19 @@ export default defineConfig({
 
   trailingSlash: 'always',
 
-  integrations: [react(), sitemap()],
+  integrations: [
+    react(),
+    sitemap(),
+    pwa({
+      name: 'MorseForge — Learn Morse Code',
+      shortName: 'MorseForge',
+      description:
+        'Learn Morse code as a game. Real CW audio, a keyboard straight key, and a signal tree that lights up as you master each character.',
+      themeColor: '#080B10',
+      backgroundColor: '#080B10',
+      startUrl: '/',
+    }),
+  ],
 
   vite: {
     plugins: [tailwindcss()],
