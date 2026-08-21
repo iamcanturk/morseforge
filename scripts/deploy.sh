@@ -23,10 +23,8 @@ echo "==> Building"
 rm -rf dist
 npm run build
 
-if [ ! -f dist/index.html ]; then
-  echo "!! dist/index.html missing — refusing to deploy an empty build" >&2
-  exit 1
-fi
+echo "==> Checking the build"
+bash "$(dirname "$0")/check-build.sh" dist
 
 echo "==> Checking SSH access to ${REMOTE}"
 if ! ssh -o BatchMode=yes -o ConnectTimeout=10 "$REMOTE" true 2>/dev/null; then

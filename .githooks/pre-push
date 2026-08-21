@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+#
+# Runs the same checks CI does, before anything leaves the machine.
+#
+# This is the primary safety net, not a convenience: GitHub Actions is not
+# always available on this account, and a repo whose only guard rail is a
+# workflow that may or may not run has no guard rail at all.
+#
+# Installed by `npm install` via the `prepare` script, which points
+# core.hooksPath at .githooks/ — so the hook is version-controlled rather than
+# living untracked in .git/hooks and vanishing on a fresh clone.
+#
+# Skip deliberately with: git push --no-verify
+
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+echo "pre-push: verifying…"
+
+if ! npm run --silent verify; then
+  echo
+  echo "pre-push: verify failed. Fix it, or push with --no-verify if you mean to." >&2
+  exit 1
+fi
+
+echo
+echo "pre-push: building…"
+if ! npm run --silent build >/dev/null; then
+  echo "pre-push: build failed." >&2
+  exit 1
+fi
+
+echo
+bash scripts/check-build.sh

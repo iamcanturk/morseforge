@@ -42,62 +42,13 @@ jobs:
       - name: Build
         run: npm run build
 
-      # The product's whole SEO and GEO position rests on pages being real HTML
-      # without JavaScript. That is a property of the build rather than of any
-      # unit test, so it is asserted against the actual output — a stray
-      # `output: 'server'`, or a page turned into a client-only island, would
-      # otherwise ship silently and cost months of indexing.
-      - name: Assert pages are prerendered
-        run: |
-          set -euo pipefail
+      # Assertions about the build output live in scripts/check-build.sh so
+      # that CI and the local pre-push hook run exactly the same checks. Keeping
+      # them in this file meant they could not be run locally at all, and would
+      # drift the moment either side changed.
+      - name: Build checks
+        run: npm run check:build
 
-          for page in \
-            index.html \
-            learn-morse-code-in-7-days/index.html \
-            morse-code-translator/index.html \
-            morse-code-alphabet/index.html \
-            words/sos/index.html
-          do
-            if [ ! -f "dist/$page" ]; then
-              echo "::error::dist/$page was not generated"
-              exit 1
-            fi
-
-            # Strip scripts and tags, then measure what a crawler would read.
-            text=$(sed -e 's/<script[^>]*>.*<\/script>//g' "dist/$page" \
-                   | sed -e 's/<[^>]*>/ /g' | tr -s '[:space:]' ' ')
-
-            if [ "${#text}" -lt 500 ]; then
-              echo "::error::dist/$page has only ${#text} characters of text without JavaScript"
-              exit 1
-            fi
-            echo "ok  $page — ${#text} characters of prerendered text"
-          done
-
-      - name: Assert the PWA was generated
-        run: |
-          set -euo pipefail
-
-          test -f dist/manifest.webmanifest || { echo "::error::no manifest"; exit 1; }
-          test -f dist/sw.js || { echo "::error::no service worker"; exit 1; }
-
-          # A worker that precaches itself pins the current build permanently.
-          if grep -q '"/sw.js"' dist/sw.js; then
-            echo "::error::the service worker precaches itself"
-            exit 1
-          fi
-          echo "ok  manifest and service worker generated"
-
-      - name: Assert crawler endpoints exist
-        run: |
-          set -euo pipefail
-
-          for file in robots.txt llms.txt sitemap-index.xml; do
-            test -f "dist/$file" || { echo "::error::dist/$file missing"; exit 1; }
-          done
-
-          grep -q GPTBot dist/robots.txt || {
-            echo "::error::robots.txt no longer names the AI crawlers"
-            exit 1
-          }
-          echo "ok  robots.txt, llms.txt and sitemap present"
+      # GitHub Actions is not always available on this account, so the pre-push
+      # hook is the primary gate and this workflow is the backstop. If the hook
+      # were bypassed, this is what catches it.

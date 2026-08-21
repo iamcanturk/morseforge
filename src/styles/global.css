@@ -73,3 +73,84 @@
 @utility glow-signal {
   filter: drop-shadow(0 0 10px color-mix(in srgb, var(--color-signal) 45%, transparent));
 }
+
+/* ---------------------------------------------------------------------------
+   Prose for Markdown content.
+   Hand-written rather than pulled from a typography plugin: the blog has one
+   post and about eight element types, and a plugin would ship rules for
+   dozens more that this design would then have to override.
+--------------------------------------------------------------------------- */
+@layer components {
+  .mf-prose {
+    line-height: 1.75;
+  }
+
+  .mf-prose > * + * {
+    margin-top: 1.25em;
+  }
+
+  .mf-prose h2 {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin-top: 2.5em;
+    margin-bottom: 0.6em;
+  }
+
+  .mf-prose h3 {
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-top: 2em;
+    margin-bottom: 0.5em;
+  }
+
+  .mf-prose p,
+  .mf-prose li {
+    color: var(--color-muted);
+  }
+
+  .mf-prose strong {
+    color: var(--color-ink);
+    font-weight: 600;
+  }
+
+  .mf-prose a {
+    color: var(--color-signal);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--color-signal) 40%, transparent);
+    text-underline-offset: 4px;
+  }
+
+  .mf-prose a:hover {
+    text-decoration-color: var(--color-signal);
+  }
+
+  .mf-prose code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    color: var(--color-cyan);
+  }
+
+  .mf-prose ol,
+  .mf-prose ul {
+    padding-left: 1.4em;
+  }
+
+  .mf-prose ol {
+    list-style: decimal;
+  }
+
+  .mf-prose ul {
+    list-style: disc;
+  }
+
+  .mf-prose li + li {
+    margin-top: 0.4em;
+  }
+
+  .mf-prose li::marker {
+    color: var(--color-signal-dim);
+  }
+}

@@ -31,7 +31,10 @@
     "verify": "npm run format:check && npm run typecheck && npm run test",
     "deploy": "bash scripts/deploy.sh",
     "format": "prettier --write \"src/**/*.{ts,tsx,astro,css}\" \"*.{json,mjs,ts}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,astro,css}\" \"*.{json,mjs,ts}\""
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,astro,css}\" \"*.{json,mjs,ts}\"",
+    "prepare": "git config core.hooksPath .githooks || true",
+    "check:build": "bash scripts/check-build.sh",
+    "verify:all": "npm run verify && npm run build && npm run check:build"
   },
   "dependencies": {
     "@astrojs/react": "^6.0.4",

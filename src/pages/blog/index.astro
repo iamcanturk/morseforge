@@ -1,0 +1,76 @@
+---
+import { getCollection } from 'astro:content'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { AUTHOR, SITE } from '../../config/site'
+
+const path = '/blog/'
+const title = 'Morse Code Notes — Learning, Timing and Technique | MorseForge'
+const description =
+  'Notes on learning Morse code properly: why charts fail, what Farnsworth timing is for, and how to get past the wall every beginner hits around 10 words per minute.'
+
+// Drafts are excluded at build time, so an unfinished post never reaches the
+// index, the sitemap or a crawler.
+const posts = (await getCollection('blog', ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.published.getTime() - a.data.published.getTime(),
+)
+
+const formatDate = (date: Date) =>
+  date.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })
+
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Blog',
+    name: 'MorseForge Notes',
+    description,
+    url: new URL(path, SITE.url).href,
+    author: { '@id': `${SITE.url}/#author` },
+    isPartOf: { '@id': `${SITE.url}/#website` },
+    blogPost: posts.map((post) => ({
+      '@type': 'BlogPosting',
+      headline: post.data.title,
+      description: post.data.description,
+      datePublished: post.data.published.toISOString(),
+      url: `${SITE.url}/blog/${post.id}/`,
+      author: { '@id': `${SITE.url}/#author` },
+    })),
+  },
+]
+---
+
+<BaseLayout title={title} description={description} path={path} schema={schema}>
+  <main class="mx-auto max-w-3xl px-6 py-14">
+    <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Notes</h1>
+    <p class="mt-4 max-w-2xl leading-relaxed text-muted">
+      What actually works when learning Morse code, and why — written while building the trainer, by {
+        AUTHOR.name
+      }.
+    </p>
+
+    {
+      posts.length === 0 ? (
+        <p class="mt-12 font-mono text-xs tracking-[0.16em] text-muted">NOTHING PUBLISHED YET</p>
+      ) : (
+        <ul class="mt-12 space-y-4">
+          {posts.map((post) => (
+            <li>
+              <a
+                href={`/blog/${post.id}/`}
+                class="block rounded-xl border border-line bg-panel p-6 transition-colors hover:border-signal-dim"
+              >
+                <time
+                  datetime={post.data.published.toISOString()}
+                  class="font-mono text-[10px] tracking-[0.16em] text-signal-dim"
+                >
+                  {formatDate(post.data.published).toUpperCase()}
+                </time>
+                <h2 class="mt-2 font-display text-xl font-semibold text-ink">{post.data.title}</h2>
+                <p class="mt-2 leading-relaxed text-muted">{post.data.description}</p>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </main>
+</BaseLayout>
