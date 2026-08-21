@@ -1,0 +1,103 @@
+# No step interpolates untrusted event data into a shell. The only `${{ }}` here
+# is `github.ref`, used in the concurrency group, which is never passed to `run`.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push makes an in-flight run irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Formatting
+        run: npm run format:check
+
+      - name: Types
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # The product's whole SEO and GEO position rests on pages being real HTML
+      # without JavaScript. That is a property of the build rather than of any
+      # unit test, so it is asserted against the actual output — a stray
+      # `output: 'server'`, or a page turned into a client-only island, would
+      # otherwise ship silently and cost months of indexing.
+      - name: Assert pages are prerendered
+        run: |
+          set -euo pipefail
+
+          for page in \
+            index.html \
+            learn-morse-code-in-7-days/index.html \
+            morse-code-translator/index.html \
+            morse-code-alphabet/index.html \
+            words/sos/index.html
+          do
+            if [ ! -f "dist/$page" ]; then
+              echo "::error::dist/$page was not generated"
+              exit 1
+            fi
+
+            # Strip scripts and tags, then measure what a crawler would read.
+            text=$(sed -e 's/<script[^>]*>.*<\/script>//g' "dist/$page" \
+                   | sed -e 's/<[^>]*>/ /g' | tr -s '[:space:]' ' ')
+
+            if [ "${#text}" -lt 500 ]; then
+              echo "::error::dist/$page has only ${#text} characters of text without JavaScript"
+              exit 1
+            fi
+            echo "ok  $page — ${#text} characters of prerendered text"
+          done
+
+      - name: Assert the PWA was generated
+        run: |
+          set -euo pipefail
+
+          test -f dist/manifest.webmanifest || { echo "::error::no manifest"; exit 1; }
+          test -f dist/sw.js || { echo "::error::no service worker"; exit 1; }
+
+          # A worker that precaches itself pins the current build permanently.
+          if grep -q '"/sw.js"' dist/sw.js; then
+            echo "::error::the service worker precaches itself"
+            exit 1
+          fi
+          echo "ok  manifest and service worker generated"
+
+      - name: Assert crawler endpoints exist
+        run: |
+          set -euo pipefail
+
+          for file in robots.txt llms.txt sitemap-index.xml; do
+            test -f "dist/$file" || { echo "::error::dist/$file missing"; exit 1; }
+          done
+
+          grep -q GPTBot dist/robots.txt || {
+            echo "::error::robots.txt no longer names the AI crawlers"
+            exit 1
+          }
+          echo "ok  robots.txt, llms.txt and sitemap present"
