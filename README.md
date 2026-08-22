@@ -13,7 +13,7 @@ character.
 **[morse.iamcanturk.dev →](https://morse.iamcanturk.dev)**
 
 [![Live](https://img.shields.io/badge/live-morse.iamcanturk.dev-00E88F?style=flat-square)](https://morse.iamcanturk.dev)
-[![Tests](https://img.shields.io/badge/tests-572%20passing-00E88F?style=flat-square)](#testing)
+[![Tests](https://img.shields.io/badge/tests-617%20passing-00E88F?style=flat-square)](#testing)
 [![License](https://img.shields.io/badge/license-MIT-8B98A5?style=flat-square)](LICENSE)
 [![Astro](https://img.shields.io/badge/Astro-7-8B98A5?style=flat-square)](https://astro.build)
 
@@ -37,6 +37,7 @@ No account. No ads. No server — your progress never leaves your device.
 | **[Telegraph](https://morse.iamcanturk.dev/telegraph/)**                           | Your keyboard is the key. Tap for a dot, hold for a dash, decoded live                      |
 | **[Copy practice](https://morse.iamcanturk.dev/copy/)**                            | Whole lines — code groups, words, on-air phrases, callsigns — graded character by character |
 | **[Daily challenge](https://morse.iamcanturk.dev/daily/)**                         | Eight lines a day, generated from the date so everyone gets the same one, with no backend   |
+| **[Games](https://morse.iamcanturk.dev/games/signal-defender/)**                   | Signal Defender for copying under pressure, Morse Runner for sending under it               |
 | **[Translator](https://morse.iamcanturk.dev/morse-code-translator/)**              | Text ↔ Morse, with audio and a signal lamp at 5–40 WPM                                      |
 | **[Alphabet](https://morse.iamcanturk.dev/morse-code-alphabet/)**                  | Every character per ITU-R M.1677-1, click to hear                                           |
 | **[Words](https://morse.iamcanturk.dev/words/)**                                   | 22 words and phrases, each playable and explained                                           |
@@ -161,7 +162,7 @@ Requires Node 20.11+.
 
 ### Testing
 
-572 tests, covering the parts where being wrong is silent:
+617 tests, covering the parts where being wrong is silent:
 
 - **Timing** — sending PARIS once takes exactly `60/WPM` seconds, checked at
   5/12/20/35 WPM and under Farnsworth. Every speed readout depends on it.
@@ -178,6 +179,10 @@ Requires Node 20.11+.
 - **Keyboard** — binding the key to Space must not stop every button and link
   on the page being activated by Space, which is what a `window` listener with
   an unconditional `preventDefault` does.
+- **Games** — the rules are pure and tested away from any canvas: difficulty
+  never runs past its floor however long the run lasts, a wrong answer costs
+  the streak but never a life, and the tightest gap still leaves time to key a
+  character.
 - **Reachability** — `npm run verify` fails on a module under `src/data`,
   `src/game`, `src/engine`, `src/storage` or `src/analytics` that no page can
   reach. Three features once shipped fully tested and completely unreachable;
