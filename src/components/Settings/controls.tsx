@@ -48,10 +48,13 @@ export function Toggle({
           : 'var(--color-elevated)',
       }}
     >
+      {/* Moved with a transform rather than `left`, and `transition-all`
+          replaced: animating a layout property re-lays-out the page on every
+          frame, and `all` animates whatever anyone adds here later. */}
       <span
-        className="absolute top-1 h-4 w-4 rounded-full transition-all"
+        className="absolute top-1 left-1.5 h-4 w-4 rounded-full transition-transform duration-150"
         style={{
-          left: checked ? '26px' : '6px',
+          transform: checked ? 'translateX(20px)' : 'translateX(0)',
           background: checked ? 'var(--color-signal)' : 'var(--color-muted)',
         }}
       />

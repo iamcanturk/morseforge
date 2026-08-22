@@ -22,11 +22,23 @@ export interface MorseKeyProps {
   /** Label for the manual commit key, e.g. "CTRL". */
   commitLabel?: string
   disabled?: boolean
+  /**
+   * Everything that drives the key, spread onto the button.
+   *
+   * Named for pointers historically, but it carries the keyboard handlers too
+   * — the button has to answer for itself when it is the focused element,
+   * because the window-level binding deliberately ignores events aimed at a
+   * button. The type says so rather than letting the spread carry handlers
+   * nothing declares.
+   */
   pointerHandlers: {
     onPointerDown: (event: React.PointerEvent) => void
     onPointerUp: () => void
     onPointerLeave: () => void
     onPointerCancel: () => void
+    onKeyDown?: (event: React.KeyboardEvent) => void
+    onKeyUp?: (event: React.KeyboardEvent) => void
+    onBlur?: () => void
   }
 }
 
@@ -86,10 +98,13 @@ export function MorseKey({
               style={{ background: 'var(--color-line)' }}
             >
               {showCountdown && (
+                // Scaled rather than resized: this updates on every frame of
+                // the countdown, and animating `width` would run layout each
+                // time.
                 <span
-                  className="block h-full rounded-full"
+                  className="block h-full w-full origin-left rounded-full"
                   style={{
-                    width: `${(1 - commitProgress) * 100}%`,
+                    transform: `scaleX(${1 - commitProgress})`,
                     background:
                       commitProgress > 0.75 ? 'var(--color-amber)' : 'var(--color-signal-dim)',
                   }}
@@ -118,8 +133,12 @@ export function MorseKey({
           boxShadow: isDown
             ? '0 0 32px color-mix(in srgb, var(--color-signal) 35%, transparent)'
             : 'none',
-          // Only these two properties animate, per the §29 performance budget.
-          transition: 'background-color 60ms linear, box-shadow 60ms linear',
+          // No transition, for the same reason the signal lamp has none: a key
+          // is down or it is up, and easing the change blurs the boundary the
+          // learner is timing against. The 60ms fade this replaces also broke
+          // the §29 budget it claimed to be following — background-color and
+          // box-shadow are neither transform nor opacity, and box-shadow is
+          // among the most expensive properties to animate.
         }}
         {...pointerHandlers}
       >

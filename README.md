@@ -67,6 +67,14 @@ beginner who means to send `S` and, three seconds of hesitation later, has sent
 `E E E`. Keying patience is its own setting, defaulting to 1.6 seconds, with a
 manual mode that removes the clock entirely.
 
+**Only transform and opacity animate.** Three things were breaking that and
+one of them carried a comment claiming it was not: the key faded its
+background-colour and box-shadow, the power meter animated `width`, and a
+toggle used `transition-all`. Animating a layout property runs layout on every
+frame; `box-shadow` is among the most expensive things to animate at all. The
+key now has no transition whatsoever, which is also more correct — a key is
+down or up, and easing that blurs the boundary a learner is timing against.
+
 **The pages people find in a search ship no framework.** The 22 word pages and
 the alphabet chart used to load 190 KB of React to attach a click handler to
 markup that was already complete. They are now 6–8 KB: the audio engine and

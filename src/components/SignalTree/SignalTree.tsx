@@ -288,12 +288,15 @@ export function SignalTree({
             className="h-1.5 flex-1 overflow-hidden rounded-full"
             style={{ background: 'var(--color-line)' }}
           >
+            {/* Scaled rather than resized. Animating `width` runs layout on
+                every frame of the 400ms; a transform runs on the compositor
+                and touches nothing else on the page. */}
             <span
-              className="block h-full rounded-full"
+              className="block h-full w-full origin-left rounded-full"
               style={{
-                width: `${powerPercent}%`,
+                transform: `scaleX(${powerPercent / 100})`,
                 background: 'var(--color-signal)',
-                transition: 'width 400ms ease-out',
+                transition: 'transform 400ms ease-out',
               }}
             />
           </span>
