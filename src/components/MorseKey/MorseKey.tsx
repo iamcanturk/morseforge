@@ -47,21 +47,41 @@ export function MorseKey({
     <div className="flex flex-col items-center gap-5">
       {/* Reserved height, so resolving a character never shifts the key out
           from under the user's finger mid-send. */}
-      <div className="flex h-24 w-full max-w-md flex-col items-center justify-center gap-2">
+      {/* `role="status"` on the wrapper rather than on the readout: a live
+          region has to exist before its content does, or the announcement is
+          dropped. This is the only feedback a screen-reader user gets that an
+          element registered at all. */}
+      <div
+        role="status"
+        className="flex h-24 w-full max-w-md flex-col items-center justify-center gap-2"
+      >
         {pending ? (
           <>
-            <span className="font-mono text-3xl tracking-[0.25em] text-cyan">
+            {/* Read from the raw code rather than the prettified form:
+                `prettify` swaps the glyphs but does not separate them, so
+                splitting its output on spaces read a whole character as one
+                mark. */}
+            <span className="sr-only">
+              {[...pending].map((element) => (element === '.' ? 'dot' : 'dash')).join(' ')}
+              {preview ? `, ${preview}` : ', not a character yet'}
+            </span>
+            <span aria-hidden="true" className="font-mono text-3xl tracking-[0.25em] text-cyan">
               {prettify(pending)}
             </span>
-            <span className="font-mono text-xs tracking-[0.16em] text-muted">
+            <span aria-hidden="true" className="font-mono text-xs tracking-[0.16em] text-muted">
               {preview ? `= ${preview}` : 'NOT A CHARACTER YET'}
             </span>
 
             {/* The countdown is the only way the user can learn how long a
                 pause they are allowed. Without it the character just vanishes
-                and the app reads as broken. */}
+                and the app reads as broken — which is exactly why hiding it
+                from assistive tech was the wrong fix. It is a progressbar. */}
             <span
-              aria-hidden="true"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round((1 - commitProgress) * 100)}
+              aria-label="Time left before this character is committed"
               className="mt-1 h-0.5 w-40 overflow-hidden rounded-full"
               style={{ background: 'var(--color-line)' }}
             >

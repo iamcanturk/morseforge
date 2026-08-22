@@ -382,10 +382,21 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
         </span>
         {seconds !== null && (
           <span
+            role="timer"
+            // Announced every ten seconds rather than every tick: a per-second
+            // live region would talk over the character being played, which is
+            // the thing the user is trying to hear.
+            aria-live={seconds % 10 === 0 ? 'polite' : 'off'}
+            aria-label={`${seconds} seconds left${seconds <= 10 ? ', hurry' : ''}`}
             className="font-mono text-2xl tabular-nums"
             style={{ color: seconds <= 10 ? 'var(--color-danger)' : 'var(--color-signal)' }}
           >
-            {seconds}s
+            {seconds}s{/* The under-ten warning was a colour change and nothing else. */}
+            {seconds <= 10 && (
+              <span aria-hidden="true" className="ml-1 text-sm">
+                !
+              </span>
+            )}
           </span>
         )}
         <button

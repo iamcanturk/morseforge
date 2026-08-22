@@ -263,6 +263,13 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
    *
    * `onPointerLeave` releases as well: dragging off the button never fires
    * pointerup on it, which would leave the tone sounding indefinitely.
+   *
+   * The keyboard handlers are here rather than left to the window binding
+   * because the window binding deliberately ignores events aimed at a button —
+   * otherwise it would break every other button on the page. So the key has to
+   * answer for itself when it is the thing with focus, which is also the only
+   * way it keeps working if the user rebinds the keying key in settings: the
+   * button says "press and hold", and it has to mean it.
    */
   const pointerHandlers = {
     onPointerDown: (event: React.PointerEvent) => {
@@ -272,6 +279,22 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
     onPointerUp: release,
     onPointerLeave: release,
     onPointerCancel: release,
+    onKeyDown: (event: React.KeyboardEvent) => {
+      if (event.key !== ' ' && event.key !== 'Enter') return
+      // Auto-repeat would otherwise read as a burst of dots, exactly as it
+      // would through the window binding.
+      if (event.repeat) return
+      event.preventDefault()
+      press()
+    },
+    onKeyUp: (event: React.KeyboardEvent) => {
+      if (event.key !== ' ' && event.key !== 'Enter') return
+      event.preventDefault()
+      release()
+    },
+    // Losing focus mid-hold never fires keyup, which would leave the tone
+    // sounding and the timers unarmed.
+    onBlur: () => release(),
   }
 
   return {

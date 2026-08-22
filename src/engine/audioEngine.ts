@@ -99,6 +99,28 @@ export class AudioEngine {
   }
 
   /**
+   * The live AudioContext, or null before `resume()` has run.
+   *
+   * Exposed for the studio, which has to build an analyser and a recording
+   * destination out of the same context the tones are scheduled on. Nothing
+   * else should reach for this — the rest of the site is better served by
+   * `play`, which cannot desynchronise the clock.
+   */
+  get context(): AudioContext | null {
+    return this.#context
+  }
+
+  /**
+   * Send the output somewhere in addition to the speakers.
+   *
+   * Additive: the master node keeps its existing connection, so tapping for a
+   * recording never silences playback.
+   */
+  tap(node: AudioNode): void {
+    this.#master?.connect(node)
+  }
+
+  /**
    * Create or resume the AudioContext.
    *
    * Browsers only allow this from a user gesture, so every entry point that can

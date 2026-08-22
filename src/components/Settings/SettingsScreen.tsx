@@ -142,14 +142,20 @@ export function SettingsScreen() {
 
   return (
     <div className="space-y-12">
-      {notice && (
-        <p
-          role="status"
-          className="rounded-lg border border-signal/40 bg-panel px-4 py-3 font-mono text-xs tracking-[0.12em] text-signal"
-        >
-          {notice}
-        </p>
-      )}
+      {/* Always mounted, empty until there is something to say. A live region
+          created at the same moment as its content is usually not registered
+          in time, and the announcement is dropped — which is every message
+          this screen has: imported, reset, or failed to read. */}
+      <p
+        role="status"
+        className={
+          notice
+            ? 'rounded-lg border border-signal/40 bg-panel px-4 py-3 font-mono text-xs tracking-[0.12em] text-signal'
+            : 'sr-only'
+        }
+      >
+        {notice ?? ''}
+      </p>
 
       <section>
         <h2 className="font-display text-xl font-bold tracking-tight">How you learn</h2>

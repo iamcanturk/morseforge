@@ -186,13 +186,45 @@ export const DEFAULT_KEY_BINDINGS: KeyBindings = {
 }
 
 /**
+ * Whether the thing being typed into has its own use for the key.
+ *
+ * The listener sits on `window`, so it sees every key event on the page, and a
+ * `preventDefault` in the bubble phase still cancels the default action. Without
+ * this check, binding the key to Space meant **no button or link on the page
+ * could be activated from the keyboard at all** — on the telegraph, where the
+ * key is bound for the whole life of the page, that included the skip link and
+ * every nav item. Space and Enter are how a keyboard user presses a button;
+ * taking them away site-wide is a keyboard trap, not a keyer.
+ *
+ * Focus on the page background still keys, which is the normal case: nothing
+ * on these screens takes focus unless you tab to it.
+ */
+function isInteractive(target: EventTarget | null): boolean {
+  // Duck-typed rather than `instanceof HTMLElement`, so this is testable
+  // without a DOM and safe in any realm.
+  const element = target as { tagName?: unknown; isContentEditable?: unknown } | null
+  if (!element || typeof element.tagName !== 'string') return false
+  if (element.isContentEditable === true) return true
+
+  if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A', 'SUMMARY', 'OPTION'].includes(element.tagName))
+    return true
+
+  const withRole = target as { getAttribute?: (name: string) => string | null }
+  const role = withRole.getAttribute?.('role') ?? null
+  return ['button', 'link', 'checkbox', 'radio', 'switch', 'textbox', 'menuitem'].includes(
+    role ?? '',
+  )
+}
+
+/**
  * Wire a KeyEngine to the keyboard. Returns an unbind function.
  *
- * Two details that matter more than they look:
+ * Three details that matter more than they look:
  * - `event.repeat` is ignored. Holding a key fires keydown repeatedly at the OS
  *   repeat rate, which would otherwise read as a burst of dots.
- * - Space is `preventDefault`ed while bound, or every hold also scrolls the page
- *   and activates whatever button has focus.
+ * - Space is `preventDefault`ed while bound, or every hold also scrolls the page.
+ * - Events aimed at a button, a link or a field are left entirely alone. See
+ *   `isInteractive`.
  */
 export function bindKeyboard(
   engine: KeyEngine,
@@ -206,6 +238,7 @@ export function bindKeyboard(
   const onKeyDown = (event: Event) => {
     const e = event as KeyboardEvent
     if (e.repeat) return
+    if (isInteractive(e.target)) return
 
     if (isKeyingKey(e.key)) {
       e.preventDefault()
@@ -226,6 +259,13 @@ export function bindKeyboard(
   const onKeyUp = (event: Event) => {
     const e = event as KeyboardEvent
     if (!isKeyingKey(e.key)) return
+    // Released over a button rather than the page: the press was never taken,
+    // so there is nothing to release — but the engine is reset rather than
+    // ignored, in case focus moved onto the button mid-hold.
+    if (isInteractive(e.target)) {
+      engine.reset()
+      return
+    }
     e.preventDefault()
     engine.release()
   }

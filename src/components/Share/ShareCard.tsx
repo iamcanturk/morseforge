@@ -115,11 +115,14 @@ export function ShareCard({ data }: { data: CardData }) {
         </a>
       </div>
 
-      {status && (
-        <p role="status" className="mt-3 font-mono text-[11px] tracking-[0.12em] text-signal">
-          {status}
-        </p>
-      )}
+      {/* Mounted whether or not there is a message: a live region that appears
+          at the same moment as its content is usually not announced. */}
+      <p
+        role="status"
+        className={status ? 'mt-3 font-mono text-[11px] tracking-[0.12em] text-signal' : 'sr-only'}
+      >
+        {status ?? ''}
+      </p>
     </div>
   )
 }

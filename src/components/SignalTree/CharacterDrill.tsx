@@ -138,7 +138,7 @@ export function CharacterDrill({ character, settings, onAttempt }: CharacterDril
       </div>
 
       {verdict ? (
-        <div className="mt-6 text-center">
+        <div aria-live="polite" className="mt-6 text-center">
           <p
             className="font-display text-2xl font-bold"
             style={{ color: verdict.correct ? 'var(--color-signal)' : 'var(--color-danger)' }}

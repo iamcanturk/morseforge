@@ -114,7 +114,10 @@ export function CopyRound({
   if (status === 'reviewing' && lastGrade) {
     return (
       <div className="mt-8">
+        {/* Focus moves to the continue button below, which meant the grade
+            itself was skipped silently — the one thing worth hearing. */}
         <div
+          aria-live="polite"
           className="rounded-xl border p-5"
           style={{
             borderColor: lastGrade.perfect ? 'var(--color-signal)' : 'var(--color-danger)',

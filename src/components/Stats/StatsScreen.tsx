@@ -165,6 +165,19 @@ export function StatsScreen() {
                     }}
                   >
                     {achievement.title}
+                    {/* Earned state was carried by colour and opacity alone, so
+                        it read identically to a locked one both to a screen
+                        reader and to anyone who cannot separate the greens. */}
+                    <span className="sr-only">
+                      {achievement.isEarned
+                        ? ', earned'
+                        : `, locked, ${Math.round(achievement.fraction * 100)} percent`}
+                    </span>
+                    {achievement.isEarned && (
+                      <span aria-hidden="true" className="ml-2 font-mono text-[10px]">
+                        ✓
+                      </span>
+                    )}
                   </p>
                   <p className="mt-1 text-xs leading-relaxed text-muted">
                     {achievement.description}
@@ -172,6 +185,11 @@ export function StatsScreen() {
 
                   {!achievement.isEarned && achievement.fraction > 0 && (
                     <div
+                      role="progressbar"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={Math.round(achievement.fraction * 100)}
+                      aria-label={`${achievement.title} progress`}
                       className="mt-2.5 h-1 overflow-hidden rounded-full"
                       style={{ background: 'var(--color-line)' }}
                     >

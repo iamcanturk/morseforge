@@ -128,7 +128,11 @@ const isCurrent = (href: string) => current === href
                     <ul class="mt-2.5 space-y-2.5">
                       {group.links.map(({ href, label, hint }) => (
                         <li>
-                          <a href={href} class="block group/link">
+                          <a
+                            href={href}
+                            aria-current={isCurrent(href) ? 'page' : undefined}
+                            class="block group/link"
+                          >
                             <span
                               class="block text-[13px] transition-colors group-hover/link:text-signal"
                               style={
