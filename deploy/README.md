@@ -75,7 +75,6 @@ The service worker decides which build every returning visitor sees. Cached
 wrongly, it is not a slow update — it is no update, permanently, for anyone who
 has already visited.
 
-
 ---
 
 ## Cloudflare is rewriting robots.txt
@@ -111,7 +110,7 @@ correct. `scripts/deploy.sh` now fetches the live URL and warns.
 
 ### The fix, in the dashboard
 
-1. **AI Crawl Control** (formerly *Bots → AI Scrapers and Crawlers*) — set to
+1. **AI Crawl Control** (formerly _Bots → AI Scrapers and Crawlers_) — set to
    **Allow**, or turn the block off for this zone.
 2. **Settings → Manage robots.txt** — turn the managed file **off**, so the
    origin's own `robots.txt` is served unmodified.
@@ -131,24 +130,27 @@ The first line should be `# MorseForge — free Morse code trainer`.
 `/panel/` and `/studio/` are the author's own tools. Three things keep them
 private, and only one of them is protection:
 
-| | |
-| --- | --- |
+|                          |                                                   |
+| ------------------------ | ------------------------------------------------- |
 | `noindex` and `Disallow` | Keeps them out of search results. Not protection. |
-| Not linked from anywhere | Keeps them out of the way. Not protection. |
-| nginx basic auth | **This is the protection.** |
+| Not linked from anywhere | Keeps them out of the way. Not protection.        |
+| nginx basic auth         | **This is the protection.**                       |
 
 The password file is **not** created by any script here, deliberately. Set it
 yourself:
 
 ```bash
-ssh morsecp 'htpasswd -c ~/.htpasswd can'
+ssh morsecp 'htpasswd -c ~/.htpasswd can && chmod 644 ~/.htpasswd'
 ```
 
-If `htpasswd` is not installed:
+**Do this before pasting the vhost.** nginx returns 500 on a location whose
+`auth_basic_user_file` does not exist, so the two pages break rather than open
+— safe, but confusing if the order is reversed.
 
-```bash
-ssh -t morsecp 'read -s -p "password: " p; echo; printf "can:%s\n" "$(openssl passwd -apr1 "$p")" > ~/.htpasswd; chmod 640 ~/.htpasswd; echo written'
-```
+**Mode 644, not 640.** nginx runs as `clp`, which is not in this site's group.
+It can traverse the home directory — that is how the document root is served at
+all — but it cannot read a group-only file. The home directory is `0770`, so
+644 inside it is still unreadable to any other site on the box.
 
 Then paste `cloudpanel-vhost.conf` into **CloudPanel → Sites →
 morse.iamcanturk.dev → Vhost → Save**. That is also what turns on `/e/`, the
