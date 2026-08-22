@@ -1,7 +1,7 @@
 ---
 import type { GetStaticPaths } from 'astro'
 import BaseLayout from '../../layouts/BaseLayout.astro'
-import { MorsePlayer } from '../../components/MorsePlayer/MorsePlayer'
+import MorsePlayer from '../../components/MorsePlayer/MorsePlayer.astro'
 import { WORDS, WORD_CATEGORIES, breakdown, morseFor, type MorseWord } from '../../data/words'
 import { prettify } from '../../engine/morseEncoder'
 import { CURRICULUM, charactersThroughDay } from '../../data/curriculum'
@@ -104,7 +104,7 @@ const schema = [
       </p>
 
       <div class="mt-6">
-        <MorsePlayer client:idle morse={morse} label={word.text} />
+        <MorsePlayer morse={morse} label={word.text} />
       </div>
 
       <h2 class="mt-12 font-display text-xl font-bold tracking-tight">

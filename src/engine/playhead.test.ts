@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildTimeline } from './timingEngine'
-import { playheadAt } from '../components/MorsePlayer/MorsePlayer'
+import { playheadAt } from '../components/MorsePlayer/player'
 
 /**
  * The playhead drives the signal lamp. If it disagrees with the audio timeline

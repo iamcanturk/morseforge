@@ -1,0 +1,61 @@
+---
+import { prettify } from '../../engine/morseEncoder'
+
+/**
+ * A playable reference chart, with no framework behind it.
+ *
+ * Every row is in the served HTML — this is a page people find in a search and
+ * read, and it should be readable before a byte of JavaScript arrives. Pressing
+ * a row to hear it is enhancement on top of markup that is already complete.
+ */
+export interface Props {
+  entries: readonly { character: string; code: string }[]
+  initialWpm?: number
+}
+
+const { entries, initialWpm = 12 } = Astro.props
+---
+
+<div data-alphabet-chart>
+  <label class="mb-5 flex max-w-sm items-center gap-3">
+    <span class="font-mono text-[10px] tracking-[0.16em] text-muted">SPEED</span>
+    <input
+      type="range"
+      data-part="speed"
+      min="5"
+      max="40"
+      value={initialWpm}
+      class="flex-1 accent-[var(--color-signal)]"
+      aria-label="Playback speed in words per minute"
+    />
+    <span data-part="wpm" class="w-16 text-right font-mono text-xs text-signal">
+      {initialWpm} WPM
+    </span>
+  </label>
+
+  <ul class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+    {
+      entries.map(({ character, code }) => (
+        <li>
+          <button
+            type="button"
+            data-code={code}
+            aria-label={`Play ${character}, ${prettify(code)}`}
+            class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors"
+            style="border-color: var(--color-line); background: var(--color-panel)"
+          >
+            <span class="w-5 font-display text-lg font-bold text-signal">{character}</span>
+            <span class="font-mono text-sm tracking-[0.18em] text-cyan">{prettify(code)}</span>
+          </button>
+        </li>
+      ))
+    }
+  </ul>
+</div>
+
+<script>
+  import { mountAllCharts } from './chart'
+
+  mountAllCharts()
+  document.addEventListener('astro:page-load', () => mountAllCharts())
+</script>

@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react'
 import { useAutoLoop } from './useAutoLoop'
-import { playheadAt } from '../MorsePlayer/MorsePlayer'
+import { playheadAt } from '../MorsePlayer/player'
 import { buildTimeline, timelineDuration } from '../../engine/timingEngine'
 import { encode, prettify } from '../../engine/morseEncoder'
 import { MORSE_TREE, layoutTree } from '../../data/tree'

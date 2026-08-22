@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AudioEngine, type Playback } from '../../engine/audioEngine'
-import { buildTimeline, timelineDuration, type TimedElement } from '../../engine/timingEngine'
+import { WPM_MAX, WPM_MIN, playheadAt } from './player'
+import { buildTimeline, timelineDuration } from '../../engine/timingEngine'
 import { prettify } from '../../engine/morseEncoder'
 import { canVibrate, stopVibration, vibrateTimeline } from '../../engine/vibrationEngine'
 
@@ -26,10 +27,6 @@ export interface MorsePlayerProps {
 }
 
 /** Where the playhead is, and whether the key is down at that instant. */
-interface Playhead {
-  on: boolean
-  index: number
-}
 
 /**
  * Resolve the timeline position at `elapsedMs`.
@@ -37,17 +34,6 @@ interface Playhead {
  * Exported for tests: this is the one piece of the player with real logic, and
  * it is pure.
  */
-export function playheadAt(timeline: readonly TimedElement[], elapsedMs: number): Playhead {
-  let offset = 0
-  for (const [index, element] of timeline.entries()) {
-    offset += element.duration
-    if (elapsedMs < offset) return { on: element.on, index }
-  }
-  return { on: false, index: -1 }
-}
-
-const WPM_MIN = 5
-const WPM_MAX = 40
 
 export function MorsePlayer({
   morse,

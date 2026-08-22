@@ -67,6 +67,13 @@ beginner who means to send `S` and, three seconds of hesitation later, has sent
 `E E E`. Keying patience is its own setting, defaulting to 1.6 seconds, with a
 manual mode that removes the clock entirely.
 
+**The pages people find in a search ship no framework.** The 22 word pages and
+the alphabet chart used to load 190 KB of React to attach a click handler to
+markup that was already complete. They are now 6–8 KB: the audio engine and
+about a hundred lines of plain DOM code. React stays where it earns its keep —
+the telegraph, the tree, practice — and the two players share one
+implementation of the timing so they cannot drift apart.
+
 **Every page is prerendered to real HTML.** GPTBot, ClaudeBot and PerplexityBot
 do not execute JavaScript. A client-rendered app is invisible to them, so the
 whole site is static and only the interactive parts hydrate — the seven-day

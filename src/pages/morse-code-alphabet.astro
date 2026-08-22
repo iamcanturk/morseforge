@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro'
-import { AlphabetChart } from '../components/Alphabet/AlphabetChart'
+import AlphabetChart from '../components/Alphabet/AlphabetChart.astro'
 import { DIGITS, LETTERS, PUNCTUATION } from '../data/morseAlphabet'
 import { prettify } from '../engine/morseEncoder'
 import { SITE } from '../config/site'
@@ -114,7 +114,7 @@ const sections = [
             </noscript>
 
             <div class="mt-5">
-              <AlphabetChart client:visible entries={section.entries} />
+              <AlphabetChart entries={section.entries} />
             </div>
           </section>
         ))
