@@ -53,11 +53,17 @@ else
     Run this yourself — it prompts for a password, and it is deliberately not
     something this script or anyone else does on your behalf:
 
-      ssh morsecp 'htpasswd -c ~/.htpasswd can'
+      ssh -t morsecp 'htpasswd -c ~/.htpasswd can && chmod 644 ~/.htpasswd'
 
-    If htpasswd is missing, this works with nothing but openssl:
+    The -t matters. htpasswd prompts, and ssh gives a one-shot command no
+    terminal unless told to. Without one htpasswd does not fail — it reads
+    end-of-file as the password and writes an EMPTY one, exit code 0.
 
-      ssh -t morsecp 'read -s -p "password: " p; echo; printf "can:%s\n" "$(openssl passwd -apr1 "$p")" > ~/.htpasswd; chmod 640 ~/.htpasswd; echo written'
+    Check it took, rather than assuming:
+
+      curl -s -o /dev/null -w '%{http_code}\n' -u can: https://morse.iamcanturk.dev/panel/
+
+    401 means an empty password is refused. 200 means there is no password.
 
     Then paste deploy/cloudpanel-vhost.conf into
     CloudPanel → Sites → morse.iamcanturk.dev → Vhost → Save.

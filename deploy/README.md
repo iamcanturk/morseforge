@@ -140,17 +140,31 @@ The password file is **not** created by any script here, deliberately. Set it
 yourself:
 
 ```bash
-ssh morsecp 'htpasswd -c ~/.htpasswd can && chmod 644 ~/.htpasswd'
+ssh -t morsecp 'htpasswd -c ~/.htpasswd can && chmod 644 ~/.htpasswd'
 ```
 
-**Do this before pasting the vhost.** nginx returns 500 on a location whose
-`auth_basic_user_file` does not exist, so the two pages break rather than open
-— safe, but confusing if the order is reversed.
+**The `-t` is not optional.** `htpasswd` prompts for the password, and `ssh`
+does not allocate a terminal for a one-shot command unless told to. Worse than
+failing, it _succeeds_: with no terminal to read from it takes end-of-file as
+the answer and writes an entry with an **empty password**, exit code 0, no
+warning. Verify afterwards rather than assuming:
 
-**Mode 644, not 640.** nginx runs as `clp`, which is not in this site's group.
-It can traverse the home directory — that is how the document root is served at
-all — but it cannot read a group-only file. The home directory is `0770`, so
-644 inside it is still unreadable to any other site on the box.
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -u can: https://morse.iamcanturk.dev/panel/
+```
+
+`401` means an empty password is refused, which is what you want. `200` means
+the file was written without one — delete it and set it again.
+
+If `-t` still gives "Pseudo-terminal will not be allocated", you are running it
+from something that is not a terminal. Log in and run it there instead:
+
+```bash
+ssh morsecp
+htpasswd -c ~/.htpasswd can
+chmod 644 ~/.htpasswd
+exit
+```
 
 Then paste `cloudpanel-vhost.conf` into **CloudPanel → Sites →
 morse.iamcanturk.dev → Vhost → Save**. That is also what turns on `/e/`, the

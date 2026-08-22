@@ -37,6 +37,8 @@ export type EventName =
   | 'daily_start'
   | 'daily_finish'
   | 'challenge_start'
+  | 'game_start'
+  | 'game_finish'
   | 'lesson_start'
   | 'lesson_finish'
   | 'telegraph_send'
