@@ -58,11 +58,14 @@ describe('difficulty', () => {
     expect(gapAt(RAMP_MS * 50)).toBe(GAP.floor)
   })
 
-  it('always leaves time to key a character between gates', () => {
-    // At the hardest, a gate must still be reachable: the gap divided by the
-    // speed is the seconds available, and under about a second and a half
-    // there is no time to send anything but E.
-    expect(GAP.floor / SPEED.floor).toBeGreaterThan(1.5)
+  it('always leaves time to actually send a character', () => {
+    // The gap divided by the speed is the seconds available per gate. The bar
+    // is not "can a dot fit" — it is the real cost of sending: about a second
+    // to key a four-element character at 15 WPM, plus the 1.6 seconds of
+    // silence the default keyer waits before it commits one.
+    //
+    // This was 1.5 and passed at 1.55 seconds per gate, which is unplayable.
+    expect(GAP.floor / SPEED.floor).toBeGreaterThan(3)
   })
 })
 

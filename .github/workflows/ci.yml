@@ -2,10 +2,21 @@
 # is `github.ref`, used in the concurrency group, which is never passed to `run`.
 name: CI
 
+# Manual only, for now.
+#
+# The account is locked for billing, so GitHub refuses to start the job at all:
+# every push produced a run that failed in three seconds with "the job was not
+# started because your account is locked due to a billing issue". A red cross
+# on every commit reads as a broken project to anyone browsing the repo, and it
+# is not — the same checks run on every push through .githooks/pre-push, which
+# is the primary gate here precisely because Actions cannot be relied on.
+#
+# To turn it back on when billing is sorted, restore:
+#
+#   push:
+#     branches: [main]
+#   pull_request:
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
 
 permissions:

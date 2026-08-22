@@ -45,11 +45,21 @@ export interface RunnerState {
 
 export const STARTING_LIVES = 3
 
-/** Metres per second, at the start and at the hardest. */
-export const SPEED = { start: 9, floor: 22 } as const
+/**
+ * Metres per second, at the start and at the hardest.
+ *
+ * The floor is set by how long it actually takes to send a character, not by
+ * what felt exciting. Keying a four-element character at 15 WPM is about a
+ * second, and the default keyer waits another 1.6 seconds of silence before it
+ * commits — so a gate arriving every 1.55 seconds, which is what a 22 m/s top
+ * speed gave, was not hard. It was impossible, and it only looked survivable
+ * because the first version of the playability test let its simulated player
+ * key several characters at once.
+ */
+export const SPEED = { start: 9, floor: 18 } as const
 
-/** Metres between gates, likewise. */
-export const GAP = { start: 70, floor: 34 } as const
+/** Metres between gates, likewise. 60 at 18 m/s is a gate every 3.3 seconds. */
+export const GAP = { start: 70, floor: 60 } as const
 
 /** How long the difficulty takes to walk from `start` to `floor`. */
 export const RAMP_MS = 150_000
