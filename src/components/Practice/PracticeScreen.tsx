@@ -22,6 +22,7 @@ import {
   type ProgressRecord,
 } from '../../storage/progress'
 import { METHODS, shouldUnlock, type MethodId } from '../../data/methods'
+import { track } from '../../analytics/track'
 
 /**
  * How the prompt is answered.
@@ -285,6 +286,7 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
                 method={progress.method}
                 unlocked={progress.unlocked}
                 onChange={(next: MethodId) => {
+                  track('method_change', next)
                   progressStore.update((current) => setMethod(current, next))
                   setPoolId('method')
                 }}
@@ -353,6 +355,7 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
         <button
           type="button"
           onClick={() => {
+            track(challenge ? 'challenge_start' : 'practice_start', challenge ? '60s' : mode)
             session.start()
             setTimeout(() => input.current?.focus(), 50)
           }}

@@ -14,6 +14,7 @@ import {
   type DailyRecord,
 } from '../../storage/daily'
 import { createSettingsStore, defaultSettings, type SettingsRecord } from '../../storage/settings'
+import { track } from '../../analytics/track'
 
 /**
  * The daily challenge (PROJECT.md §19).
@@ -85,12 +86,14 @@ export function DailyScreen() {
   const { status, summary } = session
   useEffect(() => {
     if (status !== 'finished' || !summary || today === null || challenge === null) return
+    const passed = summary.total > 0 && summary.accuracy >= challenge.passMark
+    track('daily_finish', passed ? 'pass' : 'fail')
     store.update((current) =>
       recordDaily(current, {
         date: today,
         accuracy: summary.accuracy,
         score: summary.score,
-        passed: summary.total > 0 && summary.accuracy >= challenge.passMark,
+        passed,
       }),
     )
   }, [status, summary, today, challenge, store])
@@ -233,7 +236,10 @@ export function DailyScreen() {
 
         <button
           type="button"
-          onClick={session.start}
+          onClick={() => {
+            track('daily_start', challenge.kind)
+            session.start()
+          }}
           className="mt-8 w-full rounded-lg px-6 py-3.5 font-mono text-sm tracking-[0.16em] text-void"
           style={{ background: 'var(--color-signal)' }}
         >

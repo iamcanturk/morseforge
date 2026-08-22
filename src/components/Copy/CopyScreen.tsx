@@ -12,6 +12,7 @@ import {
   unlockedCharacters,
   type ProgressRecord,
 } from '../../storage/progress'
+import { track } from '../../analytics/track'
 
 /**
  * Copy practice (PROJECT.md §13).
@@ -205,7 +206,10 @@ export function CopyScreen() {
 
         <button
           type="button"
-          onClick={session.start}
+          onClick={() => {
+            track('copy_start', kind)
+            session.start()
+          }}
           className="mt-8 w-full rounded-lg px-6 py-3.5 font-mono text-sm tracking-[0.16em] text-void"
           style={{ background: 'var(--color-signal)' }}
         >

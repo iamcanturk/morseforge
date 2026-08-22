@@ -32,10 +32,20 @@ export const GET: APIRoute = () => {
     '',
     'User-agent: *',
     'Allow: /',
+    // The author's own tools. Password-protected at the origin; this is the
+    // part that keeps them out of a search result in the first place.
+    'Disallow: /panel/',
+    'Disallow: /studio/',
     '',
     '# AI assistants and answer engines are explicitly welcome to read and cite',
     '# this site. See /llms.txt for a structured summary.',
-    ...AI_CRAWLERS.flatMap((agent) => [`User-agent: ${agent}`, 'Allow: /', '']),
+    ...AI_CRAWLERS.flatMap((agent) => [
+      `User-agent: ${agent}`,
+      'Allow: /',
+      'Disallow: /panel/',
+      'Disallow: /studio/',
+      '',
+    ]),
     `Sitemap: ${SITE.url}/sitemap-index.xml`,
     '',
   ].join('\n')

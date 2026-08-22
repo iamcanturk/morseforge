@@ -99,6 +99,18 @@ export interface SettingsRecord {
    * pulses here while suppressing motion elsewhere — or the reverse.
    */
   motion: MotionPreference
+  /**
+   * Anonymous usage counters (PROJECT.md §22).
+   *
+   * Counts which parts of the site get used — a tally per screen, nothing more.
+   * No identifier, no progress, no text anyone typed, nothing that could be
+   * tied back to a person. Progress genuinely never leaves the device, which is
+   * the promise on the front page, and this does not change that.
+   *
+   * On by default, off in one press, and never sent at all when the browser
+   * asks not to be tracked.
+   */
+  counters: boolean
 }
 
 export function defaultSettings(): SettingsRecord {
@@ -124,6 +136,7 @@ export function defaultSettings(): SettingsRecord {
     },
     keys: { ...DEFAULT_KEY_BINDINGS },
     motion: 'system',
+    counters: true,
   }
 }
 
@@ -195,6 +208,7 @@ function validateSettings(value: unknown): SettingsRecord | null {
       submit: str(keys['submit'], fallback.keys.submit ?? 'Control'),
     },
     motion: oneOf(value['motion'], ['system', 'reduce', 'full'] as const, fallback.motion),
+    counters: bool(value['counters'], fallback.counters),
   }
 }
 

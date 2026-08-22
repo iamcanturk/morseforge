@@ -392,6 +392,19 @@ export function SettingsScreen() {
           clearing your browser data erases it, so export a copy if you care about it.
         </p>
 
+        <div className="mt-5">
+          <Row
+            label="Anonymous usage counts"
+            hint="A tally of which screens get used — no identifier, no progress, nothing you typed. Never sent if your browser asks not to be tracked."
+          >
+            <Toggle
+              checked={settings.counters}
+              label="Anonymous usage counts"
+              onChange={(counters) => store.update((current) => ({ ...current, counters }))}
+            />
+          </Row>
+        </div>
+
         <div className="mt-5 flex flex-wrap gap-3">
           <button
             type="button"

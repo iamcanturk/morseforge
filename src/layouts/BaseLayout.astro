@@ -13,9 +13,26 @@ export interface Props {
   schema?: Record<string, unknown>[]
   /** Hide the header and footer, e.g. on a full-screen challenge. */
   bare?: boolean
+  /**
+   * Keep the page out of every index: no crawling, no structured data, no
+   * canonical, no sitemap entry.
+   *
+   * The tools behind the site — the analytics panel and the video studio — are
+   * for the author, not for the public. The real protection is the password on
+   * the server; this is what stops the page turning up in a search result
+   * before anyone gets as far as the password.
+   */
+  private?: boolean
 }
 
-const { title, description, path = Astro.url.pathname, schema = [], bare = false } = Astro.props
+const {
+  title,
+  description,
+  path = Astro.url.pathname,
+  schema = [],
+  bare = false,
+  private: isPrivate = false,
+} = Astro.props
 
 const canonical = new URL(path, Astro.site).href
 const ogImage = new URL('/og/default.png', Astro.site).href
@@ -81,7 +98,13 @@ const identityGraph = {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <link rel="canonical" href={canonical} />
+    {
+      isPrivate ? (
+        <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
+      ) : (
+        <link rel="canonical" href={canonical} />
+      )
+    }
 
     {
       /* Blocking on purpose, and tiny. Deferring this is what causes the flash
@@ -142,11 +165,20 @@ const identityGraph = {
     <link rel="me" href={AUTHOR_X_URL} />
     <link rel="sitemap" href="/sitemap-index.xml" />
 
-    <script is:inline type="application/ld+json" set:html={JSON.stringify(identityGraph)} />
     {
-      schema.map((entry) => (
-        <script is:inline type="application/ld+json" set:html={JSON.stringify(entry)} />
-      ))
+      /* No structured data on a private page: the identity graph exists to be
+        indexed, and there is nothing here to index. */
+    }
+    {
+      !isPrivate && (
+        <script is:inline type="application/ld+json" set:html={JSON.stringify(identityGraph)} />
+      )
+    }
+    {
+      !isPrivate &&
+        schema.map((entry) => (
+          <script is:inline type="application/ld+json" set:html={JSON.stringify(entry)} />
+        ))
     }
 
     {

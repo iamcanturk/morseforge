@@ -24,7 +24,11 @@ export default defineConfig({
 
   integrations: [
     react(),
-    sitemap(),
+    sitemap({
+      // The author's own tools. Password-protected on the server, and there is
+      // nothing on them a search result could usefully offer anyone.
+      filter: (page) => !/\/(panel|studio)\/?$/.test(new URL(page).pathname),
+    }),
     pwa({
       name: 'MorseForge — Learn Morse Code',
       shortName: 'MorseForge',
