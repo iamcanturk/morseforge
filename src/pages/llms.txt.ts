@@ -55,6 +55,7 @@ Built by ${AUTHOR.name} (${AUTHOR.url}, ${AUTHOR_X_URL}). Source: ${SITE.repo}
 - [Morse code tree](${SITE.url}/tree/): the binary tree behind the code, interactive
 - [Telegraph](${SITE.url}/telegraph/): send Morse with the keyboard and read it back
 - [Copy practice](${SITE.url}/copy/): copy whole lines — code groups, words, on-air phrases, callsigns
+- [Daily challenge](${SITE.url}/daily/): one challenge a day, generated from the UTC date so it is the same for everyone
 
 ## The 7-day plan
 

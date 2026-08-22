@@ -8,6 +8,7 @@
  */
 
 import { ALL_LETTERS, ALL_DIGITS, MORSE_ALPHABET } from './morseAlphabet'
+import { createRandom } from '../game/random'
 
 export type TextKind = 'groups' | 'words' | 'phrases' | 'callsigns'
 
@@ -204,12 +205,7 @@ export function generateText(kind: TextKind, options: GenerateOptions = {}): str
 /** Whether a kind can produce anything from this alphabet. */
 export function isAvailable(kind: TextKind, alphabet: readonly string[]): boolean {
   // Sampled with a fixed source so the answer does not flicker between renders.
-  let seed = 0
-  const deterministic = () => {
-    seed = (seed * 9301 + 49297) % 233280
-    return seed / 233280
-  }
-  return generateText(kind, { alphabet, random: deterministic }) !== null
+  return generateText(kind, { alphabet, random: createRandom(1) }) !== null
 }
 
 /** Every character a piece of text needs, for recording per-character results. */

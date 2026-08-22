@@ -29,6 +29,15 @@ export interface CopyConfig {
   characters: readonly string[]
   /** How many lines before the session ends. */
   lines: number
+  /**
+   * A fixed list to send instead of generating.
+   *
+   * The daily challenge hands the same eight lines to everyone, so it cannot
+   * generate per session — but it is otherwise the identical exercise, and
+   * running it through a second loop would be two chances to score copying
+   * differently.
+   */
+  prompts?: readonly string[]
 }
 
 export interface CopyResult {
@@ -82,11 +91,14 @@ export function useCopySession(config: CopyConfig): UseCopySessionResult {
   const configRef = useRef(config)
   configRef.current = config
 
-  const generate = useCallback(() => {
+  const generate = useCallback((index: number) => {
+    const { kind, characters, prompts } = configRef.current
+    // A fixed list runs out rather than wrapping: eight lines means eight.
+    if (prompts) return prompts[index] ?? null
+
     // Falls back to code groups, which need no vocabulary and so can always be
     // produced — better than ending the session because the chosen kind ran
     // out of material for this alphabet.
-    const { kind, characters } = configRef.current
     return (
       generateText(kind, { alphabet: characters }) ??
       generateText('groups', { alphabet: characters })
@@ -125,7 +137,7 @@ export function useCopySession(config: CopyConfig): UseCopySessionResult {
     setResults([])
     setSummary(null)
     setLastGrade(null)
-    setCurrent(generate())
+    setCurrent(generate(0))
     setStatus('running')
   }, [generate, progressStore, statsStore])
 
@@ -172,12 +184,13 @@ export function useCopySession(config: CopyConfig): UseCopySessionResult {
     if (status !== 'reviewing') return
 
     setResults((collected) => {
-      if (collected.length >= configRef.current.lines) {
+      const next = collected.length >= configRef.current.lines ? null : generate(collected.length)
+      if (next === null) {
         finish(collected)
         return collected
       }
       setLastGrade(null)
-      setCurrent(generate())
+      setCurrent(next)
       promptedAt.current = performance.now()
       setStatus('running')
       return collected
