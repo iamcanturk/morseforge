@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { MorseKey } from '../MorseKey/MorseKey'
 import { useMorseKey } from '../MorseKey/useMorseKey'
 import { SignalTree } from '../SignalTree/SignalTree'
 import { PracticeScreen } from '../Practice/PracticeScreen'
 import { STEP_COPY, TEACH_STEPS, currentStageIndex, type TeachStep } from './lesson'
-import { AudioEngine } from '../../engine/audioEngine'
+import { MorsePlayer } from '../MorsePlayer/MorsePlayer'
 import { prettify } from '../../engine/morseEncoder'
 import { LEARNING_STAGES, MORSE_ALPHABET } from '../../data/morseAlphabet'
 import { createSettingsStore, defaultSettings, type SettingsRecord } from '../../storage/settings'
@@ -31,8 +31,6 @@ export function LessonScreen() {
   const [phase, setPhase] = useState<'teach' | 'drill'>('teach')
   const [sendResult, setSendResult] = useState<'right' | 'wrong' | null>(null)
 
-  const audio = useRef<AudioEngine | null>(null)
-
   // Read once on mount rather than subscribing: the lesson deliberately does
   // not jump the learner forward mid-session because an answer happened to
   // complete a stage. Where they are up to is resolved when they arrive.
@@ -43,35 +41,15 @@ export function LessonScreen() {
     setReady(true)
   }, [progressStore, settingsStore])
 
-  useEffect(() => () => void audio.current?.dispose(), [])
-
   const stageCharacters = LEARNING_STAGES[stage] ?? []
   const character = stageCharacters[characterIndex] ?? ''
   const code = MORSE_ALPHABET[character] ?? ''
-
-  const play = useCallback(async () => {
-    if (!code || !settings.audio.enabled) return
-    audio.current ??= new AudioEngine({
-      frequency: settings.audio.frequency,
-      volume: settings.audio.volume,
-    })
-    const playback = await audio.current.play(code, {
-      wpm: settings.timing.wpm,
-      farnsworthWpm: settings.timing.farnsworthWpm,
-    })
-    await playback.finished
-  }, [code, settings])
 
   // Meeting a character counts as seeing it, which is what lights its node.
   useEffect(() => {
     if (!ready || !character) return
     progressStore.update((current) => markSeen(current, character, Date.now()))
   }, [ready, character, progressStore])
-
-  // Hearing it should actually play, not wait for a second click.
-  useEffect(() => {
-    if (step === 'hear') void play()
-  }, [step, play])
 
   const advance = useCallback(() => {
     setSendResult(null)
@@ -217,14 +195,21 @@ export function LessonScreen() {
         </div>
       )}
 
-      {step === 'hear' && (
-        <button
-          type="button"
-          onClick={() => void play()}
-          className="mt-6 w-full rounded-lg border border-cyan/40 px-5 py-3 font-mono text-xs tracking-[0.14em] text-cyan"
-        >
-          ▶ PLAY IT AGAIN
-        </button>
+      {step === 'hear' && code && (
+        // The full player rather than a bare play button: the lamp and the
+        // buzz are the whole reason this step is reachable at all without
+        // hearing. It used to be sound or nothing — with sound off in
+        // settings, the "hear it" step did literally nothing and the lesson
+        // could not be finished (§28).
+        <div className="mt-6">
+          <MorsePlayer
+            morse={code}
+            autoPlay
+            initialFlash
+            label={character}
+            initialWpm={settings.timing.wpm}
+          />
+        </div>
       )}
 
       {step === 'send' && (

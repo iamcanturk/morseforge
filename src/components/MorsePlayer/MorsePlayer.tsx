@@ -24,6 +24,15 @@ export interface MorsePlayerProps {
   /** Start with the lamp on. */
   initialFlash?: boolean
   compact?: boolean
+  /**
+   * Play once as soon as it appears.
+   *
+   * For the lesson, where the whole step is "now receive it" and making the
+   * learner press a button first would be a step backwards. Only ever fires
+   * once per code — the AudioContext is already unlocked by then, since the
+   * lesson only reaches this step from a press.
+   */
+  autoPlay?: boolean
 }
 
 /** Where the playhead is, and whether the key is down at that instant. */
@@ -40,6 +49,7 @@ export function MorsePlayer({
   label,
   initialWpm = 12,
   initialFlash = false,
+  autoPlay = false,
   compact = false,
 }: MorsePlayerProps) {
   const [wpm, setWpm] = useState(initialWpm)
@@ -140,6 +150,16 @@ export function MorsePlayer({
     }
     frame.current = requestAnimationFrame(tick)
   }, [playing, stop, sound, buzz, timeline, durationMs, stopVisuals])
+
+  // Keyed on the code, so moving to the next character in a lesson plays the
+  // new one and nothing replays when a setting changes.
+  const playRef = useRef(play)
+  playRef.current = play
+  useEffect(() => {
+    if (!autoPlay) return
+    void playRef.current()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [morse, autoPlay])
 
   const seconds = (durationMs / 1000).toFixed(1)
 

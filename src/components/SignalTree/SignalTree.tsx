@@ -24,34 +24,56 @@ const VIEWBOX = { width: 1000, height: 620 }
 const PADDING = { x: 40, y: 44 }
 const NODE_RADIUS = 17
 
+/**
+ * How each state looks.
+ *
+ * `strokeWidth` and `dashed` carry the state as well as the colour does. Four
+ * states told apart by hue alone — and the two greens are close — is unusable
+ * for a colour-blind reader, and the one non-colour cue that existed (a glow)
+ * was the same hue again.
+ */
 const STATE_STYLE: Record<
   NodeState,
-  { fill: string; stroke: string; text: string; glow: boolean }
+  { fill: string; stroke: string; text: string; glow: boolean; width: number; dashed: boolean }
 > = {
   locked: {
     fill: 'var(--color-panel)',
     stroke: 'color-mix(in srgb, var(--color-signal-dim) 28%, transparent)',
     text: 'color-mix(in srgb, var(--color-muted) 55%, transparent)',
     glow: false,
+    width: 1,
+    // Dashed, so "not yet reached" is legible without seeing the colour.
+    dashed: true,
   },
   discovered: {
     fill: 'var(--color-elevated)',
     stroke: 'var(--color-signal-dim)',
     text: 'var(--color-muted)',
     glow: false,
+    width: 1.5,
+    dashed: false,
   },
   active: {
     fill: 'color-mix(in srgb, var(--color-signal) 16%, var(--color-panel))',
     stroke: 'var(--color-signal)',
     text: 'var(--color-ink)',
     glow: false,
+    width: 2.5,
+    dashed: false,
   },
   mastered: {
     fill: 'color-mix(in srgb, var(--color-signal) 26%, var(--color-panel))',
     stroke: 'var(--color-signal)',
     text: 'var(--color-ink)',
     glow: true,
+    width: 4,
+    dashed: false,
   },
+}
+
+/** A code read aloud, so a screen reader says "dot dash" rather than ".-". */
+function spoken(code: string): string {
+  return [...code].map((mark) => (mark === '.' ? 'dot' : 'dash')).join(' ')
 }
 
 export interface SignalTreeProps {
@@ -206,11 +228,18 @@ export function SignalTree({
               return (
                 <g
                   key={`node-${code || 'root'}`}
+                  {...(!selectable && character !== null
+                    ? // A tree rendered without `onSelect` is still a diagram
+                      // worth reading. It used to expose no per-node state at
+                      // all, so on the lesson and telegraph pages a screen
+                      // reader got 26 unlabelled shapes.
+                      { role: 'img', 'aria-label': `${character}, ${spoken(code)}, ${state}` }
+                    : {})}
                   {...(selectable
                     ? {
                         role: 'button',
                         tabIndex: 0,
-                        'aria-label': `${character}, Morse ${code}, ${state}`,
+                        'aria-label': `${character}, ${spoken(code)}, ${state}`,
                         style: { cursor: 'pointer' },
                         onClick: () => onSelect?.(character!),
                         onKeyDown: (event: React.KeyboardEvent) => {
@@ -257,7 +286,10 @@ export function SignalTree({
                             ? 'var(--color-signal)'
                             : style.stroke
                     }
-                    strokeWidth={live || lit || isRoot ? 3 : 2}
+                    // Weight and dashing carry the state alongside the colour,
+                    // so the four states stay distinguishable without it.
+                    strokeWidth={live || lit || isRoot ? 3 : style.width}
+                    strokeDasharray={style.dashed && !isRoot && !lit && !live ? '3 3' : undefined}
                   />
                   {isRoot ? (
                     <circle cx={entry.cx} cy={entry.cy} r={6} fill="var(--color-cyan)" />
