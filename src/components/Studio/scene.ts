@@ -117,6 +117,95 @@ export function barHeights(data: Uint8Array, count: number): number[] {
   })
 }
 
+/**
+ * Fold a series into a symmetric shape, first value at the centre.
+ *
+ * Returns `heights.length * 2` values: the input reversed, then the input. So
+ * `[a, b, c]` becomes `[c, b, a, a, b, c]` — whatever is first ends up in the
+ * middle of the frame.
+ */
+export function mirrorBars(heights: readonly number[]): number[] {
+  return [...heights].reverse().concat(heights)
+}
+
+/**
+ * The loudest bin, or -1 when nothing is sounding.
+ *
+ * The threshold matters: without it, silence still has a "loudest" bin — noise
+ * — and the display would lock onto a different random frequency every frame.
+ */
+export function peakBin(data: Uint8Array, threshold = 16): number {
+  let best = -1
+  let loudest = threshold
+  for (let i = 1; i < data.length; i++) {
+    const value = data[i] ?? 0
+    if (value > loudest) {
+      loudest = value
+      best = i
+    }
+  }
+  return best
+}
+
+/**
+ * Bar heights measured outward from whatever frequency is actually sounding.
+ *
+ * A CW sidetone is one pitch. Mapping the bins from zero upwards puts that one
+ * spike a fixed fraction of the way along and leaves the rest of the frame
+ * dead, and simply mirroring that splits it into two peaks with a hole in the
+ * middle — worse, because now it looks deliberate.
+ *
+ * Sampling outward from the peak instead means the tone is always the centre
+ * bar and the shape falls away from it on both sides. Returns `count` values,
+ * nearest-to-peak first, ready for `mirrorBars`.
+ */
+export function spectrumAroundPeak(data: Uint8Array, count: number, spread = 40): number[] {
+  if (count <= 0) return []
+
+  const peak = peakBin(data, 16)
+  if (peak < 0) return new Array<number>(count).fill(0)
+
+  return Array.from({ length: count }, (_, index) => {
+    const offset = Math.round((index / count) * spread)
+    // Averaged with the bin the same distance below the peak, so the shape
+    // reflects the real skirt of the signal rather than one arbitrary side.
+    const above = data[peak + offset] ?? 0
+    const below = data[Math.max(0, peak - offset)] ?? 0
+    return (above + below) / 2 / 255
+  })
+}
+
+/**
+ * Where to start drawing a waveform so it does not jitter.
+ *
+ * The analyser hands back an arbitrary window of the signal, so consecutive
+ * frames start at different points in the cycle and the trace appears to
+ * shiver sideways. An oscilloscope solves this with a trigger: start at a
+ * rising zero-crossing and the wave stands still.
+ *
+ * Samples are 0..255 centred on 128. Returns 0 when there is no crossing to
+ * find, which is silence — nothing to hold steady.
+ */
+export function triggerOffset(samples: Uint8Array, searchWithin = 0.5): number {
+  const limit = Math.min(samples.length - 1, Math.floor(samples.length * searchWithin))
+  for (let i = 1; i < limit; i++) {
+    if ((samples[i - 1] ?? 128) < 128 && (samples[i] ?? 128) >= 128) return i
+  }
+  return 0
+}
+
+/**
+ * How far from the edge a point is, 0..1, for fading a trace out.
+ *
+ * Without it the waveform slams into both frame edges mid-cycle, which reads
+ * as a rendering error rather than as a signal continuing beyond the frame.
+ */
+export function edgeFade(position: number, width = 0.08): number {
+  if (width <= 0) return 1
+  const distance = Math.min(position, 1 - position)
+  return Math.max(0, Math.min(1, distance / width))
+}
+
 export interface KeyedElement {
   /** '.' or '-'. */
   element: string

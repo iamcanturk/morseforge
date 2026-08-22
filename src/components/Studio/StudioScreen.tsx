@@ -228,6 +228,17 @@ export function StudioScreen() {
       })
     })
 
+    // requestAnimationFrame stops in a hidden tab, and Web Audio does not — so
+    // switching away mid-record yields a frozen picture over continuing sound,
+    // and nothing about the resulting file says so. Watched rather than
+    // prevented: aborting would throw away a recording the user may be happy
+    // with, and there is no way to keep the canvas painting at full rate.
+    let wentHidden = false
+    const watchVisibility = () => {
+      if (document.hidden) wentHidden = true
+    }
+    document.addEventListener('visibilitychange', watchVisibility)
+
     setPhase('recording')
     startedAt.current = performance.now()
     raf.current = requestAnimationFrame(loop)
@@ -242,6 +253,13 @@ export function StudioScreen() {
     if (raf.current !== null) cancelAnimationFrame(raf.current)
     raf.current = null
     media.stop()
+    document.removeEventListener('visibilitychange', watchVisibility)
+
+    if (wentHidden) {
+      setError(
+        'This tab lost focus while recording. The browser stops drawing a hidden tab, so the picture may be frozen for part of the file — the sound will be fine. Record again with this tab in front.',
+      )
+    }
 
     const blob = await finished
     setDownload((previous) => {
@@ -303,6 +321,12 @@ export function StudioScreen() {
           <span className="font-mono text-[10px] tracking-[0.14em] text-muted">
             {size.width}×{size.height} · {seconds}s
           </span>
+
+          {phase === 'recording' && (
+            <span className="font-mono text-[10px] tracking-[0.14em] text-amber">
+              KEEP THIS TAB IN FRONT
+            </span>
+          )}
         </div>
 
         {download && (

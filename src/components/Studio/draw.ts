@@ -10,7 +10,17 @@
  * can drift.
  */
 
-import { barHeights, visibleElements, type KeyedElement, type Layout, type ModeId } from './scene'
+import {
+  barHeights,
+  edgeFade,
+  mirrorBars,
+  spectrumAroundPeak,
+  triggerOffset,
+  visibleElements,
+  type KeyedElement,
+  type Layout,
+  type ModeId,
+} from './scene'
 
 export interface Palette {
   background: string
@@ -142,42 +152,110 @@ export function drawFrame(context: CanvasRenderingContext2D, input: FrameInput) 
   context.shadowBlur = 0
 }
 
-/** Mirrored frequency bars, growing from the centre line. */
+/**
+ * Frequency bars, centred on whatever is actually sounding.
+ *
+ * A CW sidetone is one pitch. Mapping the bins from zero upwards parks that
+ * spike about a fifth of the way in and leaves the rest of the frame flat;
+ * mirroring *that* splits it into two peaks with a hole in the middle, which
+ * is worse because it looks deliberate. Sampling outward from the peak puts
+ * the tone dead centre and lets the shape fall away on both sides.
+ */
 function drawBars(context: CanvasRenderingContext2D, { frame, palette, frequency }: FrameInput) {
-  const count = Math.round(frame.width / (frame.unit * 0.022))
-  const heights = barHeights(frequency, count)
-  const slot = frame.width / count
+  const half = Math.max(4, Math.round(frame.width / (frame.unit * 0.044)))
+  const heights = mirrorBars(spectrumAroundPeak(frequency, half))
+  const slot = frame.width / heights.length
   const width = slot * 0.55
   const max = frame.unit * 0.3
 
   for (const [index, value] of heights.entries()) {
     const height = Math.max(frame.unit * 0.004, value * max)
     const x = index * slot + (slot - width) / 2
+
+    // Faded at the edges so the row of resting bars reads as a signal path
+    // continuing past the frame rather than as a dashed line stopping at it.
+    context.globalAlpha = edgeFade((index + 0.5) / heights.length, 0.1)
     // Cyan at the peaks — the same cue the site uses for a sounding tone.
     context.fillStyle = value > 0.6 ? palette.cyan : palette.signal
     context.beginPath()
     context.roundRect(x, frame.centreY - height, width, height * 2, width / 2)
     context.fill()
   }
+
+  context.globalAlpha = 1
 }
 
-/** An oscilloscope trace. */
-function drawWave(context: CanvasRenderingContext2D, { frame, palette, waveform }: FrameInput) {
-  context.strokeStyle = palette.signal
+/**
+ * An oscilloscope trace.
+ *
+ * Three things a naive version gets wrong, all of which were visible:
+ *
+ * 1. **It shivers.** The analyser hands over an arbitrary window, so every
+ *    frame starts at a different point in the cycle. Triggering on a rising
+ *    zero-crossing holds the wave still, exactly as a scope does.
+ * 2. **It is too dense.** The full buffer is dozens of cycles at 600 Hz, which
+ *    reads as a comb rather than a wave. Only a slice is drawn.
+ * 3. **It is cut off.** Running the trace into both frame edges mid-cycle
+ *    reads as a rendering error, so it fades out at each end.
+ */
+function drawWave(
+  context: CanvasRenderingContext2D,
+  { frame, palette, waveform, level }: FrameInput,
+) {
+  const start = triggerOffset(waveform)
+  // About four cycles of a 600 Hz tone, whatever the sample rate turns out to
+  // be — enough to read as a wave, few enough to stay legible at any size.
+  const span = Math.min(waveform.length - start, Math.max(64, Math.floor(waveform.length / 6)))
+  if (span < 2) {
+    drawRestingLine(context, frame, palette)
+    return
+  }
+
+  const amplitude = frame.unit * 0.26
   context.lineWidth = Math.max(2, frame.unit * 0.005)
   context.lineJoin = 'round'
   context.lineCap = 'round'
-  context.beginPath()
+  context.strokeStyle = level > 0.5 ? palette.cyan : palette.signal
 
-  const amplitude = frame.unit * 0.26
-  const samples = waveform.length || 1
-  for (let i = 0; i < samples; i++) {
-    const x = (i / (samples - 1 || 1)) * frame.width
-    const y = frame.centreY + (((waveform[i] ?? 128) - 128) / 128) * amplitude
-    if (i === 0) context.moveTo(x, y)
-    else context.lineTo(x, y)
+  // Drawn in short segments rather than one path, because the fade has to vary
+  // along its length and a single stroke can only have one alpha.
+  for (let i = 1; i < span; i++) {
+    const from = (i - 1) / (span - 1)
+    const to = i / (span - 1)
+    context.globalAlpha = edgeFade(to, 0.12)
+    context.beginPath()
+    context.moveTo(
+      from * frame.width,
+      frame.centreY + (((waveform[start + i - 1] ?? 128) - 128) / 128) * amplitude,
+    )
+    context.lineTo(
+      to * frame.width,
+      frame.centreY + (((waveform[start + i] ?? 128) - 128) / 128) * amplitude,
+    )
+    context.stroke()
   }
-  context.stroke()
+
+  context.globalAlpha = 1
+}
+
+/** The flat line the wave collapses to in silence, faded at both ends. */
+function drawRestingLine(context: CanvasRenderingContext2D, frame: Layout, palette: Palette): void {
+  const segments = 60
+  context.lineWidth = Math.max(2, frame.unit * 0.005)
+  context.lineCap = 'round'
+  context.strokeStyle = palette.dim
+
+  for (let i = 1; i <= segments; i++) {
+    const from = (i - 1) / segments
+    const to = i / segments
+    context.globalAlpha = edgeFade(to, 0.12) * 0.6
+    context.beginPath()
+    context.moveTo(from * frame.width, frame.centreY)
+    context.lineTo(to * frame.width, frame.centreY)
+    context.stroke()
+  }
+
+  context.globalAlpha = 1
 }
 
 /** The spectrum wrapped around the centre. */

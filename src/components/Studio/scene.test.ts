@@ -3,9 +3,14 @@ import {
   MODES,
   SIZES,
   barHeights,
+  edgeFade,
   fileName,
   keyedElements,
   layout,
+  mirrorBars,
+  peakBin,
+  spectrumAroundPeak,
+  triggerOffset,
   visibleElements,
   type KeyedElement,
 } from './scene'
@@ -159,5 +164,181 @@ describe('fileName', () => {
 
   it('does not run away with a long message', () => {
     expect(fileName('A'.repeat(500), SIZES[0]!, 'wave').length).toBeLessThan(80)
+  })
+})
+
+describe('mirrorBars', () => {
+  it('doubles the length', () => {
+    expect(mirrorBars([1, 2, 3])).toHaveLength(6)
+  })
+
+  it('is symmetric about the middle', () => {
+    // A CW sidetone is one frequency, so an unmirrored spectrum puts the whole
+    // signal a fifth of the way in and leaves the rest of the frame dead.
+    const mirrored = mirrorBars([0.1, 0.5, 0.9])
+    expect(mirrored).toEqual([0.9, 0.5, 0.1, 0.1, 0.5, 0.9])
+    for (let i = 0; i < mirrored.length; i++) {
+      expect(mirrored[i]).toBe(mirrored[mirrored.length - 1 - i])
+    }
+  })
+
+  it('puts the loudest bin at the outside, not the middle', () => {
+    // The low bins carry the tone, so they belong at the centre where the eye
+    // goes; the empty high end fades out to the edges.
+    const mirrored = mirrorBars([1, 0, 0])
+    expect(mirrored[0]).toBe(0)
+    expect(mirrored[2]).toBe(1)
+    expect(mirrored[3]).toBe(1)
+  })
+
+  it('does not mutate its input', () => {
+    const input = [1, 2, 3]
+    mirrorBars(input)
+    expect(input).toEqual([1, 2, 3])
+  })
+
+  it('handles an empty spectrum', () => {
+    expect(mirrorBars([])).toEqual([])
+  })
+})
+
+describe('triggerOffset', () => {
+  /** `cycles` of a sine, as the analyser would hand it over. */
+  const sine = (length: number, cycles: number, phase = 0) =>
+    new Uint8Array(
+      Array.from({ length }, (_, i) =>
+        Math.round(128 + 120 * Math.sin((i / length) * cycles * Math.PI * 2 + phase)),
+      ),
+    )
+
+  it('finds a rising crossing', () => {
+    const offset = triggerOffset(sine(512, 4))
+    expect(offset).toBeGreaterThan(0)
+    expect(sine(512, 4)[offset]).toBeGreaterThanOrEqual(128)
+    expect(sine(512, 4)[offset - 1]!).toBeLessThan(128)
+  })
+
+  it('lands on the same phase whatever the window started at', () => {
+    // This is the whole point: consecutive analyser windows start at different
+    // points in the cycle, and without a trigger the trace shivers sideways.
+    const a = sine(512, 4, 0)
+    const b = sine(512, 4, 1.1)
+    const phaseOf = (samples: Uint8Array) => {
+      const offset = triggerOffset(samples)
+      return Math.sign((samples[offset + 1] ?? 128) - (samples[offset] ?? 128))
+    }
+    expect(phaseOf(a)).toBe(phaseOf(b))
+  })
+
+  it('returns 0 for silence, since there is nothing to hold steady', () => {
+    expect(triggerOffset(new Uint8Array(512).fill(128))).toBe(0)
+  })
+
+  it('never returns an offset that would read past the buffer', () => {
+    const samples = sine(512, 4)
+    expect(triggerOffset(samples)).toBeLessThan(samples.length)
+  })
+
+  it('survives an empty buffer', () => {
+    expect(triggerOffset(new Uint8Array(0))).toBe(0)
+  })
+})
+
+describe('edgeFade', () => {
+  it('is fully faded at both edges', () => {
+    expect(edgeFade(0)).toBe(0)
+    expect(edgeFade(1)).toBe(0)
+  })
+
+  it('is fully opaque in the middle', () => {
+    expect(edgeFade(0.5)).toBe(1)
+  })
+
+  it('is symmetric', () => {
+    expect(edgeFade(0.03)).toBeCloseTo(edgeFade(0.97), 6)
+  })
+
+  it('never leaves the 0..1 range', () => {
+    for (const position of [-1, 0, 0.5, 1, 2]) {
+      const value = edgeFade(position)
+      expect(value).toBeGreaterThanOrEqual(0)
+      expect(value).toBeLessThanOrEqual(1)
+    }
+  })
+})
+
+describe('peakBin', () => {
+  it('finds the loudest bin', () => {
+    const data = new Uint8Array(256)
+    data[42] = 250
+    expect(peakBin(data)).toBe(42)
+  })
+
+  it('reports nothing during silence rather than locking onto noise', () => {
+    // Without a threshold, silence still has a "loudest" bin and the display
+    // would jump to a different random frequency every frame.
+    expect(peakBin(new Uint8Array(256))).toBe(-1)
+    expect(peakBin(new Uint8Array(256).fill(5))).toBe(-1)
+  })
+
+  it('ignores the DC bin', () => {
+    const data = new Uint8Array(256)
+    data[0] = 255
+    data[30] = 200
+    expect(peakBin(data)).toBe(30)
+  })
+})
+
+describe('spectrumAroundPeak', () => {
+  const tone = (bin: number, length = 512) => {
+    const data = new Uint8Array(length)
+    for (let i = -3; i <= 3; i++) data[bin + i] = Math.round(255 * (1 - Math.abs(i) / 4))
+    return data
+  }
+
+  it('puts the sounding frequency first, which is the centre once mirrored', () => {
+    const heights = spectrumAroundPeak(tone(25), 16)
+    expect(heights[0]).toBeGreaterThan(0.9)
+    const mirrored = mirrorBars(heights)
+    const middle = mirrored.length / 2
+    expect(mirrored[middle]).toBe(mirrored[middle - 1])
+    expect(mirrored[middle]).toBeGreaterThan(mirrored[0]!)
+  })
+
+  it('centres wherever the tone actually is', () => {
+    // The whole point: a 400 Hz tone and an 800 Hz one both end up centred,
+    // rather than one of them sitting a fifth of the way along.
+    for (const bin of [12, 25, 60, 120]) {
+      expect(spectrumAroundPeak(tone(bin), 16)[0], String(bin)).toBeGreaterThan(0.9)
+    }
+  })
+
+  it('falls away from the peak', () => {
+    const heights = spectrumAroundPeak(tone(40), 16)
+    expect(heights.at(-1)!).toBeLessThan(heights[0]!)
+  })
+
+  it('is flat during silence', () => {
+    expect(spectrumAroundPeak(new Uint8Array(512), 16).every((v) => v === 0)).toBe(true)
+  })
+
+  it('returns the requested count and stays in 0..1', () => {
+    const heights = spectrumAroundPeak(tone(25), 24)
+    expect(heights).toHaveLength(24)
+    for (const value of heights) {
+      expect(value).toBeGreaterThanOrEqual(0)
+      expect(value).toBeLessThanOrEqual(1)
+    }
+  })
+
+  it('does not read past the end of the buffer for a high peak', () => {
+    const data = new Uint8Array(64)
+    data[62] = 255
+    expect(() => spectrumAroundPeak(data, 16)).not.toThrow()
+    expect(spectrumAroundPeak(data, 16).every(Number.isFinite)).toBe(true)
+  })
+
+  it('handles a zero count', () => {
+    expect(spectrumAroundPeak(tone(25), 0)).toEqual([])
   })
 })
