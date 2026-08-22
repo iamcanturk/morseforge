@@ -23,6 +23,59 @@ import {
 } from '../../storage/progress'
 import { METHODS, shouldUnlock, type MethodId } from '../../data/methods'
 import { track } from '../../analytics/track'
+import {
+  DEFAULT_CHALLENGE,
+  challengeQuery,
+  describeChallenge,
+  isCustom,
+  parseChallenge,
+  type ChallengeLink,
+} from '../../game/challengeLink'
+import { SITE } from '../../config/site'
+
+/** Copy the challenge link, and say so. */
+function ChallengeShare({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false)
+
+  return (
+    <div className="mt-4">
+      <p className="overflow-x-auto rounded-lg border border-line bg-elevated px-4 py-3 font-mono text-[11px] whitespace-nowrap text-muted">
+        {url}
+      </p>
+      <div className="mt-3 flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            void navigator.clipboard
+              ?.writeText(url)
+              .then(() => setCopied(true))
+              // Clipboard access can be refused; saying "copied" then would be
+              // a lie, and the URL is on screen to copy by hand anyway.
+              .catch(() => setCopied(false))
+          }}
+          className="rounded-lg border px-5 py-2.5 font-mono text-xs tracking-[0.14em]"
+          style={{ borderColor: 'var(--color-signal)', color: 'var(--color-signal)' }}
+        >
+          {copied ? 'COPIED' : 'COPY LINK'}
+        </button>
+        <a
+          href={`https://x.com/intent/tweet?${new URLSearchParams({
+            text: 'Beat my score on this Morse code challenge:',
+            url,
+          }).toString()}`}
+          target="_blank"
+          rel="noreferrer"
+          className="rounded-lg border border-line px-5 py-2.5 font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:border-signal hover:text-signal"
+        >
+          POST ON X
+        </a>
+      </div>
+      <p role="status" className="sr-only">
+        {copied ? 'Link copied' : ''}
+      </p>
+    </div>
+  )
+}
 
 /**
  * How the prompt is answered.
@@ -82,6 +135,18 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
 
   const [playingPrompt, setPlayingPrompt] = useState(false)
 
+  /**
+   * The challenge described by the URL (PROJECT.md §36).
+   *
+   * Read after mount rather than during render: this page is prerendered, so
+   * there is no query string at build time, and reading one during render
+   * would tear hydration on any link that carries parameters.
+   */
+  const [link, setLink] = useState<ChallengeLink>(DEFAULT_CHALLENGE)
+  useEffect(() => {
+    if (challenge) setLink(parseChallenge(window.location.search))
+  }, [challenge])
+
   const audio = useRef<AudioEngine | null>(null)
   const input = useRef<HTMLInputElement>(null)
 
@@ -114,10 +179,10 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
     () => ({
       mode: challenge ? 'listening' : mode,
       characters: pool.characters,
-      durationMs: challenge ? 60_000 : null,
-      target: null,
+      durationMs: challenge ? link.time * 1000 : null,
+      target: challenge ? link.count : null,
     }),
-    [challenge, mode, pool],
+    [challenge, mode, pool, link],
   )
 
   const session = useSession(config)
@@ -138,15 +203,19 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
       setPlayingPrompt(true)
       try {
         const playback = await audio.current.play(code, {
-          wpm: settings.timing.wpm,
-          farnsworthWpm: settings.timing.farnsworthWpm,
+          // A shared challenge sets its own speed — that is most of what makes
+          // it the same challenge for both people.
+          wpm: challenge ? link.wpm : settings.timing.wpm,
+          farnsworthWpm: challenge
+            ? Math.min(link.wpm, settings.timing.farnsworthWpm)
+            : settings.timing.farnsworthWpm,
         })
         await playback.finished
       } finally {
         setPlayingPrompt(false)
       }
     },
-    [settings],
+    [settings, challenge, link],
   )
 
   // Play the prompt as soon as it appears, in listening mode. The AudioContext
@@ -224,18 +293,51 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
   }, [status, summary, poolId, progress.method, progress.unlocked, progressStore])
 
   if (status === 'finished' && session.summary) {
+    const summary = session.summary
     return (
-      <SessionResult
-        summary={session.summary}
-        challenge={challenge}
-        unlocked={unlockNotice}
-        earned={session.earned}
-        onAgain={() => {
-          setUnlockNotice(null)
-          session.reset()
-          session.start()
-        }}
-      />
+      <div className="space-y-8">
+        {challenge && link.beat !== null && (
+          <p
+            className="rounded-2xl border px-5 py-4 leading-relaxed"
+            style={{
+              borderColor: summary.score >= link.beat ? 'var(--color-signal)' : 'var(--color-line)',
+            }}
+          >
+            <span className="font-display text-lg font-bold text-ink">
+              {summary.score >= link.beat ? `You beat ${link.beat}.` : `${link.beat} still stands.`}
+            </span>
+            <span className="mt-1 block text-sm text-muted">
+              You scored {summary.score} on the same challenge — same length, same speed, same
+              rules.
+            </span>
+          </p>
+        )}
+
+        <SessionResult
+          summary={summary}
+          challenge={challenge}
+          unlocked={unlockNotice}
+          earned={session.earned}
+          onAgain={() => {
+            setUnlockNotice(null)
+            session.reset()
+            session.start()
+          }}
+        />
+
+        {challenge && (
+          <div className="rounded-2xl border border-line bg-panel p-6">
+            <h2 className="font-display text-lg font-bold tracking-tight">Send it to someone</h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              Everything that defines the run is in the link, so they get exactly this challenge
+              with your score to beat. Nothing is stored anywhere.
+            </p>
+            <ChallengeShare
+              url={`${SITE.url}/challenge/${challengeQuery({ ...link, beat: summary.score })}`}
+            />
+          </div>
+        )}
+      </div>
     )
   }
 
@@ -245,12 +347,20 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
         {challenge ? (
           <>
             <h2 className="font-display text-2xl font-bold tracking-tight">
-              Sixty seconds. How many can you decode?
+              {isCustom(link)
+                ? 'Someone sent you this challenge'
+                : 'Sixty seconds. How many can you decode?'}
             </h2>
             <p className="mt-3 leading-relaxed text-muted">
               You will hear one character at a time. Type what you heard. No account, no signup, and
               it starts the moment you press the button.
             </p>
+            {(isCustom(link) || link.beat !== null) && (
+              <p className="mt-4 rounded-lg border border-line px-4 py-3 font-mono text-xs tracking-[0.12em] text-signal">
+                {describeChallenge(link)}
+                {link.beat !== null && ` · BEAT ${link.beat}`}
+              </p>
+            )}
           </>
         ) : (
           <>
@@ -362,7 +472,7 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
           className="mt-8 w-full rounded-lg px-6 py-3.5 font-mono text-sm tracking-[0.16em] text-void"
           style={{ background: 'var(--color-signal)' }}
         >
-          {challenge ? '⚡ START THE 60 SECONDS' : 'START'}
+          {challenge ? `⚡ START THE ${link.time} SECONDS` : 'START'}
         </button>
 
         {!settings.audio.enabled && (

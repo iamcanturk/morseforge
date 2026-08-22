@@ -54,6 +54,19 @@ const schema = [
         <a href="/daily/" class="text-signal underline underline-offset-4">daily challenge</a> is the
         same eight lines for everyone, once a day.
       </p>
+
+      <h2 class="mt-10 font-display text-xl font-bold tracking-tight">Challenging someone else</h2>
+      <p class="mt-3 leading-relaxed text-muted">
+        Finish a run and you get a link that carries the whole challenge — length, speed, how many
+        characters, and your score to beat:
+      </p>
+      <pre
+        class="mt-4 overflow-x-auto rounded-lg border border-line bg-elevated p-4 font-mono text-xs">/challenge/?time=60&amp;wpm=20&amp;count=40&amp;beat=340</pre>
+      <p class="mt-4 leading-relaxed text-muted">
+        There is no server behind it. Everything that defines the run is in the URL, so the link
+        works offline, works forever, and cannot be taken down. Values outside a sensible range are
+        clamped rather than trusted — a URL is the most editable input a web app has.
+      </p>
     </section>
   </main>
 </BaseLayout>
