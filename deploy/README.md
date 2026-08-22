@@ -188,3 +188,20 @@ reason.
 Addresses are hashed with a salt that rolls daily and is never stored in the
 output, so the summary holds no addresses, no user agents and no individual
 paths.
+
+---
+
+## Markdown alternates need a MIME type
+
+nginx has no type for `.md` and serves it as `application/octet-stream`, which
+makes a browser download the file rather than display it. Every article links
+its Markdown copy with `rel="alternate"`, so the type has to be right or the
+arrangement is decorative.
+
+The `location ~* \.md$` block in `cloudpanel-vhost.conf` fixes it. Confirm with:
+
+```bash
+curl -sI https://morse.iamcanturk.dev/blog/sos-does-not-stand-for-anything.md | grep -i content-type
+```
+
+It should say `text/markdown`, not `application/octet-stream`.
