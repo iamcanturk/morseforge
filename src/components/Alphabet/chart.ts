@@ -9,6 +9,7 @@
  */
 
 import { AudioEngine } from '../../engine/audioEngine'
+import { track } from '../../analytics/track'
 
 const ACTIVE = 'color-mix(in srgb, var(--color-signal) 12%, var(--color-panel))'
 
@@ -42,6 +43,7 @@ export function mountChart(root: HTMLElement): () => void {
     // chart exists to solve.
     stop?.()
     audio ??= new AudioEngine()
+    track('alphabet_play')
     mark(button)
 
     const playback = await audio.play(code, { wpm })

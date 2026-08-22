@@ -13,7 +13,7 @@
  *   node scripts/check-links.mjs [dist]
  */
 
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 
 const DIST = resolve(process.argv[2] ?? 'dist')

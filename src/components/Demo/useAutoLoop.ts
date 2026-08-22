@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useReducedMotion } from '../../hooks/useReducedMotion'
 
 /**
  * Drives a looping, silent demo from a real Morse timeline.
@@ -8,9 +9,11 @@ import { useEffect, useRef, useState } from 'react'
  * 1. **Never play audio.** Browsers block autoplaying sound, and a page that
  *    started beeping on load would deserve to be closed. The demos are visual;
  *    the real thing is one click away.
- * 2. **Respect `prefers-reduced-motion`.** A looping animation is exactly what
+ * 2. **Respect the motion preference.** A looping animation is exactly what
  *    that setting exists to stop. Reduced motion gets the finished state as a
  *    still frame rather than nothing, so the feature is still communicated.
+ *    Both the OS setting and the app's own are consulted — this used to read
+ *    only the OS, which meant turning motion off in settings did nothing here.
  * 3. **Only run while on screen.** Demo loops running behind the fold would
  *    burn battery animating something nobody is looking at.
  */
@@ -33,19 +36,10 @@ export function useAutoLoop(
   { durationMs, pauseMs = 900 }: AutoLoopOptions,
 ): AutoLoopState {
   const [elapsed, setElapsed] = useState(0)
-  const [reducedMotion, setReducedMotion] = useState(false)
   const [visible, setVisible] = useState(false)
   const frame = useRef<number | null>(null)
 
-  // Read on mount rather than during render: these are prerendered in Node,
-  // where matchMedia does not exist, and differing markup would tear hydration.
-  useEffect(() => {
-    const query = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const apply = () => setReducedMotion(query.matches)
-    apply()
-    query.addEventListener('change', apply)
-    return () => query.removeEventListener('change', apply)
-  }, [])
+  const reducedMotion = useReducedMotion()
 
   useEffect(() => {
     const element = ref.current

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { MorsePlayer } from '../MorsePlayer/MorsePlayer'
+import { track } from '../../analytics/track'
 import { encodeDetailed } from '../../engine/morseEncoder'
 import { decodeDetailed } from '../../engine/morseDecoder'
 
@@ -136,7 +137,9 @@ export function Translator() {
         ))}
       </div>
 
-      {morse.trim() && <MorsePlayer morse={morse} label="PLAYBACK" />}
+      {morse.trim() && (
+        <MorsePlayer morse={morse} label="PLAYBACK" onPlay={() => track('translator_play')} />
+      )}
     </div>
   )
 }

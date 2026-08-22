@@ -33,6 +33,14 @@ export interface MorsePlayerProps {
    * lesson only reaches this step from a press.
    */
   autoPlay?: boolean
+  /**
+   * Called when playback starts.
+   *
+   * The player is used on word pages, in lessons and in the translator, and
+   * those are not the same event. Rather than have the player guess where it
+   * is, the caller says what a play means to it.
+   */
+  onPlay?: () => void
 }
 
 /** Where the playhead is, and whether the key is down at that instant. */
@@ -50,6 +58,7 @@ export function MorsePlayer({
   initialWpm = 12,
   initialFlash = false,
   autoPlay = false,
+  onPlay,
   compact = false,
 }: MorsePlayerProps) {
   const [wpm, setWpm] = useState(initialWpm)
@@ -110,6 +119,7 @@ export function MorsePlayer({
     }
 
     setPlaying(true)
+    onPlay?.()
 
     // Audio and light run off the same wall clock rather than off each other,
     // so a muted player still lights up on exactly the right beats.
@@ -149,7 +159,7 @@ export function MorsePlayer({
       frame.current = requestAnimationFrame(tick)
     }
     frame.current = requestAnimationFrame(tick)
-  }, [playing, stop, sound, buzz, timeline, durationMs, stopVisuals])
+  }, [playing, stop, sound, buzz, timeline, durationMs, stopVisuals, onPlay])
 
   // Keyed on the code, so moving to the next character in a lesson plays the
   // new one and nothing replays when a setting changes.

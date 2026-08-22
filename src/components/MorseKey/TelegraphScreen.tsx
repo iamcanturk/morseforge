@@ -12,6 +12,7 @@ import {
   createSettingsStore,
   defaultSettings,
 } from '../../storage/settings'
+import { track } from '../../analytics/track'
 
 /**
  * The real-time telegraph (PROJECT.md §14, §15).
@@ -43,6 +44,9 @@ export function TelegraphScreen() {
       bindings: settings.keys,
       frequency: settings.audio.frequency,
       volume: settings.audio.enabled ? settings.audio.volume : 0,
+      // Counted per word rather than per character: a character is a
+      // keystroke, a word is someone actually sending something.
+      onWord: () => track('telegraph_send'),
     },
   )
 

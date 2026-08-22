@@ -228,6 +228,27 @@ const identityGraph = {
           })
         })
       }
+
+      // Counting installs, inline and by hand.
+      //
+      // src/analytics/track.ts is the real tracker, but importing it here would
+      // put a bundled script on every page — and the plan, the blog and the
+      // word index currently ship no JavaScript at all, which is a property
+      // worth more than this number.
+      //
+      // The consent rules are duplicated rather than shared, so they are
+      // written to fail closed: anything unexpected means no beacon. If they
+      // ever drift from track.ts they drift toward sending less.
+      window.addEventListener('appinstalled', () => {
+        try {
+          if (navigator.doNotTrack === '1' || window.doNotTrack === '1') return
+          const raw = localStorage.getItem('morseforge_settings')
+          if (raw && JSON.parse(raw)?.data?.counters === false) return
+          navigator.sendBeacon?.('/e/?n=install')
+        } catch {
+          // No storage, no beacon. Nothing here is worth an error.
+        }
+      })
     </script>
     <a
       href="#main"

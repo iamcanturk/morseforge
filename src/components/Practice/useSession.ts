@@ -14,6 +14,7 @@ import { applySession, createStatsStore } from '../../storage/stats'
 import { achievementSnapshot } from '../../storage/snapshot'
 import { newlyEarned, type Achievement } from '../../game/achievements'
 import { xpForAnswer } from '../../game/progression'
+import { track } from '../../analytics/track'
 import type { ReviewState } from '../../game/spacedRepetition'
 
 /**
@@ -86,6 +87,10 @@ export function useSession(config: SessionConfig): UseSessionResult {
         .reduce((sum, attempt) => sum + xpForAnswer(attempt.character), 0)
 
       statsStore.update((stats) => applySession(stats, result, xpEarned, Date.now()))
+      // Reported from the hook rather than the screen: the challenge and free
+      // practice share it, and a session can end on the clock without anyone
+      // pressing anything.
+      track('practice_finish', SESSION_MODES[configRef.current.mode].skill)
 
       const after = achievementSnapshot(progressStore.read(), statsStore.read())
       setEarned(newlyEarned(before.current ?? after, after))

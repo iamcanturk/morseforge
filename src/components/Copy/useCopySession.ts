@@ -7,6 +7,7 @@ import { answer as recordAnswer, createProgressStore } from '../../storage/progr
 import { applySession, createStatsStore } from '../../storage/stats'
 import { achievementSnapshot } from '../../storage/snapshot'
 import { newlyEarned, type Achievement } from '../../game/achievements'
+import { track } from '../../analytics/track'
 
 /**
  * Runs a copy session (PROJECT.md §13).
@@ -115,6 +116,7 @@ export function useCopySession(config: CopyConfig): UseCopySessionResult {
         .reduce((sum, attempt) => sum + xpForAnswer(attempt.character), 0)
 
       statsStore.update((stats) => applySession(stats, result, xpEarned, Date.now()))
+      track('copy_finish', configRef.current.kind)
 
       const after = achievementSnapshot(progressStore.read(), statsStore.read())
       setEarned(newlyEarned(before.current ?? after, after))

@@ -16,7 +16,7 @@ character.
 [Send something](https://morse.iamcanturk.dev/telegraph/)
 
 [![Live](https://img.shields.io/badge/live-morse.iamcanturk.dev-00E88F?style=flat-square)](https://morse.iamcanturk.dev)
-[![Tests](https://img.shields.io/badge/tests-641%20passing-00E88F?style=flat-square)](#testing)
+[![Tests](https://img.shields.io/badge/tests-661%20passing-00E88F?style=flat-square)](#testing)
 [![License](https://img.shields.io/badge/license-MIT-8B98A5?style=flat-square)](LICENSE)
 [![Astro](https://img.shields.io/badge/Astro-7-8B98A5?style=flat-square)](https://astro.build)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-00E88F?style=flat-square)](CONTRIBUTING.md)
@@ -194,7 +194,7 @@ Requires Node 20.11+.
 
 ### Testing
 
-641 tests, covering the parts where being wrong is silent:
+661 tests, covering the parts where being wrong is silent:
 
 - **Timing** — sending PARIS once takes exactly `60/WPM` seconds, checked at
   5/12/20/35 WPM and under Farnsworth. Every speed readout depends on it.
@@ -215,6 +215,10 @@ Requires Node 20.11+.
   player who can only deal with one prompt at a time, because a version that
   could answer several at once made an impossible game look survivable and hid
   a real balance bug. A competent player must last; a passive one must lose.
+- **Analytics wiring** — every event declared in the closed `EventName` union
+  must actually be fired from somewhere. A declared-but-unsent event is
+  invisible: TypeScript is happy, every test passes, and the only symptom is a
+  number that stays at zero, which looks exactly like nobody using the feature.
 - **Links** — every internal reference in the built output must resolve. 2,301
   of them across 47 pages, checked against what the build actually produced.
 - **Reachability** — `npm run verify` fails on a module under `src/data`,

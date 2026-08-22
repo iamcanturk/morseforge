@@ -5,6 +5,7 @@ import { SignalTree } from '../SignalTree/SignalTree'
 import { PracticeScreen } from '../Practice/PracticeScreen'
 import { STEP_COPY, TEACH_STEPS, currentStageIndex, type TeachStep } from './lesson'
 import { MorsePlayer } from '../MorsePlayer/MorsePlayer'
+import { track } from '../../analytics/track'
 import { prettify } from '../../engine/morseEncoder'
 import { LEARNING_STAGES, MORSE_ALPHABET } from '../../data/morseAlphabet'
 import { createSettingsStore, defaultSettings, type SettingsRecord } from '../../storage/settings'
@@ -36,9 +37,12 @@ export function LessonScreen() {
   // complete a stage. Where they are up to is resolved when they arrive.
   useEffect(() => {
     const loaded = progressStore.read()
-    setStage(Math.min(currentStageIndex(loaded, Date.now()), LEARNING_STAGES.length - 1))
+    const resolved = Math.min(currentStageIndex(loaded, Date.now()), LEARNING_STAGES.length - 1)
+    setStage(resolved)
     setSettings(settingsStore.read())
     setReady(true)
+    // Once, on arrival — the stage is the interesting part, not the character.
+    track('lesson_start', `stage-${resolved + 1}`)
   }, [progressStore, settingsStore])
 
   const stageCharacters = LEARNING_STAGES[stage] ?? []
@@ -66,8 +70,10 @@ export function LessonScreen() {
       setStep('see')
       return
     }
+    // Every character in the stage has been taught; the drill is what follows.
+    track('lesson_finish', `stage-${stage + 1}`)
     setPhase('drill')
-  }, [step, characterIndex, stageCharacters.length])
+  }, [step, characterIndex, stageCharacters.length, stage])
 
   const key = useMorseKey({
     wpm: settings.timing.wpm,
