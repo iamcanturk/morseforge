@@ -68,6 +68,8 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
     given: string
   } | null>(null)
 
+  const [playingPrompt, setPlayingPrompt] = useState(false)
+
   const audio = useRef<AudioEngine | null>(null)
   const input = useRef<HTMLInputElement>(null)
 
@@ -113,11 +115,16 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
         frequency: settings.audio.frequency,
         volume: settings.audio.volume,
       })
-      const playback = await audio.current.play(code, {
-        wpm: settings.timing.wpm,
-        farnsworthWpm: settings.timing.farnsworthWpm,
-      })
-      await playback.finished
+      setPlayingPrompt(true)
+      try {
+        const playback = await audio.current.play(code, {
+          wpm: settings.timing.wpm,
+          farnsworthWpm: settings.timing.farnsworthWpm,
+        })
+        await playback.finished
+      } finally {
+        setPlayingPrompt(false)
+      }
     },
     [settings],
   )
@@ -371,9 +378,16 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
               <button
                 type="button"
                 onClick={() => void play(current)}
-                className="rounded-lg border border-cyan/40 px-6 py-3 font-mono text-xs tracking-[0.14em] text-cyan"
+                className="rounded-lg border px-6 py-3 font-mono text-xs tracking-[0.14em] transition-colors"
+                style={{
+                  borderColor: playingPrompt
+                    ? 'var(--color-cyan)'
+                    : 'color-mix(in srgb, var(--color-cyan) 40%, transparent)',
+                  color: playingPrompt ? 'var(--color-void)' : 'var(--color-cyan)',
+                  background: playingPrompt ? 'var(--color-cyan)' : 'transparent',
+                }}
               >
-                ▶ PLAY AGAIN
+                {playingPrompt ? '♪ PLAYING' : '▶ PLAY AGAIN'}
               </button>
             )}
 

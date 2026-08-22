@@ -49,6 +49,7 @@ export function DecodeChallenge() {
   const [guess, setGuess] = useState('')
   const [status, setStatus] = useState<Status>('idle')
   const [elapsed, setElapsed] = useState<number | null>(null)
+  const [playing, setPlaying] = useState(false)
 
   const startedAt = useRef<number | null>(null)
   const audio = useRef<AudioEngine | null>(null)
@@ -68,8 +69,16 @@ export function DecodeChallenge() {
   const play = useCallback(async () => {
     startClock()
     audio.current ??= new AudioEngine()
-    const playback = await audio.current.play(morse, { wpm: 12, farnsworthWpm: 8 })
-    await playback.finished
+    // Held for the whole message, so the button says something is happening.
+    // Without it a muted device, or a browser that blocked the context, looks
+    // identical to a button that does nothing.
+    setPlaying(true)
+    try {
+      const playback = await audio.current.play(morse, { wpm: 12, farnsworthWpm: 8 })
+      await playback.finished
+    } finally {
+      setPlaying(false)
+    }
   }, [morse, startClock])
 
   const check = useCallback(
@@ -148,9 +157,17 @@ export function DecodeChallenge() {
           <button
             type="button"
             onClick={() => void play()}
-            className="rounded-lg border border-cyan/40 px-5 py-3 font-mono text-xs tracking-[0.14em] text-cyan"
+            aria-live="polite"
+            className="rounded-lg border px-5 py-3 font-mono text-xs tracking-[0.14em] transition-colors"
+            style={{
+              borderColor: playing
+                ? 'var(--color-cyan)'
+                : 'color-mix(in srgb, var(--color-cyan) 40%, transparent)',
+              color: playing ? 'var(--color-void)' : 'var(--color-cyan)',
+              background: playing ? 'var(--color-cyan)' : 'transparent',
+            }}
           >
-            ▶ HEAR IT
+            {playing ? '♪ PLAYING' : '▶ HEAR IT'}
           </button>
 
           {status !== 'correct' && (

@@ -6,88 +6,149 @@ import { AUTHOR, AUTHOR_GITHUB_URL, AUTHOR_X_URL, SITE } from '../config/site'
 /**
  * Site header.
  *
- * `Logo` is a React component rendered with no client directive, so Astro
- * renders it to static HTML at build time and ships zero JavaScript for it.
+ * Three destinations in the bar and everything else behind one disclosure.
+ * The previous version put all nine links in the bar under tiny group labels,
+ * which turned the header into a wall of 9px type — a list to be scanned rather
+ * than a route to be chosen.
  *
- * The nav is grouped rather than flat. Nine links in a row is a list to be
- * scanned; three groups of three is a structure to be understood, and the
- * grouping is the product's own shape — learn it, practise it, look things up.
+ * The disclosure is a native `<details>`, so it opens without JavaScript, is
+ * keyboard operable for free, and every link inside stays in the HTML for a
+ * crawler. That last part matters: the nav is also the internal linking, and a
+ * menu built from JavaScript would hide two thirds of the site from a bot.
  *
- * It also doubles as internal linking: every page reaching every other in one
- * hop is what lets a crawler discover the site from any entry point, which
- * matters when most arrivals land on a content page rather than the home page.
+ * `Logo` is a React component with no client directive, so Astro renders it to
+ * static HTML and ships zero JavaScript for it.
  */
-const groups = [
+const primary = [
+  { href: '/learn/', label: 'Learn' },
+  { href: '/practice/', label: 'Practice' },
+  { href: '/morse-code-translator/', label: 'Translator' },
+]
+
+const more = [
   {
     title: 'Learn',
     links: [
-      { href: '/learn/', label: 'Lessons' },
-      { href: '/learn-morse-code-in-7-days/', label: '7-day plan' },
-      { href: '/tree/', label: 'The tree' },
-      { href: '/morse-code-alphabet/', label: 'Alphabet' },
+      { href: '/learn/', label: 'Guided lessons', hint: 'See it, hear it, send it' },
+      {
+        href: '/learn-morse-code-in-7-days/',
+        label: '7-day plan',
+        hint: 'The whole course, written out',
+      },
+      { href: '/tree/', label: 'The Morse tree', hint: 'Why each letter has its code' },
     ],
   },
   {
     title: 'Practise',
     links: [
-      { href: '/practice/', label: 'Practice' },
-      { href: '/challenge/', label: '60s challenge' },
-      { href: '/telegraph/', label: 'Telegraph' },
+      { href: '/practice/', label: 'Practice', hint: 'Listen, read or send' },
+      { href: '/challenge/', label: '60-second challenge', hint: 'How many can you decode?' },
+      { href: '/telegraph/', label: 'Telegraph key', hint: 'Send freely and read it back' },
     ],
   },
   {
     title: 'Look up',
     links: [
-      { href: '/morse-code-translator/', label: 'Translator' },
-      { href: '/words/', label: 'Words' },
-      { href: '/blog/', label: 'Notes' },
+      { href: '/morse-code-translator/', label: 'Translator', hint: 'Text to Morse and back' },
+      { href: '/morse-code-alphabet/', label: 'Alphabet', hint: 'Every character, playable' },
+      { href: '/words/', label: 'Words in Morse', hint: 'SOS, CQ, I love you…' },
+      { href: '/blog/', label: 'Notes', hint: 'How to learn it properly' },
     ],
   },
 ]
 
-/** Flat list for the mobile strip, where the grouping does not fit. */
-const flat = [...groups.flatMap((group) => group.links), { href: '/settings/', label: 'Settings' }]
+/** Flat list for the mobile strip, where the disclosure would fight the scroll. */
+const flat = [
+  ...new Map(more.flatMap((g) => g.links).map((l) => [l.href, l])).values(),
+  { href: '/settings/', label: 'Settings' },
+]
 
 const current = Astro.url.pathname
 const isCurrent = (href: string) => current === href
-const linkColour = (href: string) =>
-  isCurrent(href) ? 'color: var(--color-signal)' : 'color: var(--color-muted)'
 ---
 
-<header class="border-b border-line">
+<header
+  class="sticky top-0 z-40 border-b border-line backdrop-blur"
+  style="background: color-mix(in srgb, var(--color-void) 88%, transparent)"
+>
   <div class="mx-auto max-w-6xl px-6">
-    <div class="flex items-center justify-between gap-6 py-4">
-      <a href="/" class="shrink-0" aria-label="MorseForge home">
-        <Logo size={24} />
-      </a>
+    <div class="flex items-center justify-between gap-4 py-3">
+      <div class="flex items-center gap-7">
+        <a href="/" class="shrink-0" aria-label="MorseForge home">
+          <Logo size={24} />
+        </a>
 
-      <nav aria-label="Main" class="hidden lg:block">
-        <ul class="flex items-start gap-8">
+        <nav aria-label="Main" class="hidden items-center gap-6 lg:flex">
           {
-            groups.map((group) => (
-              <li>
-                <span class="block font-mono text-[9px] tracking-[0.18em] text-signal-dim">
-                  {group.title.toUpperCase()}
-                </span>
-                <ul class="mt-1.5 flex gap-4">
-                  {group.links.map(({ href, label }) => (
-                    <li>
-                      <a
-                        href={href}
-                        aria-current={isCurrent(href) ? 'page' : undefined}
-                        class="text-xs transition-colors hover:text-signal"
-                        style={linkColour(href)}
-                      >
-                        {label}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </li>
+            primary.map(({ href, label }) => (
+              <a
+                href={href}
+                aria-current={isCurrent(href) ? 'page' : undefined}
+                class="text-sm transition-colors hover:text-signal"
+                style={isCurrent(href) ? 'color: var(--color-signal)' : 'color: var(--color-ink)'}
+              >
+                {label}
+              </a>
             ))
           }
-        </ul>
-      </nav>
+
+          <details class="group relative" data-menu>
+            <summary
+              class="flex cursor-pointer list-none items-center gap-1 text-sm text-muted transition-colors hover:text-signal [&::-webkit-details-marker]:hidden"
+            >
+              Everything
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="3"
+                aria-hidden="true"
+                class="transition-transform group-open:rotate-180"
+              >
+                <path d="m6 9 6 6 6-6"></path>
+              </svg>
+            </summary>
+
+            <div
+              class="absolute top-full left-0 z-50 mt-3 grid w-[34rem] grid-cols-3 gap-5 rounded-xl border border-line p-5 shadow-2xl"
+              style="background: var(--color-panel)"
+            >
+              {
+                more.map((group) => (
+                  <div>
+                    <span class="block font-mono text-[9px] tracking-[0.18em] text-signal-dim">
+                      {group.title.toUpperCase()}
+                    </span>
+                    <ul class="mt-2.5 space-y-2.5">
+                      {group.links.map(({ href, label, hint }) => (
+                        <li>
+                          <a href={href} class="block group/link">
+                            <span
+                              class="block text-[13px] transition-colors group-hover/link:text-signal"
+                              style={
+                                isCurrent(href)
+                                  ? 'color: var(--color-signal)'
+                                  : 'color: var(--color-ink)'
+                              }
+                            >
+                              {label}
+                            </span>
+                            <span class="mt-0.5 block text-[11px] leading-snug text-muted">
+                              {hint}
+                            </span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))
+              }
+            </div>
+          </details>
+        </nav>
+      </div>
 
       {
         /* Author credit lives in the header as well as the footer: on a long
@@ -97,11 +158,11 @@ const linkColour = (href: string) =>
         <a
           href={AUTHOR.url}
           rel="me"
-          class="hidden text-xs whitespace-nowrap text-muted transition-colors hover:text-signal sm:block"
+          class="hidden text-xs whitespace-nowrap text-muted transition-colors hover:text-signal md:block"
           >by {AUTHOR.name}</a
         >
 
-        <span class="hidden h-4 w-px bg-line sm:block" aria-hidden="true"></span>
+        <span class="hidden h-4 w-px bg-line md:block" aria-hidden="true"></span>
 
         <a
           href={SITE.repo}
@@ -160,12 +221,13 @@ const linkColour = (href: string) =>
     </div>
 
     {
-      /* Flat, sideways-scrolling strip on mobile: ten links wrapped to four rows
-        on a 375px screen and pushed the page heading below the fold. */
+      /* Flat, sideways-scrolling strip on mobile: a disclosure inside a scroll
+        container fights the scroll, and ten links wrapped to four rows pushed
+        the page heading below the fold. */
     }
     <nav
       aria-label="Main"
-      class="-mx-6 overflow-x-auto px-6 pb-3 [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden"
+      class="-mx-6 overflow-x-auto px-6 pb-2.5 [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden"
     >
       <ul class="flex items-center gap-5 whitespace-nowrap">
         {
@@ -175,7 +237,7 @@ const linkColour = (href: string) =>
                 href={href}
                 aria-current={isCurrent(href) ? 'page' : undefined}
                 class="font-mono text-[11px] tracking-[0.12em] transition-colors"
-                style={linkColour(href)}
+                style={isCurrent(href) ? 'color: var(--color-signal)' : 'color: var(--color-muted)'}
               >
                 {label.toUpperCase()}
               </a>
@@ -185,4 +247,22 @@ const linkColour = (href: string) =>
       </ul>
     </nav>
   </div>
+
+  <script is:inline>
+    // A native <details> stays open after you follow a link back, and two open
+    // at once would overlap. Neither is worth a framework — this is the whole
+    // behaviour the element is missing.
+    document.addEventListener('click', (event) => {
+      for (const menu of document.querySelectorAll('[data-menu][open]')) {
+        if (!menu.contains(event.target)) menu.removeAttribute('open')
+      }
+    })
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return
+      for (const menu of document.querySelectorAll('[data-menu][open]')) {
+        menu.removeAttribute('open')
+        menu.querySelector('summary')?.focus()
+      }
+    })
+  </script>
 </header>

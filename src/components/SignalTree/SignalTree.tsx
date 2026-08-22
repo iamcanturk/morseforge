@@ -136,11 +136,15 @@ export function SignalTree({
           screen each node is under 6px wide — unreadable, and well below any
           usable touch target. Scrolling sideways keeps the nodes at a real size
           and, more importantly, keeps dots-left/dashes-right intact; rotating
-          the tree to fit would fit better and teach the wrong thing. */}
+          the tree to fit would fit better and teach the wrong thing.
+
+          560px is the floor: below it the depth-4 letters stop being legible,
+          above it the tree overflowed containers it was being placed in and
+          made desktop users scroll sideways for no reason. */}
       <div className="-mx-6 overflow-x-auto px-6 [scrollbar-width:thin] sm:mx-0 sm:px-0">
         <svg
           viewBox={`0 0 ${VIEWBOX.width} ${VIEWBOX.height}`}
-          className="h-auto w-full min-w-[640px]"
+          className="h-auto w-full min-w-[560px]"
           role="img"
           aria-labelledby="signal-tree-title signal-tree-desc"
         >
