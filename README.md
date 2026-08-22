@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="public/icons/icon-192.png" alt="" width="72" height="72">
-
-# MorseForge
+<a href="https://morse.iamcanturk.dev">
+  <img src="public/og/github-social.png" alt="MorseForge — Learn Morse. Build the Signal." width="820">
+</a>
 
 ### Learn Morse. Build the Signal.
 
@@ -10,12 +10,16 @@ A free Morse code trainer that runs entirely in your browser — real CW audio, 
 keyboard straight key, and a signal tree that lights up as you master each
 character.
 
-**[morse.iamcanturk.dev →](https://morse.iamcanturk.dev)**
+**[Open it →](https://morse.iamcanturk.dev)** &nbsp;·&nbsp;
+[Learn in 7 days](https://morse.iamcanturk.dev/learn-morse-code-in-7-days/) &nbsp;·&nbsp;
+[60-second challenge](https://morse.iamcanturk.dev/challenge/) &nbsp;·&nbsp;
+[Send something](https://morse.iamcanturk.dev/telegraph/)
 
 [![Live](https://img.shields.io/badge/live-morse.iamcanturk.dev-00E88F?style=flat-square)](https://morse.iamcanturk.dev)
 [![Tests](https://img.shields.io/badge/tests-641%20passing-00E88F?style=flat-square)](#testing)
 [![License](https://img.shields.io/badge/license-MIT-8B98A5?style=flat-square)](LICENSE)
 [![Astro](https://img.shields.io/badge/Astro-7-8B98A5?style=flat-square)](https://astro.build)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-00E88F?style=flat-square)](CONTRIBUTING.md)
 
 </div>
 
@@ -43,6 +47,27 @@ No account. No ads. No server — your progress never leaves your device.
 | **[Words](https://morse.iamcanturk.dev/words/)**                                   | 22 words and phrases, each playable and explained                                           |
 
 ---
+
+<!--
+  Demo GIF goes here once recorded. Drop it at docs/demo.gif and uncomment:
+
+  <div align="center">
+    <img src="docs/demo.gif" alt="Sending a character on the telegraph key and watching the tree light up" width="820">
+  </div>
+
+  Recording recipe is in docs/launch.md.
+-->
+
+## Try it in thirty seconds
+
+No signup, nothing to install, and it works on a phone.
+
+1. **[Hear one character](https://morse.iamcanturk.dev/learn/)** — the guided
+   lesson shows it, plays it, then asks you to send it back.
+2. **[Send your own](https://morse.iamcanturk.dev/telegraph/)** — hold the space
+   bar. Tap for a dot, hold for a dash. It decodes as you go.
+3. **[Take the 60-second challenge](https://morse.iamcanturk.dev/challenge/)** —
+   and send the link to someone, with your score baked into it.
 
 ## Why it's built this way
 
@@ -210,29 +235,83 @@ returning visitor to whichever build they first loaded.
 
 ---
 
-## Author
-
-Built by **[Can Türk](https://iamcanturk.dev)**.
-
-- 🌐 [iamcanturk.dev](https://iamcanturk.dev)
-- 𝕏 [@iamcanturk](https://x.com/iamcanturk)
-- 💻 [github.com/iamcanturk](https://github.com/iamcanturk)
-
-If MorseForge is useful to you, a ⭐ on the repo or a link back to
-[morse.iamcanturk.dev](https://morse.iamcanturk.dev) genuinely helps.
-
 ## Contributing
 
-Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
-Good first issues are [labelled](https://github.com/iamcanturk/morse/labels/good%20first%20issue).
+Contributions are genuinely wanted, and there are specific things that would
+help more than others.
+
+**If you are a licensed operator**, the thing I am least sure of is whether the
+on-air conventions are right — the Q-codes, the prosigns, what an actual
+exchange sounds like. I am not licensed. Being told where this is wrong is the
+single most valuable thing anyone can do here, and an issue saying "the RST
+phrasing is off" is a real contribution.
+
+**If you learn Morse and it does not work for you**, say so and say where. The
+place people quit is the most important information this project can get, and
+it is invisible from the inside — nothing here reports back, by design.
+
+**If you write code**, the ideas that would move this furthest:
+
+- **Iambic keyer support.** Straight key only right now, and paddles are what
+  most operators actually use.
+- **Translations.** Everything is English. The learning content is
+  language-independent; the interface is not.
+- **A11y testing with a real screen reader.** The markup has been audited and
+  the obvious failures are fixed, but it has never been driven by someone who
+  uses one daily.
+- **[Iambic keyer and paddle support](https://github.com/iamcanturk/morse/issues/43)** —
+  the biggest single gap.
+- **[Translations](https://github.com/iamcanturk/morse/issues/44)** — say which
+  language before you start so two people do not do the same one.
+- **[Good first issues](https://github.com/iamcanturk/morse/labels/good%20first%20issue)**
+  if you want something small and self-contained to start with.
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) first — it is short. The one rule worth
+knowing up front: `npm run verify` has to pass, and a pre-push hook enforces it,
+so a broken build cannot reach the repo.
+
+### Not code, still useful
+
+- **Star the repo.** It is the cheapest signal that this is worth someone's
+  time, and it is most of how anyone finds it.
+- **Link to it** from a club page, a wiki, a forum answer.
+- **Tell someone learning Morse.** Word of mouth beats everything else here,
+  because there is no advertising budget and no growth loop.
+
+---
+
+## Author
+
+Built and maintained by **[Can Türk](https://iamcanturk.dev)** — I build things
+on the web, mostly the kind that work without an account.
+
+<p>
+  <a href="https://iamcanturk.dev"><img src="https://img.shields.io/badge/website-iamcanturk.dev-00E88F?style=for-the-badge" alt="iamcanturk.dev"></a>
+  <a href="https://x.com/iamcanturk"><img src="https://img.shields.io/badge/X-@iamcanturk-000000?style=for-the-badge&logo=x" alt="@iamcanturk on X"></a>
+  <a href="https://github.com/iamcanturk"><img src="https://img.shields.io/badge/GitHub-iamcanturk-8B98A5?style=for-the-badge&logo=github" alt="iamcanturk on GitHub"></a>
+</p>
+
+If MorseForge is useful to you, a ⭐ or a link back to
+[morse.iamcanturk.dev](https://morse.iamcanturk.dev) genuinely helps — and if
+you build something with it, I would like to see it.
+
+Available for work: **[iamcanturk.dev](https://iamcanturk.dev)**.
+
+---
 
 ## Credits
 
 Morse codes and timing follow
 [ITU-R M.1677-1](https://www.itu.int/rec/R-REC-M.1677/en), the ITU
 recommendation defining International Morse code. Farnsworth timing follows the
-ARRL standard.
+ARRL standard. The Koch ordering follows Ludwig Koch's original method.
+
+Built with [Astro](https://astro.build), [React](https://react.dev) and
+[Tailwind CSS](https://tailwindcss.com). Fonts are
+[Space Grotesk](https://fonts.google.com/specimen/Space+Grotesk) and
+[JetBrains Mono](https://www.jetbrains.com/lp/mono/), self-hosted.
 
 ## License
 
-[MIT](LICENSE) © Can Türk
+[MIT](LICENSE) © Can Türk — use it, fork it, ship it. Attribution is
+appreciated but not required.
