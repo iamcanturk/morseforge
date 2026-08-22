@@ -36,3 +36,6 @@ playwright-report/
 
 # Intermediate frames for the README animation; the GIF is committed.
 .demo-frames/
+
+# Editor tooling, not part of the project.
+.claude/
