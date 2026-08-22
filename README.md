@@ -192,6 +192,8 @@ Requires Node 20.11+.
   player who can only deal with one prompt at a time, because a version that
   could answer several at once made an impossible game look survivable and hid
   a real balance bug. A competent player must last; a passive one must lose.
+- **Links** — every internal reference in the built output must resolve. 2,301
+  of them across 47 pages, checked against what the build actually produced.
 - **Reachability** — `npm run verify` fails on a module under `src/data`,
   `src/game`, `src/engine`, `src/storage` or `src/analytics` that no page can
   reach. Three features once shipped fully tested and completely unreachable;

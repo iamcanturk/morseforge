@@ -132,6 +132,22 @@ else
   fail "only $linked of $post_count posts link their Markdown copy"
 fi
 
+# --------------------------------------------------------------------------
+# Internal links
+#
+# A broken internal link is invisible in development — you wrote it, so you
+# know where it was meant to go — and it is the commonest way a static site
+# rots. A crawler that follows one to a 404 learns the site is unmaintained.
+# --------------------------------------------------------------------------
+echo "Links:"
+if node "$(dirname "$0")/check-links.mjs" "$DIST" >/tmp/morseforge-links.$$ 2>&1; then
+  pass "$(tail -1 /tmp/morseforge-links.$$)"
+else
+  fail "$(head -1 /tmp/morseforge-links.$$)"
+  sed -n '2,12p' /tmp/morseforge-links.$$ >&2
+fi
+rm -f /tmp/morseforge-links.$$
+
 echo
 if [ "$failures" -gt 0 ]; then
   echo "$failures build check(s) failed." >&2

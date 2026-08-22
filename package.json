@@ -35,7 +35,8 @@
     "prepare": "git config core.hooksPath .githooks || true",
     "check:build": "bash scripts/check-build.sh",
     "verify:all": "npm run verify && npm run build && npm run check:build",
-    "check:reachable": "node scripts/check-reachable.mjs"
+    "check:reachable": "node scripts/check-reachable.mjs",
+    "check:links": "node scripts/check-links.mjs"
   },
   "dependencies": {
     "@astrojs/react": "^6.0.4",
