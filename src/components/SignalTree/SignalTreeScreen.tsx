@@ -12,6 +12,7 @@ import {
   type ProgressRecord,
   answer,
   createProgressStore,
+  emptyProgress,
   getCharacter,
   markSeen,
   overallMastery,
@@ -32,7 +33,7 @@ export function SignalTreeScreen() {
   // Progress starts empty rather than being read during render: this component
   // is prerendered at build time, where there is no localStorage, and rendering
   // different markup on the client than the server would tear the hydration.
-  const [progress, setProgress] = useState<ProgressRecord>({ characters: {} })
+  const [progress, setProgress] = useState<ProgressRecord>(emptyProgress)
   const [settings, setSettings] = useState<SettingsRecord>(defaultSettings)
   const [selected, setSelected] = useState<string | null>(null)
   const [playing, setPlaying] = useState(false)

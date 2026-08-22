@@ -4,7 +4,7 @@ import { AUTHOR } from '../../config/site'
 import { prettify } from '../../engine/morseEncoder'
 import { ALL_LETTERS, MORSE_ALPHABET } from '../../data/morseAlphabet'
 import { ShareCard } from '../Share/ShareCard'
-import { currentStreak } from '../../game/progression'
+import { currentStreak, xpForAnswer } from '../../game/progression'
 import { createStatsStore } from '../../storage/stats'
 import { createProgressStore, masteredCharacters } from '../../storage/progress'
 
@@ -18,13 +18,26 @@ import { createProgressStore, masteredCharacters } from '../../storage/progress'
 export function SessionResult({
   summary,
   challenge,
+  unlocked = null,
   onAgain,
 }: {
   summary: SessionSummary
   challenge: boolean
+  /** A character this session earned, for methods that unlock on accuracy. */
+  unlocked?: string | null
   onAgain: () => void
 }) {
   const accuracy = Math.round(summary.accuracy * 100)
+
+  // Recomputed rather than passed down: it is the same pure function the
+  // session used to bank it, so the two cannot disagree.
+  const xpEarned = useMemo(
+    () =>
+      summary.attempts
+        .filter((attempt) => attempt.correct)
+        .reduce((sum, attempt) => sum + xpForAnswer(attempt.character), 0),
+    [summary.attempts],
+  )
   const wpm = Math.round(summary.wpm * 10) / 10
 
   // Read after mount: the stores are empty during prerender, and the session
@@ -63,6 +76,22 @@ export function SessionResult({
       <p className="mt-1 text-sm text-muted">
         {summary.correct} correct of {summary.total}
       </p>
+
+      {unlocked && (
+        <p
+          className="mt-6 rounded-xl border px-5 py-4 leading-relaxed"
+          style={{ borderColor: 'var(--color-signal)', color: 'var(--color-ink)' }}
+        >
+          <span className="font-display text-lg font-bold text-signal">{unlocked} unlocked</span>
+          <span className="mt-1 block text-sm text-muted">
+            You cleared the bar, so the next character in your order joins the pool.
+          </span>
+        </p>
+      )}
+
+      {xpEarned > 0 && (
+        <p className="mt-4 font-mono text-sm tracking-[0.14em] text-amber">+{xpEarned} XP</p>
+      )}
 
       <dl className="mt-8 grid grid-cols-3 gap-4 border-t border-line pt-6">
         <div>

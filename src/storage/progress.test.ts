@@ -5,18 +5,22 @@ import {
   PROGRESS_VERSION,
   answer,
   createProgressStore,
+  emptyProgress,
   dueCharacters,
   getCharacter,
   markSeen,
   masteredCharacters,
   overallMastery,
+  setMethod,
   summarize,
+  unlockNext,
+  unlockedCharacters,
 } from './progress'
 import { createMemoryDriver } from './store'
 import { SKILLS } from '../game/mastery'
 
 const T0 = 1_700_000_000_000
-const empty = (): ProgressRecord => ({ characters: {} })
+const empty = emptyProgress
 
 /** Answer every skill `times` times, all correct. */
 function drill(record: ProgressRecord, character: string, times: number, now = T0) {
@@ -213,5 +217,82 @@ describe('persistence', () => {
     store.write(drill(empty(), 'E', 4))
     store.clear()
     expect(store.read().characters).toEqual({})
+  })
+})
+
+describe('learning method', () => {
+  it('starts on the Signal order with nothing extra unlocked', () => {
+    const record = empty()
+    expect(record.method).toBe('signal')
+    expect(record.unlocked).toBe(0)
+    expect(unlockedCharacters(record)).toEqual(['E', 'T'])
+  })
+
+  it('survives an answer', () => {
+    // Returning a bare { characters } here would silently reset the method on
+    // every single answer, and nothing in the UI would show it.
+    const record = answer(setMethod(empty(), 'koch'), 'K', 'listening', true, T0)
+    expect(record.method).toBe('koch')
+  })
+
+  it('survives being marked seen', () => {
+    expect(markSeen(setMethod(empty(), 'koch'), 'K', T0).method).toBe('koch')
+  })
+
+  it('opens Koch with K and M', () => {
+    expect(unlockedCharacters(setMethod(empty(), 'koch'))).toEqual(['K', 'M'])
+  })
+
+  it('resets unlocks when the method changes', () => {
+    // The count means "characters into this order". Carrying it across would
+    // hand the learner a random slice of a sequence they never started.
+    let record = unlockNext(unlockNext(setMethod(empty(), 'koch')))
+    expect(record.unlocked).toBe(2)
+    record = setMethod(record, 'alphabetical')
+    expect(record.unlocked).toBe(0)
+    expect(unlockedCharacters(record)).toEqual(['A', 'B'])
+  })
+
+  it('is a no-op when set to the method already in use', () => {
+    const record = unlockNext(setMethod(empty(), 'koch'))
+    expect(setMethod(record, 'koch')).toBe(record)
+  })
+
+  it('unlocks one character at a time', () => {
+    const record = unlockNext(setMethod(empty(), 'koch'))
+    expect(unlockedCharacters(record)).toEqual(['K', 'M', 'R'])
+  })
+
+  it('stops at the end of the order', () => {
+    let record = setMethod(empty(), 'koch')
+    for (let i = 0; i < 100; i++) record = unlockNext(record)
+    expect(unlockedCharacters(record)).toHaveLength(36)
+  })
+
+  it('round-trips through storage', () => {
+    const driver = createMemoryDriver()
+    createProgressStore(driver).write(unlockNext(setMethod(empty(), 'koch')))
+
+    const reloaded = createProgressStore(driver).read()
+    expect(reloaded.method).toBe('koch')
+    expect(reloaded.unlocked).toBe(1)
+  })
+
+  it('falls back to the default for a method name it does not know', () => {
+    const driver = createMemoryDriver()
+    driver.setItem(
+      PROGRESS_KEY,
+      JSON.stringify({ version: PROGRESS_VERSION, data: { method: 'telepathy', unlocked: 5 } }),
+    )
+    expect(createProgressStore(driver).read().method).toBe('signal')
+  })
+
+  it('clamps an unlock count past the end of the order', () => {
+    const driver = createMemoryDriver()
+    driver.setItem(
+      PROGRESS_KEY,
+      JSON.stringify({ version: PROGRESS_VERSION, data: { method: 'koch', unlocked: 9999 } }),
+    )
+    expect(unlockedCharacters(createProgressStore(driver).read())).toHaveLength(36)
   })
 })

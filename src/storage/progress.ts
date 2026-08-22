@@ -9,6 +9,7 @@
  */
 
 import { ALL_LETTERS } from '../data/morseAlphabet'
+import { DEFAULT_METHOD, METHODS, type MethodId, activeCharacters } from '../data/methods'
 import {
   type Skill,
   type SkillStats,
@@ -26,7 +27,10 @@ import {
   review,
   selectDue,
 } from '../game/spacedRepetition'
-import { Store, type StorageDriver, count, isRecord, num } from './store'
+import { Store, type StorageDriver, count, isRecord, num, oneOf } from './store'
+
+/** Method ids as a plain tuple, for `oneOf`. */
+const METHOD_VALUES = ['signal', 'koch', 'alphabetical'] as const
 
 export const PROGRESS_KEY = 'morseforge_progress'
 export const PROGRESS_VERSION = 1
@@ -42,6 +46,17 @@ export interface CharacterProgress {
 
 export interface ProgressRecord {
   characters: Record<string, CharacterProgress>
+  /**
+   * Which teaching order the learner is following.
+   *
+   * Stored with progress rather than with settings because it is not a
+   * preference — it decides which characters exist for them, and resetting
+   * progress has to reset it too. A learner who wipes their progress and finds
+   * themselves still eighteen characters into Koch has not been reset.
+   */
+  method: MethodId
+  /** Characters unlocked beyond the method's starting set. */
+  unlocked: number
 }
 
 function emptyCharacterProgress(now: number): CharacterProgress {
@@ -86,8 +101,14 @@ function validateSchedule(value: unknown, now: number): ReviewState {
 
 function validateProgress(value: unknown): ProgressRecord | null {
   if (!isRecord(value)) return null
+
+  const method = oneOf(value['method'], METHOD_VALUES, DEFAULT_METHOD)
+  // Clamped to the method's own length: a file naming a long order and then
+  // switched to a short one would otherwise claim characters that do not exist.
+  const unlocked = Math.min(count(value['unlocked']), METHODS[method].order.length)
+
   const rawCharacters = value['characters']
-  if (!isRecord(rawCharacters)) return { characters: {} }
+  if (!isRecord(rawCharacters)) return { characters: {}, method, unlocked }
 
   const now = Date.now()
   const characters: Record<string, CharacterProgress> = {}
@@ -102,7 +123,12 @@ function validateProgress(value: unknown): ProgressRecord | null {
     }
   }
 
-  return { characters }
+  return { characters, method, unlocked }
+}
+
+/** A fresh, empty progress record. */
+export function emptyProgress(): ProgressRecord {
+  return { characters: {}, method: DEFAULT_METHOD, unlocked: 0 }
 }
 
 export function createProgressStore(driver?: StorageDriver): Store<ProgressRecord> {
@@ -111,7 +137,7 @@ export function createProgressStore(driver?: StorageDriver): Store<ProgressRecor
       key: PROGRESS_KEY,
       version: PROGRESS_VERSION,
       validate: validateProgress,
-      createDefault: () => ({ characters: {} }),
+      createDefault: emptyProgress,
     },
     driver,
   )
@@ -120,6 +146,24 @@ export function createProgressStore(driver?: StorageDriver): Store<ProgressRecor
 /* -------------------------------------------------------------------------- */
 /* Operations                                                                  */
 /* -------------------------------------------------------------------------- */
+
+/** The characters the learner's current method has unlocked for them. */
+export function unlockedCharacters(record: ProgressRecord): string[] {
+  return activeCharacters(METHODS[record.method], record.unlocked)
+}
+
+/** Switch method. Unlocks reset, because they count into a different order. */
+export function setMethod(record: ProgressRecord, method: MethodId): ProgressRecord {
+  if (record.method === method) return record
+  return { ...record, method, unlocked: 0 }
+}
+
+/** Unlock the next character in the current method. */
+export function unlockNext(record: ProgressRecord): ProgressRecord {
+  const limit = METHODS[record.method].order.length - METHODS[record.method].startingCount
+  if (record.unlocked >= limit) return record
+  return { ...record, unlocked: record.unlocked + 1 }
+}
 
 /** Progress for a character, defaulted if it has never been touched. */
 export function getCharacter(
@@ -137,6 +181,7 @@ export function markSeen(record: ProgressRecord, character: string, now: number)
   if (current.seen) return record
 
   return {
+    ...record,
     characters: { ...record.characters, [key]: { ...current, seen: true } },
   }
 }
@@ -159,6 +204,7 @@ export function answer(
   const current = getCharacter(record, key, now)
 
   return {
+    ...record,
     characters: {
       ...record.characters,
       [key]: {

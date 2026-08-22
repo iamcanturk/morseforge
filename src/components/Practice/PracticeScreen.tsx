@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from './useSession'
 import { SessionResult } from './SessionResult'
+import { MethodPicker } from './MethodPicker'
 import { MorseKey } from '../MorseKey/MorseKey'
 import { useMorseKey } from '../MorseKey/useMorseKey'
 import { AudioEngine } from '../../engine/audioEngine'
@@ -11,7 +12,16 @@ import { createSettingsStore, defaultSettings, type SettingsRecord } from '../..
 import { SignalTree } from '../SignalTree/SignalTree'
 import { levelToNodeState, type NodeState } from '../../data/tree'
 import { masteryLevel } from '../../game/mastery'
-import { createProgressStore, getCharacter, type ProgressRecord } from '../../storage/progress'
+import {
+  createProgressStore,
+  emptyProgress,
+  getCharacter,
+  setMethod,
+  unlockNext,
+  unlockedCharacters,
+  type ProgressRecord,
+} from '../../storage/progress'
+import { METHODS, shouldUnlock, type MethodId } from '../../data/methods'
 
 /**
  * How the prompt is answered.
@@ -52,7 +62,8 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
   const [settings, setSettings] = useState<SettingsRecord>(defaultSettings)
 
   const [mode, setMode] = useState<SessionMode>('listening')
-  const [poolId, setPoolId] = useState<(typeof POOLS)[number]['id']>('stage2')
+  const [poolId, setPoolId] = useState<'method' | (typeof POOLS)[number]['id']>('method')
+  const [unlockNotice, setUnlockNotice] = useState<string | null>(null)
   const [layout, setLayout] = useState<PracticeLayout>('flat')
   const [guess, setGuess] = useState('')
   /**
@@ -74,7 +85,7 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
   const input = useRef<HTMLInputElement>(null)
 
   const progressStore = useMemo(() => createProgressStore(), [])
-  const [progress, setProgress] = useState<ProgressRecord>({ characters: {} })
+  const [progress, setProgress] = useState<ProgressRecord>(emptyProgress)
 
   useEffect(() => {
     setSettings(settingsStore.read())
@@ -88,7 +99,15 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
 
   useEffect(() => () => void audio.current?.dispose(), [])
 
-  const pool = POOLS.find((entry) => entry.id === poolId)!
+  const methodCharacters = useMemo(() => unlockedCharacters(progress), [progress])
+
+  const pool = useMemo(
+    () =>
+      poolId === 'method'
+        ? { id: 'method' as const, label: 'My method', characters: methodCharacters }
+        : POOLS.find((entry) => entry.id === poolId)!,
+    [poolId, methodCharacters],
+  )
 
   const config = useMemo<SessionConfig>(
     () => ({
@@ -182,12 +201,35 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
     resetKey()
   }, [current, resetKey])
 
+  /**
+   * Unlock the next character when a Koch-style session clears the bar.
+   *
+   * Checked once per finished session rather than per answer: accuracy over a
+   * whole session is the measure Koch describes, and unlocking mid-session
+   * would introduce a character the learner has never seen into a run they are
+   * being scored on.
+   */
+  const summary = session.summary
+  useEffect(() => {
+    if (status !== 'finished' || !summary || poolId !== 'method') return
+
+    const method = METHODS[progress.method]
+    if (!shouldUnlock(method, summary.accuracy, summary.total)) return
+    if (progress.unlocked >= method.order.length - method.startingCount) return
+
+    const next = method.order[method.startingCount + progress.unlocked]
+    progressStore.update(unlockNext)
+    setUnlockNotice(next ?? null)
+  }, [status, summary, poolId, progress.method, progress.unlocked, progressStore])
+
   if (status === 'finished' && session.summary) {
     return (
       <SessionResult
         summary={session.summary}
         challenge={challenge}
+        unlocked={unlockNotice}
         onAgain={() => {
+          setUnlockNotice(null)
           session.reset()
           session.start()
         }}
@@ -238,6 +280,15 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
                 </div>
               </fieldset>
 
+              <MethodPicker
+                method={progress.method}
+                unlocked={progress.unlocked}
+                onChange={(next: MethodId) => {
+                  progressStore.update((current) => setMethod(current, next))
+                  setPoolId('method')
+                }}
+              />
+
               <fieldset>
                 <legend className="font-mono text-[10px] tracking-[0.18em] text-muted">
                   ANSWER BY
@@ -273,7 +324,10 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
                   CHARACTERS
                 </legend>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {POOLS.map((entry) => (
+                  {[
+                    { id: 'method' as const, label: `My method (${methodCharacters.length})` },
+                    ...POOLS,
+                  ].map((entry) => (
                     <button
                       key={entry.id}
                       type="button"
