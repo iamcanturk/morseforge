@@ -23,11 +23,24 @@ import { StudioScreen } from '../components/Studio/StudioScreen'
 
     <section class="mt-14 border-t border-line pt-8 text-sm leading-relaxed text-muted">
       <p>
-        The file is WebM, because that is what a browser can encode without a server. Every editor
-        and both YouTube and X accept it directly. For a hard MP4 requirement:
+        The file is MP4 where the browser can record one, which is most of them now. That is not
+        about compatibility but about correctness: MediaRecorder&rsquo;s WebM output carries no
+        duration in its header, so anything that wants a frame rate divides frames by a duration of
+        roughly zero and concludes the video runs at hundreds of frames per second. X rejects that
+        outright &mdash; <em>maximum frame rate 60, actual 991</em> &mdash; even though the file was 60fps
+        all along. An MP4 is finalised with a real duration, so it uploads without argument.
+      </p>
+      <p class="mt-4">
+        If your browser falls back to WebM and something refuses it, rewriting the container fixes
+        it without re-encoding:
       </p>
       <pre
-        class="mt-4 overflow-x-auto rounded-lg border border-line bg-elevated p-4 font-mono text-xs">ffmpeg -i morseforge.webm -c:v libx264 -pix_fmt yuv420p -c:a aac morseforge.mp4</pre>
+        class="mt-4 overflow-x-auto rounded-lg border border-line bg-elevated p-4 font-mono text-xs">ffmpeg -i morseforge.webm -c copy -fflags +genpts morseforge.mp4</pre>
+      <p class="mt-4">
+        And if a platform still argues, this re-encodes at an explicit 60fps, which nothing refuses:
+      </p>
+      <pre
+        class="mt-4 overflow-x-auto rounded-lg border border-line bg-elevated p-4 font-mono text-xs">ffmpeg -i morseforge.webm -vf fps=60 -c:v libx264 -pix_fmt yuv420p -c:a aac morseforge.mp4</pre>
       <p class="mt-4">
         This page is not linked from anywhere, is disallowed in robots.txt and carries a noindex.
         The password on it is the part that actually protects it.

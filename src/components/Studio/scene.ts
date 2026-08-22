@@ -266,12 +266,22 @@ export function visibleElements(
 }
 
 /** A filename that says what it is, without a clock. */
-export function fileName(message: string, size: Size, mode: ModeId): string {
+export function fileName(message: string, size: Size, mode: ModeId, extension = 'mp4'): string {
   const slug =
     message
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')
       .slice(0, 40) || 'morse'
-  return `morseforge-${slug}-${mode}-${size.width}x${size.height}.webm`
+  return `morseforge-${slug}-${mode}-${size.width}x${size.height}.${extension}`
+}
+
+/**
+ * The extension for a MediaRecorder mime type.
+ *
+ * Not cosmetic: a WebM named `.mp4` is rejected by everything, and an `.mp4`
+ * named `.webm` uploads but confuses editors.
+ */
+export function extensionFor(mimeType: string): string {
+  return mimeType.startsWith('video/mp4') ? 'mp4' : 'webm'
 }

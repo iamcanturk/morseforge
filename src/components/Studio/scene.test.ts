@@ -4,6 +4,7 @@ import {
   SIZES,
   barHeights,
   edgeFade,
+  extensionFor,
   fileName,
   keyedElements,
   layout,
@@ -155,11 +156,11 @@ describe('visibleElements', () => {
 
 describe('fileName', () => {
   it('says what it is', () => {
-    expect(fileName('CQ CQ', SIZES[0]!, 'keying')).toBe('morseforge-cq-cq-keying-1920x1080.webm')
+    expect(fileName('CQ CQ', SIZES[0]!, 'keying')).toBe('morseforge-cq-cq-keying-1920x1080.mp4')
   })
 
   it('survives a message that slugs to nothing', () => {
-    expect(fileName('!!!', SIZES[0]!, 'bars')).toBe('morseforge-morse-bars-1920x1080.webm')
+    expect(fileName('!!!', SIZES[0]!, 'bars')).toBe('morseforge-morse-bars-1920x1080.mp4')
   })
 
   it('does not run away with a long message', () => {
@@ -340,5 +341,30 @@ describe('spectrumAroundPeak', () => {
 
   it('handles a zero count', () => {
     expect(spectrumAroundPeak(tone(25), 0)).toEqual([])
+  })
+})
+
+describe('extensionFor', () => {
+  it('names an MP4 an mp4 and a WebM a webm', () => {
+    // Not cosmetic: a WebM named .mp4 is rejected by everything that opens it.
+    expect(extensionFor('video/mp4;codecs=avc1.42E01E,mp4a.40.2')).toBe('mp4')
+    expect(extensionFor('video/mp4')).toBe('mp4')
+    expect(extensionFor('video/webm;codecs=vp9,opus')).toBe('webm')
+    expect(extensionFor('video/webm')).toBe('webm')
+  })
+
+  it('falls back to webm for anything it does not recognise', () => {
+    expect(extensionFor('')).toBe('webm')
+    expect(extensionFor('video/quicktime')).toBe('webm')
+  })
+})
+
+describe('fileName with a container', () => {
+  it('defaults to mp4, which is what the studio now records', () => {
+    expect(fileName('CQ', SIZES[0]!, 'keying')).toMatch(/\.mp4$/)
+  })
+
+  it('uses whatever the recorder actually produced', () => {
+    expect(fileName('CQ', SIZES[0]!, 'keying', 'webm')).toMatch(/\.webm$/)
   })
 })

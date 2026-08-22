@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { MODES, SIZES, fileName, keyedElements, layout, type ModeId } from './scene'
+import { MODES, SIZES, extensionFor, fileName, keyedElements, layout, type ModeId } from './scene'
 import { drawCaption, drawFrame, drawLogo, readPalette } from './draw'
 import { AudioEngine } from '../../engine/audioEngine'
 import { encode, prettify } from '../../engine/morseEncoder'
@@ -208,10 +208,31 @@ export function StudioScreen() {
       ...destination.stream.getAudioTracks(),
     ])
 
-    const candidates = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+    /*
+     * MP4 first, and not for compatibility — for correctness.
+     *
+     * MediaRecorder's WebM output carries no duration in its header; it is a
+     * live muxer and never goes back to write one. Anything that then wants a
+     * frame rate computes frames ÷ duration, gets a duration near zero, and
+     * concludes the video runs at several hundred frames per second. X rejects
+     * the upload outright: "maximum frame rate 60, actual 991". The file was
+     * always 60fps — the container simply never said so.
+     *
+     * An MP4 is finalised with a real duration and a real frame rate, so it
+     * uploads without argument. WebM stays as the fallback for browsers that
+     * cannot record MP4, with a note on the page about remuxing it.
+     */
+    const candidates = [
+      'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+      'video/mp4;codecs=avc1',
+      'video/mp4',
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm',
+    ]
     const mimeType = candidates.find((type) => MediaRecorder.isTypeSupported(type))
     if (!mimeType) {
-      setError('This browser cannot record WebM. Chrome or Firefox will.')
+      setError('This browser cannot record video. Chrome, Edge or Safari will.')
       return
     }
 
@@ -264,7 +285,10 @@ export function StudioScreen() {
     const blob = await finished
     setDownload((previous) => {
       if (previous) URL.revokeObjectURL(previous.url)
-      return { url: URL.createObjectURL(blob), name: fileName(message, size, mode) }
+      return {
+        url: URL.createObjectURL(blob),
+        name: fileName(message, size, mode, extensionFor(mimeType)),
+      }
     })
     setPhase('idle')
     paint(0)
