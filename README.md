@@ -254,19 +254,19 @@ it is invisible from the inside — nothing here reports back, by design.
 
 **If you write code**, the ideas that would move this furthest:
 
-- **Iambic keyer support.** Straight key only right now, and paddles are what
-  most operators actually use.
-- **Translations.** Everything is English. The learning content is
-  language-independent; the interface is not.
-- **A11y testing with a real screen reader.** The markup has been audited and
-  the obvious failures are fixed, but it has never been driven by someone who
-  uses one daily.
 - **[Iambic keyer and paddle support](https://github.com/iamcanturk/morse/issues/43)** —
-  the biggest single gap.
-- **[Translations](https://github.com/iamcanturk/morse/issues/44)** — say which
-  language before you start so two people do not do the same one.
-- **[Good first issues](https://github.com/iamcanturk/morse/labels/good%20first%20issue)**
-  if you want something small and self-contained to start with.
+  the biggest single gap. Straight key only right now, and paddles are what most
+  operators actually use.
+- **[Translations](https://github.com/iamcanturk/morse/issues/44)** — everything
+  is English. Say which language before you start, so two people do not
+  translate the same thing.
+- **Screen-reader testing.** The markup has been audited and the obvious
+  failures are fixed, but it has never been driven by someone who uses one
+  daily. That gap does not close by reading the code.
+- **Something small?** Open an issue describing what you want to work on and I
+  will scope it with you. There is no stale backlog here — anything that could
+  be fixed in an afternoon has been, so a curated list of easy tasks would be
+  a list of things nobody needed.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) first — it is short. The one rule worth
 knowing up front: `npm run verify` has to pass, and a pre-push hook enforces it,
