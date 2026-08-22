@@ -180,6 +180,7 @@ export function CopyScreen() {
         <SessionResult
           summary={session.summary}
           challenge={false}
+          earned={session.earned}
           onAgain={() => {
             session.reset()
             session.start()

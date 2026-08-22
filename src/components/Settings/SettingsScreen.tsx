@@ -12,7 +12,15 @@ import {
   defaultSettings,
   matchKeyerPreset,
 } from '../../storage/settings'
-import { PROGRESS_KEY, createProgressStore } from '../../storage/progress'
+import {
+  PROGRESS_KEY,
+  createProgressStore,
+  emptyProgress,
+  setMethod,
+  type ProgressRecord,
+} from '../../storage/progress'
+import { MethodPicker } from '../Practice/MethodPicker'
+import type { MethodId } from '../../data/methods'
 import { SETTINGS_KEY } from '../../storage/settings'
 
 /**
@@ -27,6 +35,7 @@ export function SettingsScreen() {
   const progressStore = useMemo(() => createProgressStore(), [])
 
   const [settings, setSettings] = useState<SettingsRecord>(defaultSettings)
+  const [progress, setProgress] = useState<ProgressRecord>(emptyProgress)
   const [notice, setNotice] = useState<string | null>(null)
   const audio = useRef<AudioEngine | null>(null)
   const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -36,6 +45,11 @@ export function SettingsScreen() {
     setSettings(store.read())
     return store.subscribe(setSettings)
   }, [store])
+
+  useEffect(() => {
+    setProgress(progressStore.read())
+    return progressStore.subscribe(setProgress)
+  }, [progressStore])
 
   useEffect(
     () => () => {
@@ -136,6 +150,23 @@ export function SettingsScreen() {
           {notice}
         </p>
       )}
+
+      <section>
+        <h2 className="font-display text-xl font-bold tracking-tight">How you learn</h2>
+        <p className="mt-2 text-sm leading-relaxed text-muted">
+          Which order characters are introduced in. The same picker is on the practice screen — this
+          is here because it is a preference you set once, not a per-session choice.
+        </p>
+        <div className="mt-5">
+          <MethodPicker
+            method={progress.method}
+            unlocked={progress.unlocked}
+            onChange={(next: MethodId) =>
+              progressStore.update((current) => setMethod(current, next))
+            }
+          />
+        </div>
+      </section>
 
       <section>
         <h2 className="font-display text-xl font-bold tracking-tight">Sound</h2>

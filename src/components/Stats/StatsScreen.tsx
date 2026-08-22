@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ALL_LETTERS } from '../../data/morseAlphabet'
-import { evaluate, type AchievementSnapshot } from '../../game/achievements'
-import { masteryLevel } from '../../game/mastery'
+import { evaluate } from '../../game/achievements'
 import { currentStreak, levelProgress } from '../../game/progression'
 import {
   createProgressStore,
   emptyProgress,
-  getCharacter,
   masteredCharacters,
   overallMastery,
   type ProgressRecord,
@@ -17,6 +15,7 @@ import {
   lifetimeAccuracy,
   type StatsRecord,
 } from '../../storage/stats'
+import { achievementSnapshot } from '../../storage/snapshot'
 
 /**
  * The stats dashboard (PROJECT.md §20, §49).
@@ -46,27 +45,13 @@ export function StatsScreen() {
     () => masteredCharacters(progress, ALL_LETTERS, now).length,
     [progress, now],
   )
-  const seen = useMemo(
-    () =>
-      ALL_LETTERS.filter((character) => {
-        const entry = getCharacter(progress, character, now)
-        return masteryLevel(entry.skills, entry.seen) >= 1
-      }).length,
-    [progress, now],
+
+  // Built by the same function the result screen uses, so the two can never
+  // disagree about whether something has been earned.
+  const achievements = useMemo(
+    () => evaluate(achievementSnapshot(progress, stats, now)),
+    [progress, stats, now],
   )
-
-  const snapshot: AchievementSnapshot = {
-    elementsSent: stats.elementsSent,
-    mastered,
-    seen,
-    bestWpm: stats.bestWpm,
-    longestStreak: stats.streak.longest,
-    sessions: stats.sessions,
-    totalCorrect: stats.totalCorrect,
-    messagesSent: stats.messagesSent,
-  }
-
-  const achievements = useMemo(() => evaluate(snapshot), [snapshot])
   const level = levelProgress(stats.xp)
   const streak = currentStreak(stats.streak, now)
   const accuracy = Math.round(lifetimeAccuracy(stats) * 100)

@@ -5,6 +5,7 @@ import { prettify } from '../../engine/morseEncoder'
 import { ALL_LETTERS, MORSE_ALPHABET } from '../../data/morseAlphabet'
 import { ShareCard } from '../Share/ShareCard'
 import { currentStreak, xpForAnswer } from '../../game/progression'
+import type { Achievement } from '../../game/achievements'
 import { createStatsStore } from '../../storage/stats'
 import { createProgressStore, masteredCharacters } from '../../storage/progress'
 
@@ -19,12 +20,15 @@ export function SessionResult({
   summary,
   challenge,
   unlocked = null,
+  earned = [],
   onAgain,
 }: {
   summary: SessionSummary
   challenge: boolean
   /** A character this session earned, for methods that unlock on accuracy. */
   unlocked?: string | null
+  /** Achievements crossed during this session, shown once, here. */
+  earned?: readonly Achievement[]
   onAgain: () => void
 }) {
   const accuracy = Math.round(summary.accuracy * 100)
@@ -87,6 +91,30 @@ export function SessionResult({
             You cleared the bar, so the next character in your order joins the pool.
           </span>
         </p>
+      )}
+
+      {earned.length > 0 && (
+        <ul className="mt-6 space-y-2">
+          {earned.map((achievement) => (
+            <li
+              key={achievement.id}
+              className="flex items-center gap-3 rounded-xl border px-5 py-4 text-left"
+              style={{ borderColor: 'var(--color-amber)' }}
+            >
+              <span aria-hidden="true" className="text-2xl">
+                {achievement.icon}
+              </span>
+              <span className="min-w-0">
+                <span className="block font-display text-sm font-semibold text-amber">
+                  {achievement.title}
+                </span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-muted">
+                  {achievement.description}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
 
       {xpEarned > 0 && (

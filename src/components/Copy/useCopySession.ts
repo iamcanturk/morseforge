@@ -5,6 +5,8 @@ import { summarize, type Attempt, type SessionSummary } from '../../game/session
 import { xpForAnswer } from '../../game/progression'
 import { answer as recordAnswer, createProgressStore } from '../../storage/progress'
 import { applySession, createStatsStore } from '../../storage/stats'
+import { achievementSnapshot } from '../../storage/snapshot'
+import { newlyEarned, type Achievement } from '../../game/achievements'
 
 /**
  * Runs a copy session (PROJECT.md §13).
@@ -44,6 +46,8 @@ export interface UseCopySessionResult {
   /** The line just graded, held while the answer key is on screen. */
   lastGrade: CopyGrade | null
   summary: SessionSummary | null
+  /** Achievements this session earned. Empty unless it just crossed one. */
+  earned: readonly Achievement[]
   /** Lines copied without a single error. */
   perfectLines: number
   start: () => void
@@ -64,7 +68,11 @@ export function useCopySession(config: CopyConfig): UseCopySessionResult {
   const [results, setResults] = useState<CopyResult[]>([])
   const [lastGrade, setLastGrade] = useState<CopyGrade | null>(null)
   const [summary, setSummary] = useState<SessionSummary | null>(null)
+  const [earned, setEarned] = useState<readonly Achievement[]>([])
 
+  // Taken before the session writes anything: "newly earned" can only be
+  // answered by comparing before against after.
+  const before = useRef<ReturnType<typeof achievementSnapshot> | null>(null)
   const startedAt = useRef<number>(0)
   const promptedAt = useRef<number>(0)
   const attempts = useRef<Attempt[]>([])
@@ -96,17 +104,22 @@ export function useCopySession(config: CopyConfig): UseCopySessionResult {
 
       statsStore.update((stats) => applySession(stats, result, xpEarned, Date.now()))
 
+      const after = achievementSnapshot(progressStore.read(), statsStore.read())
+      setEarned(newlyEarned(before.current ?? after, after))
+
       setResults([...collected])
       setSummary(result)
       setStatus('finished')
       setCurrent(null)
       setLastGrade(null)
     },
-    [statsStore],
+    [statsStore, progressStore],
   )
 
   const start = useCallback(() => {
     attempts.current = []
+    setEarned([])
+    before.current = achievementSnapshot(progressStore.read(), statsStore.read())
     startedAt.current = performance.now()
     promptedAt.current = performance.now()
     setResults([])
@@ -114,7 +127,7 @@ export function useCopySession(config: CopyConfig): UseCopySessionResult {
     setLastGrade(null)
     setCurrent(generate())
     setStatus('running')
-  }, [generate])
+  }, [generate, progressStore, statsStore])
 
   const submit = useCallback(
     (given: string): CopyGrade | null => {
@@ -184,6 +197,7 @@ export function useCopySession(config: CopyConfig): UseCopySessionResult {
     setResults([])
     setLastGrade(null)
     setSummary(null)
+    setEarned([])
     attempts.current = []
   }, [])
 
@@ -197,6 +211,7 @@ export function useCopySession(config: CopyConfig): UseCopySessionResult {
     results,
     lastGrade,
     summary,
+    earned,
     perfectLines,
     start,
     submit,

@@ -11,6 +11,8 @@ import {
 import { SESSION_MODES } from '../../game/session'
 import { answer as recordAnswer, createProgressStore, getCharacter } from '../../storage/progress'
 import { applySession, createStatsStore } from '../../storage/stats'
+import { achievementSnapshot } from '../../storage/snapshot'
+import { newlyEarned, type Achievement } from '../../game/achievements'
 import { xpForAnswer } from '../../game/progression'
 import type { ReviewState } from '../../game/spacedRepetition'
 
@@ -32,6 +34,8 @@ export interface UseSessionResult {
   /** Milliseconds left, or null when untimed. */
   remaining: number | null
   summary: SessionSummary | null
+  /** Achievements this session earned. Empty unless it just crossed one. */
+  earned: readonly Achievement[]
   start: () => void
   /** Grade an answer and move on. Returns whether it was right. */
   submit: (given: string) => boolean
@@ -48,7 +52,12 @@ export function useSession(config: SessionConfig): UseSessionResult {
   const [attempts, setAttempts] = useState<Attempt[]>([])
   const [remaining, setRemaining] = useState<number | null>(config.durationMs)
   const [summary, setSummary] = useState<SessionSummary | null>(null)
+  const [earned, setEarned] = useState<readonly Achievement[]>([])
 
+  // Taken before the session writes anything, because "newly earned" can only
+  // be answered by comparing the two — once the session is banked, an
+  // achievement earned two months ago looks identical to one earned just now.
+  const before = useRef<ReturnType<typeof achievementSnapshot> | null>(null)
   const startedAt = useRef<number | null>(null)
   const promptedAt = useRef<number>(0)
   const recent = useRef<string[]>([])
@@ -78,11 +87,14 @@ export function useSession(config: SessionConfig): UseSessionResult {
 
       statsStore.update((stats) => applySession(stats, result, xpEarned, Date.now()))
 
+      const after = achievementSnapshot(progressStore.read(), statsStore.read())
+      setEarned(newlyEarned(before.current ?? after, after))
+
       setSummary(result)
       setStatus('finished')
       setCurrent(null)
     },
-    [stopTimer, statsStore],
+    [stopTimer, statsStore, progressStore],
   )
 
   /** Schedules per character, so prompts go to whatever is closest to forgotten. */
@@ -109,6 +121,8 @@ export function useSession(config: SessionConfig): UseSessionResult {
   const start = useCallback(() => {
     setAttempts([])
     setSummary(null)
+    setEarned([])
+    before.current = achievementSnapshot(progressStore.read(), statsStore.read())
     recent.current = []
     startedAt.current = performance.now()
     setStatus('running')
@@ -130,7 +144,7 @@ export function useSession(config: SessionConfig): UseSessionResult {
         }
       }, 100)
     }
-  }, [advance, finish, stopTimer])
+  }, [advance, finish, stopTimer, progressStore, statsStore])
 
   const submit = useCallback(
     (given: string): boolean => {
@@ -185,6 +199,7 @@ export function useSession(config: SessionConfig): UseSessionResult {
     setCurrent(null)
     setAttempts([])
     setSummary(null)
+    setEarned([])
     setRemaining(configRef.current.durationMs)
     startedAt.current = null
     recent.current = []
@@ -192,5 +207,5 @@ export function useSession(config: SessionConfig): UseSessionResult {
 
   useEffect(() => stopTimer, [stopTimer])
 
-  return { status, current, attempts, remaining, summary, start, submit, stop, reset }
+  return { status, current, attempts, remaining, summary, earned, start, submit, stop, reset }
 }

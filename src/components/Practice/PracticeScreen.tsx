@@ -228,6 +228,7 @@ export function PracticeScreen({ challenge = false }: PracticeScreenProps) {
         summary={session.summary}
         challenge={challenge}
         unlocked={unlockNotice}
+        earned={session.earned}
         onAgain={() => {
           setUnlockNotice(null)
           session.reset()
