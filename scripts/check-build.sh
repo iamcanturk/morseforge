@@ -95,6 +95,43 @@ if [ -f "$DIST/robots.txt" ]; then
     || fail "robots.txt no longer names the AI crawlers"
 fi
 
+# --------------------------------------------------------------------------
+# Machine-readable copies
+#
+# An assistant fetching an article should get clean Markdown rather than a
+# document built for a browser. That only works if the alternates exist and the
+# HTML says where they are — and a broken build of either is silent.
+# --------------------------------------------------------------------------
+echo "For assistants:"
+
+if [ -f "$DIST/llms-full.txt" ]; then
+  size=$(wc -c <"$DIST/llms-full.txt")
+  if [ "$size" -gt 10000 ]; then
+    pass "llms-full.txt — $size characters"
+  else
+    fail "llms-full.txt is only $size characters; something stopped generating"
+  fi
+else
+  fail "llms-full.txt missing"
+fi
+
+markdown_count=$(find "$DIST/blog" -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+post_count=$(find "$DIST/blog" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
+
+if [ "$markdown_count" -gt 0 ] && [ "$markdown_count" -eq "$post_count" ]; then
+  pass "every post has a Markdown copy — $markdown_count of $post_count"
+else
+  fail "$markdown_count Markdown copies for $post_count posts"
+fi
+
+# The copy is useless if nothing points at it.
+linked=$(grep -l 'rel="alternate" type="text/markdown"' "$DIST"/blog/*/index.html 2>/dev/null | wc -l | tr -d ' ')
+if [ "$linked" -eq "$post_count" ]; then
+  pass "every post links its Markdown copy"
+else
+  fail "only $linked of $post_count posts link their Markdown copy"
+fi
+
 echo
 if [ "$failures" -gt 0 ]; then
   echo "$failures build check(s) failed." >&2

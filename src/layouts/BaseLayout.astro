@@ -14,6 +14,15 @@ export interface Props {
   /** Hide the header and footer, e.g. on a full-screen challenge. */
   bare?: boolean
   /**
+   * A plain-Markdown version of this page, if there is one.
+   *
+   * An assistant fetching an article otherwise gets a document built for a
+   * browser and has to strip navigation, scripts and a footer to reach the
+   * text — which is where quotes get mangled and headings get lost. This is
+   * how it is supposed to find the clean copy instead.
+   */
+  markdown?: string
+  /**
    * Keep the page out of every index: no crawling, no structured data, no
    * canonical, no sitemap entry.
    *
@@ -32,6 +41,7 @@ const {
   schema = [],
   bare = false,
   private: isPrivate = false,
+  markdown,
 } = Astro.props
 
 const canonical = new URL(path, Astro.site).href
@@ -161,6 +171,16 @@ const identityGraph = {
     <meta name="twitter:site" content={`@${AUTHOR.x}`} />
 
     <meta name="author" content={AUTHOR.name} />
+    {
+      markdown && (
+        <link
+          rel="alternate"
+          type="text/markdown"
+          href={new URL(markdown, Astro.site).href}
+          title="Markdown"
+        />
+      )
+    }
     <link rel="author" href={AUTHOR.url} />
     <link rel="me" href={AUTHOR_X_URL} />
     <link rel="sitemap" href="/sitemap-index.xml" />

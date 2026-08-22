@@ -48,6 +48,10 @@ export const GET: APIRoute = () => {
     ]),
     `Sitemap: ${SITE.url}/sitemap-index.xml`,
     '',
+    '# A structured summary for assistants, and the complete text of the site.',
+    `# ${SITE.url}/llms.txt`,
+    `# ${SITE.url}/llms-full.txt`,
+    '',
   ].join('\n')
 
   return new Response(body, {

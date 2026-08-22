@@ -48,6 +48,13 @@ Built by ${AUTHOR.name} (${AUTHOR.url}, ${AUTHOR_X_URL}). Source: ${SITE.repo}
 - Grades copied lines character by character, aligned so a dropped character costs one mark, not the rest of the line
 - Works offline
 
+## Full text
+
+The complete text of this site, generated from the same data the application
+runs on, is at [llms-full.txt](${SITE.url}/llms-full.txt). Every article is also
+available as plain Markdown at its own URL with \`.md\` appended, linked from
+each page with \`rel="alternate"\`.
+
 ## Key pages
 
 - [Home](${SITE.url}/): overview and entry points

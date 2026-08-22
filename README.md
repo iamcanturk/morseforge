@@ -13,7 +13,7 @@ character.
 **[morse.iamcanturk.dev →](https://morse.iamcanturk.dev)**
 
 [![Live](https://img.shields.io/badge/live-morse.iamcanturk.dev-00E88F?style=flat-square)](https://morse.iamcanturk.dev)
-[![Tests](https://img.shields.io/badge/tests-628%20passing-00E88F?style=flat-square)](#testing)
+[![Tests](https://img.shields.io/badge/tests-641%20passing-00E88F?style=flat-square)](#testing)
 [![License](https://img.shields.io/badge/license-MIT-8B98A5?style=flat-square)](LICENSE)
 [![Astro](https://img.shields.io/badge/Astro-7-8B98A5?style=flat-square)](https://astro.build)
 
@@ -82,6 +82,15 @@ markup that was already complete. They are now 6–8 KB: the audio engine and
 about a hundred lines of plain DOM code. React stays where it earns its keep —
 the telegraph, the tree, practice — and the two players share one
 implementation of the timing so they cannot drift apart.
+
+**Assistants get Markdown, not a stripped-down web page.** Every article is
+served twice: as HTML for people, and at the same URL with `.md` appended as the
+source it was rendered from, linked with `rel="alternate"`. There is also
+`/llms-full.txt` — the complete text of the site in one file, generated from the
+same alphabet, curriculum and word notes the app runs on, so it cannot describe
+a product that does not exist. A model answering a question about Morse code
+should not have to fetch twenty pages and strip navigation out of each one; that
+stripping is where quotes get mangled.
 
 **Every page is prerendered to real HTML.** GPTBot, ClaudeBot and PerplexityBot
 do not execute JavaScript. A client-rendered app is invisible to them, so the
@@ -162,7 +171,7 @@ Requires Node 20.11+.
 
 ### Testing
 
-628 tests, covering the parts where being wrong is silent:
+641 tests, covering the parts where being wrong is silent:
 
 - **Timing** — sending PARIS once takes exactly `60/WPM` seconds, checked at
   5/12/20/35 WPM and under Farnsworth. Every speed readout depends on it.
