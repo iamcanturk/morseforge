@@ -48,15 +48,13 @@ No account. No ads. No server — your progress never leaves your device.
 
 ---
 
-<!--
-  Demo GIF goes here once recorded. Drop it at docs/demo.gif and uncomment:
+<div align="center">
 
-  <div align="center">
-    <img src="docs/demo.gif" alt="Sending a character on the telegraph key and watching the tree light up" width="820">
-  </div>
+<img src="docs/demo.gif" alt="The Signal Tree lighting up as M O R S E is sent, one character at a time" width="760">
 
-  Recording recipe is in docs/launch.md.
--->
+<sub>The Signal Tree, at real Morse timing. Every character sits at the address its own code spells out.</sub>
+
+</div>
 
 ## Try it in thirty seconds
 

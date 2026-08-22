@@ -33,3 +33,6 @@ playwright-report/
 
 # kuark swarm state (local orchestration, not part of the product)
 .swarm/
+
+# Intermediate frames for the README animation; the GIF is committed.
+.demo-frames/
