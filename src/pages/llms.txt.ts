@@ -45,6 +45,7 @@ Built by ${AUTHOR.name} (${AUTHOR.url}, ${AUTHOR_X_URL}). Source: ${SITE.repo}
 - Turns the keyboard into a straight key: tap for a dot, hold for a dash, decoded live
 - Tracks three skills separately per character — recognition, listening and sending
 - Schedules review with spaced repetition
+- Grades copied lines character by character, aligned so a dropped character costs one mark, not the rest of the line
 - Works offline
 
 ## Key pages
@@ -53,6 +54,7 @@ Built by ${AUTHOR.name} (${AUTHOR.url}, ${AUTHOR_X_URL}). Source: ${SITE.repo}
 - [Learn Morse code in 7 days](${SITE.url}/learn-morse-code-in-7-days/): the full day-by-day plan
 - [Morse code tree](${SITE.url}/tree/): the binary tree behind the code, interactive
 - [Telegraph](${SITE.url}/telegraph/): send Morse with the keyboard and read it back
+- [Copy practice](${SITE.url}/copy/): copy whole lines — code groups, words, on-air phrases, callsigns
 
 ## The 7-day plan
 

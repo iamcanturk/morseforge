@@ -201,3 +201,26 @@ describe('isFinished / remainingMs', () => {
     expect(remainingMs(open, 1000)).toBeNull()
   })
 })
+
+describe('difficultyWeight on multi-character prompts', () => {
+  it('sums across the prompt rather than reading one character', () => {
+    // Reading a single codeLength returned 0 for anything longer than one
+    // character, which made a five-letter group worth less than an E.
+    expect(difficultyWeight('EEEEE')).toBeCloseTo(5, 6)
+    expect(difficultyWeight('EEEEE')).toBeGreaterThan(difficultyWeight('E'))
+  })
+
+  it('pays more for a group of hard characters than easy ones', () => {
+    expect(difficultyWeight('QQQQQ')).toBeGreaterThan(difficultyWeight('EEEEE'))
+  })
+
+  it('ignores spaces', () => {
+    expect(difficultyWeight('CQ CQ')).toBeCloseTo(difficultyWeight('CQCQ'), 6)
+  })
+
+  it('never returns zero, whatever it is given', () => {
+    expect(difficultyWeight('')).toBeGreaterThan(0)
+    expect(difficultyWeight('   ')).toBeGreaterThan(0)
+    expect(difficultyWeight('🚀🚀')).toBeGreaterThan(0)
+  })
+})

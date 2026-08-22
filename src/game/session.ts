@@ -40,11 +40,26 @@ export interface Attempt {
   elapsedMs: number
 }
 
-/** How much a character is worth, by how many elements it takes. */
-export function difficultyWeight(character: string): number {
-  // Q (four elements) is genuinely harder to hear than E (one), and a score
-  // that paid the same for both would reward drilling only the easy half.
-  return 1 + (codeLength(character) - 1) * 0.25
+/**
+ * How much a prompt is worth, by how many elements it takes to send.
+ *
+ * Q (four elements) is genuinely harder to hear than E (one), and a score that
+ * paid the same for both would reward drilling only the easy half.
+ *
+ * Sums across the prompt, so word practice is weighted by its real length.
+ * Reading a single `codeLength` here returned 0 for anything longer than one
+ * character, which quietly made a five-letter group worth *less* than an E.
+ */
+export function difficultyWeight(prompt: string): number {
+  const characters = [...prompt].filter((character) => character !== ' ')
+  if (characters.length === 0) return 1
+
+  return characters.reduce((sum, character) => {
+    const elements = codeLength(character)
+    // An unknown character still counts as one, so a weight can never be zero
+    // or negative and answering can never subtract points.
+    return sum + (elements === 0 ? 1 : 1 + (elements - 1) * 0.25)
+  }, 0)
 }
 
 export interface SessionSummary {

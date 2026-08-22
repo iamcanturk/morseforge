@@ -13,7 +13,7 @@ character.
 **[morse.iamcanturk.dev →](https://morse.iamcanturk.dev)**
 
 [![Live](https://img.shields.io/badge/live-morse.iamcanturk.dev-00E88F?style=flat-square)](https://morse.iamcanturk.dev)
-[![Tests](https://img.shields.io/badge/tests-383%20passing-00E88F?style=flat-square)](#testing)
+[![Tests](https://img.shields.io/badge/tests-425%20passing-00E88F?style=flat-square)](#testing)
 [![License](https://img.shields.io/badge/license-MIT-8B98A5?style=flat-square)](LICENSE)
 [![Astro](https://img.shields.io/badge/Astro-7-8B98A5?style=flat-square)](https://astro.build)
 
@@ -35,6 +35,7 @@ No account. No ads. No server — your progress never leaves your device.
 | **[Learn it in 7 days](https://morse.iamcanturk.dev/learn-morse-code-in-7-days/)** | Two characters on day one, all 26 letters and 10 digits by day seven                        |
 | **[The tree](https://morse.iamcanturk.dev/tree/)**                                 | The real binary structure of Morse, drawn as a circuit. Pick a node to hear it and drill it |
 | **[Telegraph](https://morse.iamcanturk.dev/telegraph/)**                           | Your keyboard is the key. Tap for a dot, hold for a dash, decoded live                      |
+| **[Copy practice](https://morse.iamcanturk.dev/copy/)**                            | Whole lines — code groups, words, on-air phrases, callsigns — graded character by character |
 | **[Translator](https://morse.iamcanturk.dev/morse-code-translator/)**              | Text ↔ Morse, with audio and a signal lamp at 5–40 WPM                                      |
 | **[Alphabet](https://morse.iamcanturk.dev/morse-code-alphabet/)**                  | Every character per ITU-R M.1677-1, click to hear                                           |
 | **[Words](https://morse.iamcanturk.dev/words/)**                                   | 22 words and phrases, each playable and explained                                           |
@@ -71,6 +72,12 @@ whole site is static and only the interactive parts hydrate — the seven-day
 plan, the blog and the word index ship **zero bytes of JavaScript**, and pages
 that do load React only do so because there is genuinely something to interact
 with.
+
+**A dropped character costs one mark, not the rest of the line.** Copy practice
+compares what was sent against what you typed by aligning them first, so missing
+the second letter of `HELLO` is scored as one miss rather than as four wrong
+answers. Grading it position by position would tell a learner they got 20% of a
+line they had almost entirely right.
 
 **Nothing is written twice.** The alphabet is one object. The tree, the
 curriculum, the word pages, the translator, `llms.txt` and every code printed
@@ -132,7 +139,7 @@ Requires Node 20.11+.
 
 ### Testing
 
-383 tests, covering the parts where being wrong is silent:
+425 tests, covering the parts where being wrong is silent:
 
 - **Timing** — sending PARIS once takes exactly `60/WPM` seconds, checked at
   5/12/20/35 WPM and under Farnsworth. Every speed readout depends on it.
@@ -144,6 +151,8 @@ Requires Node 20.11+.
 - **Content** — no day of the plan can suggest a practice word containing a
   letter it has not taught yet, and factual claims made in prose on the public
   pages are asserted against the alphabet.
+- **Copy grading** — a dropped character costs one mark, not every character
+  after it: the two lines are aligned by edit distance before they are compared.
 
 ---
 
