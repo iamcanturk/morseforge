@@ -15,9 +15,12 @@ import {
   summarize,
   unlockNext,
   unlockedCharacters,
+  accuracyBySkill,
+  weakestSkill,
 } from './progress'
 import { createMemoryDriver } from './store'
 import { SKILLS } from '../game/mastery'
+import { ALL_LETTERS } from '../data/morseAlphabet'
 
 const T0 = 1_700_000_000_000
 const empty = emptyProgress
@@ -294,5 +297,72 @@ describe('learning method', () => {
       JSON.stringify({ version: PROGRESS_VERSION, data: { method: 'koch', unlocked: 9999 } }),
     )
     expect(unlockedCharacters(createProgressStore(driver).read())).toHaveLength(36)
+  })
+})
+
+describe('accuracyBySkill', () => {
+  it('reports each skill separately rather than one average', () => {
+    // The §20 point: a single lifetime figure hides that sending runs well
+    // ahead of listening, which is the only actionable part.
+    let record = empty()
+    for (let i = 0; i < 10; i++) record = answer(record, 'E', 'sending', true, T0)
+    for (let i = 0; i < 10; i++) record = answer(record, 'E', 'listening', i < 4, T0)
+
+    const bySkill = accuracyBySkill(record, ['E'], T0)
+    expect(bySkill.sending.accuracy).toBe(1)
+    expect(bySkill.listening.accuracy).toBeCloseTo(0.4, 6)
+  })
+
+  it('returns null for a skill never attempted, not zero', () => {
+    // Never having tried is not the same as always getting it wrong, and a 0%
+    // on the dashboard would read as the second.
+    const record = answer(empty(), 'E', 'sending', true, T0)
+    const bySkill = accuracyBySkill(record, ['E'], T0)
+    expect(bySkill.sending.accuracy).toBe(1)
+    expect(bySkill.recognition.accuracy).toBeNull()
+    expect(bySkill.recognition.attempts).toBe(0)
+  })
+
+  it('adds up across characters', () => {
+    let record = answer(empty(), 'E', 'listening', true, T0)
+    record = answer(record, 'T', 'listening', false, T0)
+    const bySkill = accuracyBySkill(record, ['E', 'T'], T0)
+    expect(bySkill.listening.attempts).toBe(2)
+    expect(bySkill.listening.accuracy).toBe(0.5)
+  })
+
+  it('is all null for a fresh learner', () => {
+    const bySkill = accuracyBySkill(empty(), ALL_LETTERS, T0)
+    for (const skill of SKILLS) expect(bySkill[skill].accuracy).toBeNull()
+  })
+})
+
+describe('weakestSkill', () => {
+  it('names the skill furthest behind', () => {
+    let record = empty()
+    for (let i = 0; i < 20; i++) record = answer(record, 'E', 'sending', true, T0)
+    for (let i = 0; i < 20; i++) record = answer(record, 'E', 'listening', i < 5, T0)
+    for (let i = 0; i < 20; i++) record = answer(record, 'E', 'recognition', i < 15, T0)
+
+    expect(weakestSkill(record, ['E'], T0)).toBe('listening')
+  })
+
+  it('says nothing until there is enough evidence', () => {
+    // Two answers is not evidence, and naming a "weakest skill" off one
+    // unlucky guess is worse than saying nothing.
+    let record = empty()
+    record = answer(record, 'E', 'sending', true, T0)
+    record = answer(record, 'E', 'listening', false, T0)
+    expect(weakestSkill(record, ['E'], T0)).toBeNull()
+  })
+
+  it('says nothing when only one skill has been practised', () => {
+    let record = empty()
+    for (let i = 0; i < 30; i++) record = answer(record, 'E', 'listening', i % 2 === 0, T0)
+    expect(weakestSkill(record, ['E'], T0)).toBeNull()
+  })
+
+  it('says nothing for a fresh learner', () => {
+    expect(weakestSkill(empty(), ALL_LETTERS, T0)).toBeNull()
   })
 })

@@ -13,7 +13,7 @@ character.
 **[morse.iamcanturk.dev →](https://morse.iamcanturk.dev)**
 
 [![Live](https://img.shields.io/badge/live-morse.iamcanturk.dev-00E88F?style=flat-square)](https://morse.iamcanturk.dev)
-[![Tests](https://img.shields.io/badge/tests-550%20passing-00E88F?style=flat-square)](#testing)
+[![Tests](https://img.shields.io/badge/tests-558%20passing-00E88F?style=flat-square)](#testing)
 [![License](https://img.shields.io/badge/license-MIT-8B98A5?style=flat-square)](LICENSE)
 [![Astro](https://img.shields.io/badge/Astro-7-8B98A5?style=flat-square)](https://astro.build)
 
@@ -146,7 +146,7 @@ Requires Node 20.11+.
 
 ### Testing
 
-550 tests, covering the parts where being wrong is silent:
+558 tests, covering the parts where being wrong is silent:
 
 - **Timing** — sending PARIS once takes exactly `60/WPM` seconds, checked at
   5/12/20/35 WPM and under Farnsworth. Every speed readout depends on it.
@@ -163,6 +163,10 @@ Requires Node 20.11+.
 - **Keyboard** — binding the key to Space must not stop every button and link
   on the page being activated by Space, which is what a `window` listener with
   an unconditional `preventDefault` does.
+- **Reachability** — `npm run verify` fails on a module under `src/data`,
+  `src/game`, `src/engine`, `src/storage` or `src/analytics` that no page can
+  reach. Three features once shipped fully tested and completely unreachable;
+  coverage is exactly the wrong instrument for catching that.
 
 ---
 

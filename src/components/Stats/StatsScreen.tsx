@@ -3,12 +3,16 @@ import { ALL_LETTERS } from '../../data/morseAlphabet'
 import { evaluate } from '../../game/achievements'
 import { currentStreak, levelProgress } from '../../game/progression'
 import {
+  accuracyBySkill,
   createProgressStore,
   emptyProgress,
   masteredCharacters,
   overallMastery,
+  weakestSkill,
   type ProgressRecord,
 } from '../../storage/progress'
+import { SESSION_MODES } from '../../game/session'
+import { SKILLS, type Skill } from '../../game/mastery'
 import {
   createStatsStore,
   defaultStats,
@@ -16,6 +20,19 @@ import {
   type StatsRecord,
 } from '../../storage/stats'
 import { achievementSnapshot } from '../../storage/snapshot'
+
+/**
+ * The practice mode that trains a given skill.
+ *
+ * `SESSION_MODES` is keyed by mode and carries the skill; this is the same
+ * mapping read the other way, so the dashboard names a skill exactly as the
+ * practice screen does rather than inventing a second vocabulary for it.
+ */
+function skillToMode(skill: Skill) {
+  return (Object.keys(SESSION_MODES) as (keyof typeof SESSION_MODES)[]).find(
+    (mode) => SESSION_MODES[mode].skill === skill,
+  )!
+}
 
 /**
  * The stats dashboard (PROJECT.md §20, §49).
@@ -58,6 +75,9 @@ export function StatsScreen() {
   const power = Math.round(overallMastery(progress, ALL_LETTERS, now) * 100)
   const minutes = Math.round(stats.practiceMs / 60_000)
   const earned = achievements.filter((a) => a.isEarned).length
+
+  const bySkill = useMemo(() => accuracyBySkill(progress, ALL_LETTERS, now), [progress, now])
+  const weakest = useMemo(() => weakestSkill(progress, ALL_LETTERS, now), [progress, now])
 
   if (!ready) {
     return <p className="font-mono text-xs tracking-[0.16em] text-muted">LOADING</p>
@@ -124,6 +144,59 @@ export function StatsScreen() {
         {nothingYet && (
           <p className="mt-4 text-sm leading-relaxed text-muted">
             Nothing here yet. A single session fills most of this in.
+          </p>
+        )}
+      </section>
+
+      {/* Accuracy per skill (§20). */}
+      <section>
+        <h2 className="font-display text-xl font-bold tracking-tight">Where you are weakest</h2>
+        <p className="mt-2 text-sm leading-relaxed text-muted">
+          The single accuracy figure above averages all three, which hides the useful part —
+          recognising a printed code, hearing it at speed and keying it are different abilities and
+          they do not improve together.
+        </p>
+
+        <dl className="mt-5 grid gap-4 sm:grid-cols-3">
+          {SKILLS.map((skill) => {
+            const entry = bySkill[skill]
+            const isWeakest = weakest === skill
+            return (
+              <div
+                key={skill}
+                className="rounded-xl border p-4"
+                style={{
+                  borderColor: isWeakest ? 'var(--color-amber)' : 'var(--color-line)',
+                  background: 'var(--color-panel)',
+                }}
+              >
+                <dt className="font-mono text-[10px] tracking-[0.16em] text-muted">
+                  {SESSION_MODES[skillToMode(skill)].label.toUpperCase()}
+                </dt>
+                <dd
+                  className="mt-1.5 font-display text-2xl font-semibold"
+                  style={{ color: isWeakest ? 'var(--color-amber)' : 'var(--color-ink)' }}
+                >
+                  {/* Never attempted reads as a dash, not as 0% — the two are
+                      not the same and 0% would be a lie. */}
+                  {entry.accuracy === null ? '—' : `${Math.round(entry.accuracy * 100)}%`}
+                  {isWeakest && <span className="sr-only"> — furthest behind</span>}
+                </dd>
+                <p className="mt-1 font-mono text-[10px] tracking-[0.14em] text-muted">
+                  {entry.attempts === 0 ? 'NOT TRIED' : `${entry.attempts} ANSWERS`}
+                </p>
+              </div>
+            )
+          })}
+        </dl>
+
+        {weakest !== null && (
+          <p className="mt-4 text-sm leading-relaxed text-muted">
+            {SESSION_MODES[skillToMode(weakest)].label} is furthest behind.{' '}
+            <a href="/practice/" className="text-signal underline underline-offset-4">
+              Practise it
+            </a>
+            .
           </p>
         )}
       </section>

@@ -272,6 +272,68 @@ export function overallMastery(
 }
 
 /** The practice queue: what is most in danger of being forgotten. */
+/**
+ * Accuracy per skill, across every character (PROJECT.md §20).
+ *
+ * The lifetime figure on the dashboard averages all three, which hides the one
+ * thing worth knowing: almost everyone's sending accuracy runs well ahead of
+ * their listening, and a single number tells you nothing about which to
+ * practise. Returns null for a skill with no attempts rather than 0 — never
+ * having tried is not the same as always getting it wrong.
+ */
+export function accuracyBySkill(
+  record: ProgressRecord,
+  characters: readonly string[],
+  now = Date.now(),
+): Record<Skill, { accuracy: number | null; attempts: number }> {
+  const totals = Object.fromEntries(
+    SKILLS.map((skill) => [skill, { attempts: 0, correct: 0 }]),
+  ) as Record<Skill, { attempts: number; correct: number }>
+
+  for (const character of characters) {
+    const entry = getCharacter(record, character, now)
+    for (const skill of SKILLS) {
+      totals[skill].attempts += entry.skills[skill].attempts
+      totals[skill].correct += entry.skills[skill].correct
+    }
+  }
+
+  return Object.fromEntries(
+    SKILLS.map((skill) => [
+      skill,
+      {
+        attempts: totals[skill].attempts,
+        accuracy:
+          totals[skill].attempts === 0 ? null : totals[skill].correct / totals[skill].attempts,
+      },
+    ]),
+  ) as Record<Skill, { accuracy: number | null; attempts: number }>
+}
+
+/**
+ * The skill furthest behind, or null when there is nothing to compare.
+ *
+ * Only counts skills with enough attempts to mean anything — two answers is
+ * not evidence, and telling someone to drill their "weakest skill" on the
+ * strength of one unlucky guess is worse than saying nothing.
+ */
+export function weakestSkill(
+  record: ProgressRecord,
+  characters: readonly string[],
+  now = Date.now(),
+  minimumAttempts = 10,
+): Skill | null {
+  const bySkill = accuracyBySkill(record, characters, now)
+  const eligible = SKILLS.filter(
+    (skill) => bySkill[skill].attempts >= minimumAttempts && bySkill[skill].accuracy !== null,
+  )
+  if (eligible.length < 2) return null
+
+  return eligible.reduce((worst, skill) =>
+    (bySkill[skill].accuracy ?? 1) < (bySkill[worst].accuracy ?? 1) ? skill : worst,
+  )
+}
+
 export function dueCharacters(
   record: ProgressRecord,
   characters: readonly string[],
