@@ -67,12 +67,6 @@ const more = [
   },
 ]
 
-/** Flat list for the mobile strip, where the disclosure would fight the scroll. */
-const flat = [
-  ...new Map(more.flatMap((g) => g.links).map((l) => [l.href, l])).values(),
-  { href: '/settings/', label: 'Settings' },
-]
-
 const current = Astro.url.pathname
 const isCurrent = (href: string) => current === href
 ---
@@ -235,31 +229,81 @@ const isCurrent = (href: string) => current === href
     </div>
 
     {
-      /* Flat, sideways-scrolling strip on mobile: a disclosure inside a scroll
-        container fights the scroll, and ten links wrapped to four rows pushed
-        the page heading below the fold. */
+      /* The mobile menu.
+        
+        This was a sideways-scrolling strip, which measured badly: sixteen
+        links, thirteen of them off-screen behind 1,462px of horizontal scroll
+        with nothing to indicate there was anything to scroll to. Most of the
+        site was unreachable on a phone unless you happened to swipe a row of
+        text that did not look swipeable.
+        
+        A disclosure shows all of it, grouped the same way the desktop menu is.
+        Native <details>, so it opens with no JavaScript and is keyboard
+        operable for free, and every link stays in the HTML for a crawler. */
     }
-    <nav
-      aria-label="Main"
-      class="-mx-6 overflow-x-auto px-6 pb-2.5 [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden"
-    >
-      <ul class="flex items-center gap-5 whitespace-nowrap">
+    <details class="pb-3 lg:hidden" data-menu data-mobile-menu>
+      <summary
+        class="flex cursor-pointer list-none items-center justify-between rounded-lg border border-line px-4 py-2.5 text-sm text-ink [&::-webkit-details-marker]:hidden"
+      >
+        <span class="font-mono text-xs tracking-[0.16em]">MENU</span>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          aria-hidden="true"
+          class="text-muted transition-transform [details[open]_&]:rotate-180"
+        >
+          <path d="m6 9 6 6 6-6"></path>
+        </svg>
+      </summary>
+
+      {
+        /* Capped and scrollable. The header is sticky, and a sticky element
+          taller than the viewport stops sticking — it scrolls away with the
+          page and comes back in the wrong place. Open, this panel measured
+          1,162px on an 812px screen. */
+      }
+      <nav aria-label="Main" class="mt-3 max-h-[62vh] space-y-5 overflow-y-auto overscroll-contain">
         {
-          flat.map(({ href, label }) => (
-            <li>
-              <a
-                href={href}
-                aria-current={isCurrent(href) ? 'page' : undefined}
-                class="font-mono text-[11px] tracking-[0.12em] transition-colors"
-                style={isCurrent(href) ? 'color: var(--color-signal)' : 'color: var(--color-muted)'}
-              >
-                {label.toUpperCase()}
-              </a>
-            </li>
+          more.map((group) => (
+            <div>
+              <p class="font-mono text-[10px] tracking-[0.18em] text-signal-dim">
+                {group.title.toUpperCase()}
+              </p>
+              <ul class="mt-1.5">
+                {group.links.map(({ href, label, hint }) => (
+                  <li>
+                    <a
+                      href={href}
+                      aria-current={isCurrent(href) ? 'page' : undefined}
+                      class="-mx-2 block rounded-lg px-2 py-2.5"
+                      style={
+                        isCurrent(href) ? 'color: var(--color-signal)' : 'color: var(--color-ink)'
+                      }
+                    >
+                      <span class="block text-sm">{label}</span>
+                      <span class="mt-0.5 block text-xs leading-snug text-muted">{hint}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))
         }
-      </ul>
-    </nav>
+
+        <a
+          href="/settings/"
+          aria-current={isCurrent('/settings/') ? 'page' : undefined}
+          class="-mx-2 block rounded-lg px-2 py-3 text-sm"
+          style={isCurrent('/settings/')
+            ? 'color: var(--color-signal)'
+            : 'color: var(--color-muted)'}>Settings</a
+        >
+      </nav>
+    </details>
   </div>
 
   <script is:inline>

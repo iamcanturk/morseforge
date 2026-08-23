@@ -50,12 +50,17 @@ export function Logo({ size = 36, glow = true, tagline = false, className }: Log
         >
           MORSEFORGE
         </span>
+        {/* Two spans rather than one string: on a narrow screen the single line
+            wrapped to "LEARN MORSE. BUILD THE / SIGNAL.", orphaning the word
+            the whole line is built around. Broken at the sentence, it reads
+            correctly at any width. */}
         {tagline && (
           <span
-            className="font-mono tracking-[0.18em] text-signal mt-2"
+            className="mt-2 font-mono tracking-[0.18em] text-signal"
             style={{ fontSize: size * 0.22 }}
           >
-            LEARN MORSE. BUILD THE SIGNAL.
+            <span className="inline-block">LEARN MORSE.</span>{' '}
+            <span className="inline-block">BUILD THE SIGNAL.</span>
           </span>
         )}
       </span>

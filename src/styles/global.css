@@ -150,6 +150,41 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Touch targets (PROJECT.md §28).
+
+   A finger is not a mouse pointer. Measured on a 375px screen, most of the
+   small chip buttons — the character-pool pickers, the mode toggles, the
+   player's SOUND/LAMP/BUZZ row — came out 34px tall, well under the 44px
+   anyone can hit reliably.
+
+   One rule rather than thirty edited class strings, because this is a property
+   of the input device and not a styling decision anyone should be making per
+   component. Scoped to coarse pointers, so nothing changes on a desktop where
+   34px is a perfectly good button.
+
+   `min-height` only: forcing a minimum width would stretch every icon button
+   into a rectangle. Padding gives the horizontal room, and the icon buttons
+   are square already.
+   ------------------------------------------------------------------------ */
+@media (pointer: coarse) {
+  button,
+  [role='button'],
+  [role='switch'],
+  [role='radio'],
+  summary,
+  select,
+  input:not([type='range']):not([type='checkbox']):not([type='radio']) {
+    min-height: 44px;
+  }
+
+  /* A range input's track is thin by default and the thumb is what gets
+     dragged; height here makes the whole strip grabbable. */
+  input[type='range'] {
+    height: 44px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
    Prose for Markdown content.
    Hand-written rather than pulled from a typography plugin: the blog has one
    post and about eight element types, and a plugin would ship rules for

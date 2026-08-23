@@ -73,7 +73,13 @@ export function TelegraphScreen() {
 
   return (
     <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_360px]">
-      <section>
+      {/* `min-w-0` is load-bearing. A grid item defaults to `min-width: auto`,
+          which refuses to shrink below its content's minimum — and the tree
+          inside is 560px wide by design. On a 375px screen the column was
+          327px and this section was 560px, so the whole page scrolled
+          sideways. The tree has its own scroll container; without this, that
+          container never got the chance to do its job. */}
+      <section className="min-w-0">
         <MorseKey
           isDown={state.isDown}
           pending={state.pending}

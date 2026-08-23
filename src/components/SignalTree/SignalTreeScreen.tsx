@@ -101,8 +101,12 @@ export function SignalTreeScreen() {
   const code = selected ? MORSE_ALPHABET[selected] : null
   const path = selected ? pathTo(selected) : []
 
+  // minmax(0,1fr) rather than 1fr: a plain `1fr` track will not shrink below
+  // its content's minimum, and the tree inside is deliberately wider than a
+  // phone — so the column held the page open instead of letting the tree's own
+  // scroll container do its job.
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_300px]">
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
       <SignalTree
         states={states}
         power={power}

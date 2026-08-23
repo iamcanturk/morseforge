@@ -163,155 +163,175 @@ export function SignalTree({
           560px is the floor: below it the depth-4 letters stop being legible,
           above it the tree overflowed containers it was being placed in and
           made desktop users scroll sideways for no reason. */}
-      <div className="-mx-6 overflow-x-auto px-6 [scrollbar-width:thin] sm:mx-0 sm:px-0">
-        <svg
-          viewBox={`0 0 ${VIEWBOX.width} ${VIEWBOX.height}`}
-          className="h-auto w-full min-w-[560px]"
-          role="img"
-          aria-labelledby="signal-tree-title signal-tree-desc"
+      {/* On a phone the tree is wider than the screen and always will be —
+          560px of it does not fit in 375, and squeezing it further makes the
+          depth-4 letters unreadable. So it scrolls, and says so: a fade at the
+          right edge is the only thing that makes a horizontal scroll look like
+          one, and without it people simply never saw the T half of the tree. */}
+      <div className="relative">
+        <div
+          className="-mx-6 overflow-x-auto px-6 [scrollbar-width:thin] sm:mx-0 sm:px-0"
+          data-tree-scroll
         >
-          <title id="signal-tree-title">Morse signal tree</title>
-          <desc id="signal-tree-desc">
-            {`The Morse code binary tree across ${depth} levels. From the centre, a dot branches left and a dash branches right. ${
-              Object.values(states).filter((s) => s === 'mastered').length
-            } of 26 characters are mastered.`}
-          </desc>
+          <svg
+            viewBox={`0 0 ${VIEWBOX.width} ${VIEWBOX.height}`}
+            className="h-auto w-full min-w-[560px]"
+            role="img"
+            aria-labelledby="signal-tree-title signal-tree-desc"
+          >
+            <title id="signal-tree-title">Morse signal tree</title>
+            <desc id="signal-tree-desc">
+              {`The Morse code binary tree across ${depth} levels. From the centre, a dot branches left and a dash branches right. ${
+                Object.values(states).filter((s) => s === 'mastered').length
+              } of 26 characters are mastered.`}
+            </desc>
 
-          {/* Traces first so nodes sit on top of them. */}
-          <g>
-            {placed.map((entry) => {
-              if (entry.node.depth === 0) return null
-              const parent = byCode.get(entry.node.code.slice(0, -1))
-              if (!parent) return null
+            {/* Traces first so nodes sit on top of them. */}
+            <g>
+              {placed.map((entry) => {
+                if (entry.node.depth === 0) return null
+                const parent = byCode.get(entry.node.code.slice(0, -1))
+                if (!parent) return null
 
-              const live = liveCodes.has(entry.node.code) && liveCodes.has(parent.node.code)
-              const lit =
-                highlightedCodes.has(entry.node.code) && highlightedCodes.has(parent.node.code)
-              const state = stateFor(entry.node.character)
-              const energised = state === 'mastered' || state === 'active'
+                const live = liveCodes.has(entry.node.code) && liveCodes.has(parent.node.code)
+                const lit =
+                  highlightedCodes.has(entry.node.code) && highlightedCodes.has(parent.node.code)
+                const state = stateFor(entry.node.character)
+                const energised = state === 'mastered' || state === 'active'
 
-              return (
-                <line
-                  key={`trace-${entry.node.code}`}
-                  x1={parent.cx}
-                  y1={parent.cy}
-                  x2={entry.cx}
-                  y2={entry.cy}
-                  stroke={
-                    live
-                      ? 'var(--color-amber)'
-                      : lit
-                        ? 'var(--color-cyan)'
-                        : energised
-                          ? 'var(--color-signal-dim)'
-                          : 'color-mix(in srgb, var(--color-line) 90%, transparent)'
-                  }
-                  strokeWidth={live || lit ? 3 : 2}
-                  strokeLinecap="round"
-                />
-              )
-            })}
-          </g>
-
-          <g>
-            {placed.map((entry) => {
-              const { character, code, depth: nodeDepth } = entry.node
-              const state = stateFor(character)
-              const style = STATE_STYLE[state]
-              const lit = highlightedCodes.has(code)
-              const live = liveCodes.has(code)
-
-              // The root is the power core rather than a character.
-              const isRoot = nodeDepth === 0
-              const selectable = Boolean(onSelect) && character !== null
-
-              return (
-                <g
-                  key={`node-${code || 'root'}`}
-                  {...(!selectable && character !== null
-                    ? // A tree rendered without `onSelect` is still a diagram
-                      // worth reading. It used to expose no per-node state at
-                      // all, so on the lesson and telegraph pages a screen
-                      // reader got 26 unlabelled shapes.
-                      { role: 'img', 'aria-label': `${character}, ${spoken(code)}, ${state}` }
-                    : {})}
-                  {...(selectable
-                    ? {
-                        role: 'button',
-                        tabIndex: 0,
-                        'aria-label': `${character}, ${spoken(code)}, ${state}`,
-                        style: { cursor: 'pointer' },
-                        onClick: () => onSelect?.(character!),
-                        onKeyDown: (event: React.KeyboardEvent) => {
-                          if (event.key !== 'Enter' && event.key !== ' ') return
-                          // Space is the Morse key everywhere else in the app, so
-                          // it must not also scroll the page here.
-                          event.preventDefault()
-                          onSelect?.(character!)
-                        },
-                      }
-                    : {})}
-                >
-                  {selectable && (
-                    // A generous invisible hit area: the 17px circles are well
-                    // under the 44px touch target minimum (§28).
-                    <circle cx={entry.cx} cy={entry.cy} r={24} fill="transparent" />
-                  )}
-                  {(style.glow || lit || live) && (
-                    <circle
-                      cx={entry.cx}
-                      cy={entry.cy}
-                      r={NODE_RADIUS + 7}
-                      fill={
-                        live
-                          ? 'var(--color-amber)'
-                          : lit
-                            ? 'var(--color-cyan)'
-                            : 'var(--color-signal)'
-                      }
-                      opacity={live || lit ? 0.22 : 0.14}
-                    />
-                  )}
-                  <circle
-                    cx={entry.cx}
-                    cy={entry.cy}
-                    r={isRoot ? NODE_RADIUS + 4 : NODE_RADIUS}
-                    fill={isRoot ? 'var(--color-panel)' : style.fill}
+                return (
+                  <line
+                    key={`trace-${entry.node.code}`}
+                    x1={parent.cx}
+                    y1={parent.cy}
+                    x2={entry.cx}
+                    y2={entry.cy}
                     stroke={
                       live
                         ? 'var(--color-amber)'
                         : lit
                           ? 'var(--color-cyan)'
-                          : isRoot
-                            ? 'var(--color-signal)'
-                            : style.stroke
+                          : energised
+                            ? 'var(--color-signal-dim)'
+                            : 'color-mix(in srgb, var(--color-line) 90%, transparent)'
                     }
-                    // Weight and dashing carry the state alongside the colour,
-                    // so the four states stay distinguishable without it.
-                    strokeWidth={live || lit || isRoot ? 3 : style.width}
-                    strokeDasharray={style.dashed && !isRoot && !lit && !live ? '3 3' : undefined}
+                    strokeWidth={live || lit ? 3 : 2}
+                    strokeLinecap="round"
                   />
-                  {isRoot ? (
-                    <circle cx={entry.cx} cy={entry.cy} r={6} fill="var(--color-cyan)" />
-                  ) : (
-                    <text
-                      x={entry.cx}
-                      y={entry.cy}
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      fontSize={16}
-                      fontWeight={600}
-                      fill={live ? 'var(--color-amber)' : lit ? 'var(--color-cyan)' : style.text}
-                      style={{ fontFamily: 'var(--font-mono)' }}
-                    >
-                      {character}
-                    </text>
-                  )}
-                </g>
-              )
-            })}
-          </g>
-        </svg>
+                )
+              })}
+            </g>
+
+            <g>
+              {placed.map((entry) => {
+                const { character, code, depth: nodeDepth } = entry.node
+                const state = stateFor(character)
+                const style = STATE_STYLE[state]
+                const lit = highlightedCodes.has(code)
+                const live = liveCodes.has(code)
+
+                // The root is the power core rather than a character.
+                const isRoot = nodeDepth === 0
+                const selectable = Boolean(onSelect) && character !== null
+
+                return (
+                  <g
+                    key={`node-${code || 'root'}`}
+                    {...(!selectable && character !== null
+                      ? // A tree rendered without `onSelect` is still a diagram
+                        // worth reading. It used to expose no per-node state at
+                        // all, so on the lesson and telegraph pages a screen
+                        // reader got 26 unlabelled shapes.
+                        { role: 'img', 'aria-label': `${character}, ${spoken(code)}, ${state}` }
+                      : {})}
+                    {...(selectable
+                      ? {
+                          role: 'button',
+                          tabIndex: 0,
+                          'aria-label': `${character}, ${spoken(code)}, ${state}`,
+                          style: { cursor: 'pointer' },
+                          onClick: () => onSelect?.(character!),
+                          onKeyDown: (event: React.KeyboardEvent) => {
+                            if (event.key !== 'Enter' && event.key !== ' ') return
+                            // Space is the Morse key everywhere else in the app, so
+                            // it must not also scroll the page here.
+                            event.preventDefault()
+                            onSelect?.(character!)
+                          },
+                        }
+                      : {})}
+                  >
+                    {selectable && (
+                      // A generous invisible hit area: the 17px circles are well
+                      // under the 44px touch target minimum (§28).
+                      <circle cx={entry.cx} cy={entry.cy} r={24} fill="transparent" />
+                    )}
+                    {(style.glow || lit || live) && (
+                      <circle
+                        cx={entry.cx}
+                        cy={entry.cy}
+                        r={NODE_RADIUS + 7}
+                        fill={
+                          live
+                            ? 'var(--color-amber)'
+                            : lit
+                              ? 'var(--color-cyan)'
+                              : 'var(--color-signal)'
+                        }
+                        opacity={live || lit ? 0.22 : 0.14}
+                      />
+                    )}
+                    <circle
+                      cx={entry.cx}
+                      cy={entry.cy}
+                      r={isRoot ? NODE_RADIUS + 4 : NODE_RADIUS}
+                      fill={isRoot ? 'var(--color-panel)' : style.fill}
+                      stroke={
+                        live
+                          ? 'var(--color-amber)'
+                          : lit
+                            ? 'var(--color-cyan)'
+                            : isRoot
+                              ? 'var(--color-signal)'
+                              : style.stroke
+                      }
+                      // Weight and dashing carry the state alongside the colour,
+                      // so the four states stay distinguishable without it.
+                      strokeWidth={live || lit || isRoot ? 3 : style.width}
+                      strokeDasharray={style.dashed && !isRoot && !lit && !live ? '3 3' : undefined}
+                    />
+                    {isRoot ? (
+                      <circle cx={entry.cx} cy={entry.cy} r={6} fill="var(--color-cyan)" />
+                    ) : (
+                      <text
+                        x={entry.cx}
+                        y={entry.cy}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        fontSize={16}
+                        fontWeight={600}
+                        fill={live ? 'var(--color-amber)' : lit ? 'var(--color-cyan)' : style.text}
+                        style={{ fontFamily: 'var(--font-mono)' }}
+                      >
+                        {character}
+                      </text>
+                    )}
+                  </g>
+                )
+              })}
+            </g>
+          </svg>
+        </div>
+
+        {/* Hidden once the whole tree fits, which is every screen above 560px. */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 right-0 w-10 sm:hidden"
+          style={{
+            background:
+              'linear-gradient(to right, transparent, color-mix(in srgb, var(--color-void) 92%, transparent))',
+          }}
+        />
       </div>
 
       {powerPercent !== null && (
