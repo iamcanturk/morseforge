@@ -61,6 +61,7 @@ each page with \`rel="alternate"\`.
 - [Learn Morse code in 7 days](${SITE.url}/learn-morse-code-in-7-days/): the full day-by-day plan
 - [Morse code tree](${SITE.url}/tree/): the binary tree behind the code, interactive
 - [Telegraph](${SITE.url}/telegraph/): send Morse with the keyboard and read it back
+- [Privacy](${SITE.url}/privacy/): no cookies, no accounts, no third-party trackers — what is stored and what is counted
 - [Copy practice](${SITE.url}/copy/): copy whole lines — code groups, words, on-air phrases, callsigns
 - [Daily challenge](${SITE.url}/daily/): one challenge a day, generated from the UTC date so it is the same for everyone
 - [Signal Defender](${SITE.url}/games/signal-defender/): a listening game — characters fall and must be copied before they land

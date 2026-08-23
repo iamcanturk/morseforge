@@ -1,0 +1,176 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import { AUTHOR, SITE } from '../config/site'
+
+/**
+ * The privacy page.
+ *
+ * There is no cookie banner on this site, and that is a considered position
+ * rather than an omission: consent under ePrivacy is required for storing or
+ * reading information on someone's device for non-essential purposes, and
+ * nothing here does that. No cookies are set, ever. The only device storage is
+ * the visitor's own progress, written when they use the app — which is the
+ * service they came for.
+ *
+ * What *is* required is telling people what happens, which is this page.
+ * A banner would have been theatre implying tracking that does not exist.
+ */
+const title = 'Privacy — What MorseForge Stores and Sends | MorseForge'
+const description =
+  'No cookies, no accounts, no tracking. Your progress is stored in your own browser and never leaves it. Exactly what is collected, why, and how to switch it off.'
+
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: 'Privacy',
+    url: `${SITE.url}/privacy/`,
+    description,
+    isPartOf: { '@id': `${SITE.url}/#website` },
+    publisher: { '@id': `${SITE.url}/#author` },
+    inLanguage: 'en',
+  },
+]
+---
+
+<BaseLayout title={title} description={description} path="/privacy/" schema={schema}>
+  <main class="mx-auto max-w-3xl px-6 py-14">
+    <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Privacy</h1>
+
+    <p class="mt-4 text-lg leading-relaxed text-ink">
+      There are no cookies on this site, no accounts, and no third-party trackers. Your progress is
+      stored in your own browser and is never sent anywhere.
+    </p>
+
+    <p class="mt-4 leading-relaxed text-muted">
+      That is also why there is no consent banner. A banner is required when a site stores or reads
+      information on your device for something you did not ask for. This one does not, so the banner
+      would be theatre — implying tracking that is not happening. This page is the honest version of
+      the same obligation.
+    </p>
+
+    <section class="mt-12">
+      <h2 class="font-display text-xl font-bold tracking-tight">What stays on your device</h2>
+      <p class="mt-3 leading-relaxed text-muted">
+        Four things, in your browser's local storage. None of them are sent to any server, and none
+        of them are readable by anyone but you.
+      </p>
+      <ul class="mt-4 space-y-2 text-muted">
+        <li>
+          <strong class="text-ink">Your progress</strong> — which characters you have met and how you
+          have done on each, per skill.
+        </li>
+        <li>
+          <strong class="text-ink">Your settings</strong> — speed, pitch, key bindings, theme, motion.
+        </li>
+        <li>
+          <strong class="text-ink">Your statistics</strong> — sessions, streak, XP, best speed.
+        </li>
+        <li>
+          <strong class="text-ink">Your daily challenge results</strong> — the last few weeks of them.
+        </li>
+      </ul>
+      <p class="mt-4 leading-relaxed text-muted">
+        Clearing your browser data erases all of it, and there is no copy anywhere else to restore
+        from. If it matters to you, export it from
+        <a href="/settings/" class="text-signal underline underline-offset-4">settings</a> — it is a plain
+        JSON file you keep.
+      </p>
+    </section>
+
+    <section class="mt-12">
+      <h2 class="font-display text-xl font-bold tracking-tight">What is counted</h2>
+      <p class="mt-3 leading-relaxed text-muted">
+        Two things, both of them counts rather than records of a person.
+      </p>
+
+      <h3 class="mt-6 font-display font-semibold text-ink">Anonymous usage counters</h3>
+      <p class="mt-2 leading-relaxed text-muted">
+        When you start a practice session or finish a game, the browser sends a request naming that
+        event — <code class="text-signal-dim">practice_start</code>, and sometimes a short label
+        like <code class="text-signal-dim">listening</code>. That is the whole message. There is no
+        identifier, no session token, nothing you typed, and no way to connect two events to the
+        same person.
+      </p>
+      <p class="mt-3 leading-relaxed text-muted">
+        The server answers with an empty response and stores nothing; the request line in its own
+        access log is the only record, and a scheduled script turns those lines into daily totals.
+        You can turn this off in
+        <a href="/settings/" class="text-signal underline underline-offset-4">settings</a>, and it
+        is never sent at all if your browser asks not to be tracked.
+      </p>
+
+      <h3 class="mt-6 font-display font-semibold text-ink">Cloudflare Web Analytics</h3>
+      <p class="mt-2 leading-relaxed text-muted">
+        Counts page views. It is
+        <a
+          href="https://developers.cloudflare.com/web-analytics/"
+          rel="noopener"
+          class="text-signal underline underline-offset-4">cookieless by design</a
+        > and does not fingerprint or follow anyone between sites. Cloudflare processes this on our behalf
+        and it is the only third party this site contacts.
+      </p>
+    </section>
+
+    <section class="mt-12">
+      <h2 class="font-display text-xl font-bold tracking-tight">Your IP address</h2>
+      <p class="mt-3 leading-relaxed text-muted">
+        Like every web server, ours records the address each request came from. That is unavoidable
+        — it is how a reply finds its way back — and the log is what makes it possible to see that a
+        site is being attacked.
+      </p>
+      <p class="mt-3 leading-relaxed text-muted">
+        The script that produces the visitor counts does not keep addresses. It hashes each one with
+        a secret that is regenerated every day and never stored, counts the hash, and discards it.
+        Two visits on the same day collapse into one count; the same person tomorrow does not, so
+        nobody can be followed across days — not even by us. The raw logs rotate daily and only the
+        most recent few days exist on the server.
+      </p>
+    </section>
+
+    <section class="mt-12">
+      <h2 class="font-display text-xl font-bold tracking-tight">What there is none of</h2>
+      <ul class="mt-4 space-y-2 text-muted">
+        <li>No cookies. Not one, not even a "necessary" one.</li>
+        <li>No accounts, no email addresses, no names.</li>
+        <li>No advertising, no advertising networks, no data sold or shared.</li>
+        <li>No fonts, scripts or images loaded from anyone else's server.</li>
+        <li>No profiling and no automated decisions about you.</li>
+      </ul>
+      <p class="mt-4 leading-relaxed text-muted">
+        You can check all of this rather than take our word for it: open your browser's developer
+        tools on any page here and look at the cookie jar and the network tab. The
+        <a href={SITE.repo} rel="noopener" class="text-signal underline underline-offset-4"
+          >whole source is public</a
+        >, including the script that processes the logs.
+      </p>
+    </section>
+
+    <section class="mt-12">
+      <h2 class="font-display text-xl font-bold tracking-tight">Your rights</h2>
+      <p class="mt-3 leading-relaxed text-muted">
+        Under the GDPR you can ask what data is held about you, ask for it to be corrected or
+        deleted, and object to how it is processed. In practice there is very little to ask about:
+        we hold no account, no contact details and nothing that identifies you. Your progress is
+        already in your hands — deleting it is a button in
+        <a href="/settings/" class="text-signal underline underline-offset-4">settings</a> and needs nobody's
+        permission.
+      </p>
+      <p class="mt-3 leading-relaxed text-muted">
+        For anything else, or to ask a question about this page, contact
+        <a href={AUTHOR.url} rel="me" class="text-signal underline underline-offset-4"
+          >{AUTHOR.name}</a
+        >.
+      </p>
+    </section>
+
+    <p class="mt-12 border-t border-line pt-6 text-sm text-muted">
+      If this page ever stops matching what the site does, that is a bug. Please
+      <a
+        href={`${SITE.repo}/issues`}
+        rel="noopener"
+        class="text-signal underline underline-offset-4">report it</a
+      >.
+    </p>
+  </main>
+</BaseLayout>
