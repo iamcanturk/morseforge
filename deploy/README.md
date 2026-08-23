@@ -205,3 +205,41 @@ curl -sI https://morse.iamcanturk.dev/blog/sos-does-not-stand-for-anything.md | 
 ```
 
 It should say `text/markdown`, not `application/octet-stream`.
+
+---
+
+## Security headers, and the nginx trap that hid them
+
+The five security headers are declared at the server level **and repeated in
+every location that serves a document**. That repetition is not sloppiness.
+
+nginx inherits `add_header` from an outer block into a `location` only if that
+location declares no `add_header` of its own — and when it does declare one, it
+drops _all_ the inherited ones, not just any that clash. Every location in this
+vhost sets a `Cache-Control`, so a first attempt with the headers declared once
+at the server level produced this:
+
+```
+$ curl -sI https://morse.iamcanturk.dev/ | grep -i strict-transport
+                                    # nothing
+
+$ curl -sI https://morse.iamcanturk.dev/no-such-page/ | grep -i strict-transport
+strict-transport-security: max-age=63072000; includeSubDomains; preload
+```
+
+Present on the 404 — which matches no location with an `add_header` — and
+absent everywhere a visitor would actually go. `always` does not help: it
+governs whether a header is added to error responses, not inheritance.
+
+Documents get the full set. Assets get only HSTS and `nosniff`, because a
+Content-Security-Policy on a stylesheet response accomplishes nothing.
+
+Confirm after applying:
+
+```bash
+curl -sI https://morse.iamcanturk.dev/ | grep -iE 'strict-transport|content-security|referrer-policy|nosniff'
+```
+
+All four should appear. If the site breaks instead, remove the
+`Content-Security-Policy` lines first — that is the only one that can stop a
+page working.
