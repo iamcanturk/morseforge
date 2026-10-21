@@ -16,6 +16,26 @@ import { PAGES } from '../config/pages'
 
 let root: string
 
+/**
+ * Git exports GIT_DIR, GIT_INDEX_FILE and friends to the hooks it runs. The
+ * pre-push hook runs this suite, and git invoked from the temporary folder
+ * below would then still find the real repository through them — so the
+ * "outside a repository" cases passed by hand and failed on every push.
+ * Clearing them for the suite makes it behave the same in both places.
+ */
+const savedGitEnv: Record<string, string> = {}
+beforeAll(() => {
+  for (const [name, value] of Object.entries(process.env)) {
+    if (name.startsWith('GIT_') && value !== undefined) {
+      savedGitEnv[name] = value
+      delete process.env[name]
+    }
+  }
+})
+afterAll(() => {
+  Object.assign(process.env, savedGitEnv)
+})
+
 const touch = (file: string, body = '') => {
   mkdirSync(join(root, file, '..'), { recursive: true })
   writeFileSync(join(root, file), body)
