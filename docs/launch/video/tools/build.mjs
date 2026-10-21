@@ -101,8 +101,11 @@ function plan(lang, cut, fmt) {
       gap = Math.max(gap, line.rec.start + r.marks.at(-1).at + 1.4 - line.end)
     }
     if (id === 's13') {
+      // The page starts lighting the tape ~1.5 s after Play; put the first lit
+      // letter on screen as the voice starts, so the scene shows it playing.
       const r = rec('message')
-      line.rec = { name: 'message', start: r3(line.start + 0.15 - r.marks[0].at), cues: [] }
+      const lit = sceneChanges(join(ROOT, 'assets', 'rec', `message-${fmt}.mp4`)).find((t) => t > r.marks[0].at + 0.5) ?? r.marks[0].at
+      line.rec = { name: 'message', start: r3(line.start + 0.3 - lit), cues: [] }
     }
     lines.push(line)
     t = line.end + gap
