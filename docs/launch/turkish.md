@@ -1,7 +1,7 @@
 # Türkçe kanallar
 
-**Önemli:** Arayüz şu an yalnızca İngilizce. Çeviri altyapısı #44'te sürüyor,
-ama çeviri henüz yok. Bunu her Türkçe gönderide açıkça söyle. Mors alfabesi
+**Önemli:** Arayüz şu an yalnızca İngilizce. Çeviri altyapısı hazır
+(docs/TRANSLATING.md), ama henüz hiçbir dil yayında değil. Bunu her Türkçe gönderide açıkça söyle. Mors alfabesi
 evrensel, ancak menüler İngilizce; bunu sonradan öğrenen kullanıcı
 kandırıldığını düşünür.
 

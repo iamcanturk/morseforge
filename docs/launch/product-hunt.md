@@ -95,8 +95,8 @@ Free. Open source.
 > 💡 Lamp mode: every listening drill works with the sound off.
 > 🔒 No account, no ads, works offline. Progress stays in your browser.
 >
-> It's free and open source (MIT). The biggest gap is paddle/iambic keying:
-> straight key only for now.
+> It's free and open source (MIT). It keys as a straight key or as iambic
+> paddles, and it's English only for now.
 >
 > What would make you come back on day two? That's the question I most want
 > answered.

@@ -35,8 +35,8 @@ Live: https://morse.iamcanturk.dev
   screen
 
 **Tools**
-- A brass straight key on your keyboard, decoded live, with a telegram share
-  card
+- A brass straight key or iambic paddles (A and B, dot/dah memory, USB paddle
+  adapters on Ctrl), decoded live, with a telegram share card
 - Secret messages that play in Morse, carried only in the URL fragment
 - Translator, playable alphabet with a page per character, the Signal Tree
 
@@ -49,9 +49,9 @@ Live: https://morse.iamcanturk.dev
 **Under it**
 - PARIS-standard timing with ARRL Farnsworth spacing
 - Astro 7 static output, React 19 islands only on interactive screens
-- 1,936 tests
+- 2,067 tests
 - No account, no ads, no backend. Cloudflare's cookieless analytics and a
   first-party event counter you can switch off; see /privacy/
 
-**Known gaps:** straight key only (#43), English only (#44). Help wanted on
-both.
+**Known gap:** English only. The translation plumbing is in
+(docs/TRANSLATING.md); help with a first language is welcome.

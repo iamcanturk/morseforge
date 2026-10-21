@@ -16,21 +16,21 @@ master each character.
 [Send a secret message](https://morse.iamcanturk.dev/message/)
 
 <!--
-  How the figures on this page were measured (build of 2026-10-21, after the FIX2 wave):
-    tests        npx vitest run                  -> 1936 passed, 100 files
-    pages, links node scripts/check-links.mjs dist -> 9691 internal references, 88 pages
+  How the figures on this page were measured (build of 2026-10-21, after paddles and the i18n plumbing):
+    tests        npx vitest run                  -> 2067 passed, 102 files
+    pages, links node scripts/check-links.mjs dist -> 9692 internal references, 88 pages
     sitemap      <loc> entries in dist/sitemap-0.xml -> 83 (the other 5 pages are noindex or private)
     words        dist/words/*/                   -> 22
     char pages   dist/morse-code-alphabet/*/     -> 36
     .md copies   find dist -name '*.md'          -> 29 (22 words, 5 notes, 2 reference pages)
     JS weight    each page's scripts and their static imports, gzipped, from dist/_astro:
-                 script-free pages ~6 KB (inline layout scripts), word/character/reference ~13 KB,
-                 interactive screens ~85-130 KB (landing 91, practice 120, lesson 131)
+                 script-free pages ~6 KB (inline layout scripts), word/character/reference ~14 KB,
+                 interactive screens ~90-140 KB (landing 93, telegraph 118, practice 127, lesson 137)
   Re-run these when you change the badge; the README does not update itself.
 -->
 
 [![Live](https://img.shields.io/badge/live-morse.iamcanturk.dev-00E88F?style=flat-square)](https://morse.iamcanturk.dev)
-[![Tests](https://img.shields.io/badge/tests-1936%20passing-00E88F?style=flat-square)](#testing)
+[![Tests](https://img.shields.io/badge/tests-2067%20passing-00E88F?style=flat-square)](#testing)
 [![License](https://img.shields.io/badge/license-MIT-8B98A5?style=flat-square)](LICENSE)
 [![Astro](https://img.shields.io/badge/Astro-7-8B98A5?style=flat-square)](https://astro.build)
 [![Node](https://img.shields.io/badge/node-%E2%89%A522.12-8B98A5?style=flat-square)](#running-it-locally)
@@ -72,7 +72,7 @@ one. It is a design system rather than a skin — see
 | **[The tree](https://morse.iamcanturk.dev/tree/)**                                                                                                                                                | The real binary structure of Morse, drawn as a circuit board. Pick a node to hear it and drill it                                       |
 | **[60-second challenge](https://morse.iamcanturk.dev/challenge/)**                                                                                                                                | Seeded, so a link carries the same prompts in the same order. Scores on one link are comparable                                         |
 | **[Daily challenge](https://morse.iamcanturk.dev/daily/)**                                                                                                                                        | Eight lines a day, generated from the date. It says up front which characters and speed, and the share gives nothing away               |
-| **[Telegraph](https://morse.iamcanturk.dev/telegraph/)**                                                                                                                                          | A brass straight key on your keyboard. Tap for a dot, hold for a dash, decoded live. A few words answer back                            |
+| **[Telegraph](https://morse.iamcanturk.dev/telegraph/)**                                                                                                                                          | A brass straight key, or iambic paddles on `[` and `]`, decoded live. A few words answer back                                          |
 | **[Secret message](https://morse.iamcanturk.dev/message/)**                                                                                                                                       | Write a message, get a link that plays it in Morse. The message lives only in the URL fragment                                          |
 | **[Practice](https://morse.iamcanturk.dev/practice/)**                                                                                                                                            | Listening, sending and recognition, in three teaching orders, scored per skill                                                          |
 | **[Copy practice](https://morse.iamcanturk.dev/copy/)**                                                                                                                                           | Whole lines — code groups, words, on-air phrases, callsigns — graded character by character                                             |
@@ -311,8 +311,8 @@ and from Settings, in either direction.
 notes and the word index ship no script files at all, only the layout's inline
 scripts for the theme, the menus and the progress chip, about 6 KB gzipped.
 Word, character and reference pages add a small audio player and come to about
-13 KB in total. React stays where it earns its keep — the lesson, the telegraph,
-practice, the games — and those screens land at roughly 85 to 130 KB gzipped.
+14 KB in total. React stays where it earns its keep — the lesson, the telegraph,
+practice, the games — and those screens land at roughly 90 to 140 KB gzipped.
 The two players share one implementation of the timing so they cannot drift
 apart.
 
@@ -457,7 +457,7 @@ Requires **Node 22.12 or newer**, which is Astro 7's own floor.
 
 ### Testing
 
-1,936 tests in 100 files, covering the parts where being wrong is silent:
+2,067 tests in 102 files, covering the parts where being wrong is silent:
 
 - **Timing** — sending PARIS once takes exactly `60/WPM` seconds, checked at
   5/12/20/35 WPM and under Farnsworth. Every speed readout depends on it.
@@ -500,7 +500,7 @@ Requires **Node 22.12 or newer**, which is Astro 7's own floor.
   invisible: TypeScript is happy, every test passes, and the only symptom is a
   number that stays at zero, which looks exactly like nobody using the feature.
 - **Links** — every internal reference in the built output must resolve:
-  9,691 of them across 88 pages in this build, checked against what the build
+  9,692 of them across 88 pages in this build, checked against what the build
   actually produced.
 - **SEO** — on the built output: one visible H1, title and description within
   their limits, a self canonical, JSON-LD that parses, noindex pages kept out of
@@ -540,12 +540,13 @@ it is invisible from the inside — nothing here reports back, by design.
 
 **If you write code**, the ideas that would move this furthest:
 
-- **[Iambic keyer and paddle support](https://github.com/iamcanturk/morseforge/issues/43)** —
-  the biggest single gap. Straight key only right now, and paddles are what most
-  operators actually use.
-- **[Translations](https://github.com/iamcanturk/morseforge/issues/44)** — everything
-  is English. Say which language before you start, so two people do not
-  translate the same thing.
+- **Translations** — the plumbing is in ([docs/TRANSLATING.md](docs/TRANSLATING.md)),
+  and no language has shipped yet. Say which language before you start, so two
+  people do not translate the same thing.
+- **Paddle keying, from people who use paddles.** Iambic A and B, dot/dah
+  memory and USB paddle adapters landed in [#43](https://github.com/iamcanturk/morseforge/issues/43),
+  and the timing is tested, but it has not yet been used on air by an operator
+  who keys with paddles every day. Tell me where it feels wrong.
 - **Screen-reader testing.** The markup has been audited and the obvious
   failures are fixed, but it has never been driven by someone who uses one
   daily. That gap does not close by reading the code.

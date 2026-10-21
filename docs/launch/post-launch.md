@@ -65,11 +65,12 @@ comparison gains.
 > Practice offers Koch order. The default walks the code tree by length, and
 > the Farnsworth spacing can be turned off in Settings.
 
-### "No paddles = useless for real operators"
+### "Paddles feel wrong" / "Iambic B timing is off"
 
-> Fair. Today it's for beginners, and beginners mostly start on a straight
-> key. Iambic support is the most-wanted open issue (#43). If you know keyer
-> timing well, help is very welcome.
+> Paddle keying (Iambic A and B, dot/dah memory) landed right before launch.
+> The element timing comes from the WPM and is tested, but it hasn't been
+> keyed on air by many paddle users yet. Tell me exactly what felt off (mode,
+> WPM, adapter), and I'll open an issue and fix it.
 
 ### "Gamification is a gimmick"
 
@@ -99,9 +100,9 @@ comparison gains.
    - a feature request → plain issue, `enhancement`
 2. **Reply in the thread with the issue link.** People see they were heard,
    and the conversation moves to where it can be tracked.
-3. **Duplicates:** if five people ask for paddles, link them all to #43 and
-   add one comment there summarising the demand ("asked for on HN ×3, Reddit
-   ×2"). Don't open five issues.
+3. **Duplicates:** if five people ask for the same thing (a language, say),
+   collect them in one issue with a comment summarising the demand ("asked
+   for on HN ×3, Reddit ×2"). Don't open five issues.
 4. **Weekly:** on Monday 2 and Monday 9 November, sort the new issues into
    "fix this week" (bugs, wrong on-air content), "next" and "not doing" (close
    with a sentence why). Thank contributors by name in the next release notes.

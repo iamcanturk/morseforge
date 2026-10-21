@@ -76,8 +76,9 @@ Example links for testing:
 - ✅ **Social preview is already set and is the current image.** The image
   GitHub serves is byte-for-byte `public/og/github-social.png` (same MD5). No
   upload needed. Re-upload only if that file changes.
-- ✅ Issues #43 (iambic keyer) and #44 (translations) are open with
-  `help wanted`. Those are the two gaps the copy admits to.
+- ✅ #43 (paddles/iambic) shipped and closed on 2026-10-21; #44 (translation
+  plumbing) is closed too. The copy now presents paddles as a feature and
+  "English only" as the one gap.
 - ⚠️ **No release yet.** 👤 Create `v1.0.0` from the GitHub web UI on launch
   morning with the notes in [github-release.md](github-release.md) (the tag is
   an outward action, so Can does it).

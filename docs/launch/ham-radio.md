@@ -51,7 +51,10 @@ section's pinned rules first. If in doubt, ask a moderator.
 > exchange is phrased. If anyone has ten minutes to look and tell me what's off,
 > I'll correct it.
 >
-> Known gaps: straight key only (no iambic/paddle yet) and English only.
+> It keys as a straight key or as iambic paddles (A and B, dot/dah memory;
+> USB paddle adapters map to Left/Right Ctrl). Paddle keying is new, so a
+> paddle user's opinion on the timing would be especially welcome. It's
+> English only for now.
 >
 > Source (MIT): https://github.com/iamcanturk/morseforge
 >

@@ -82,18 +82,20 @@ first comment). That is the HN convention for Show HN with a link.
 >   flashes a lamp on the same timeline as the tone, and lamp drills still count
 >   as listening practice.
 > - **Pages people find in search ship almost no JS.** About 6 KB gzipped on
->   content pages and about 13 KB on word and character pages. React only on the
->   interactive screens (about 85 to 130 KB). Everything is prerendered, with
+>   content pages and about 14 KB on word and character pages. React only on the
+>   interactive screens (about 90 to 140 KB). Everything is prerendered, with
 >   `/llms.txt` and `.md` copies for assistants.
-> - **1,936 tests.** The ones that caught real bugs were the boring ones: two
+> - **2,067 tests.** The ones that caught real bugs were the boring ones: two
 >   tabs racing on one localStorage key, OS key auto-repeat turning one dash
 >   into a burst of dots.
 >
 > Astro 7 + React islands, Web Audio for the tone, MIT licensed:
 > https://github.com/iamcanturk/morseforge
 >
-> Two honest gaps: it's a straight key only (no iambic paddles yet, that's
-> issue #43), and it's English only (#44). I'm still in training and not
+> It keys as a straight key or as iambic paddles (A and B, with dot/dah
+> memory; `[` and `]` on a keyboard, Ctrl for USB paddle adapters). Paddles
+> are brand new, so I'd especially value feedback from people who use them on
+> air. The honest gap is that it's English only for now. I'm still in training and not
 > licensed yet, so if the on-air conventions are wrong anywhere, I'd really
 > like to know.
 
@@ -118,7 +120,7 @@ Keep answers short, factual, and in the first person. See
 - **"Analytics?"** "Cloudflare's cookieless Web Analytics and a first-party
   counter of event names (no URLs, no text), which you can switch off in
   Settings. /privacy/ lists exactly what each one sees."
-- **"Paddles?"** "Not yet. Straight key only. #43 is the issue."
+- **"Paddles?"** "Yes, as of this week: Iambic A and B with dot/dah memory, on `[`/`]` or Left/Right Ctrl for USB paddle adapters, and two on-screen paddles on touch screens. It's new, so if the timing feels off to someone who keys with paddles every day, I want to hear it."
 - **"The URL fragment isn't secret."** "Right. It's meant for fun, not
   privacy, and the page says it isn't encryption. The point is only that the
   text never reaches my server."

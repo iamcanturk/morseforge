@@ -107,8 +107,9 @@ instead of making a new post.
 >
 > https://morse.iamcanturk.dev
 >
-> Known gaps: straight key only (iambic/paddle support is the open issue I'd
-> most like help with), and English only.
+> Paddles too: Iambic A and B with dot/dah memory, on `[`/`]` or Left/Right
+> Ctrl for USB paddle adapters. That part is new, so I'd value a paddle
+> user's take on the timing. English only for now.
 >
 > If the prosigns, Q-codes or the phrasing of an exchange are off, please tell
 > me. I'll fix it and credit you in the changelog. Source:
@@ -166,7 +167,7 @@ Saturday" flair. On any other day the post is removed.
 >
 > - **Content pages ship no framework.** About 6 KB gzipped (only the layout's
 >   inline scripts). Word and character pages, with a small audio player, are
->   about 13 KB. Interactive screens are about 85 to 130 KB.
+>   about 14 KB. Interactive screens are about 90 to 140 KB.
 > - **One timeline drives the tone and the lamp,** so the sound and the visual
 >   "Lamp" mode can't drift apart.
 > - **Shared state across tabs:** a store re-reads the raw localStorage string
@@ -175,7 +176,7 @@ Saturday" flair. On any other day the post is removed.
 >   fully tested and completely unreachable from any page.
 > - **Assistants get Markdown:** `.md` copies at the same URL and
 >   `/llms-full.txt`, generated from the same data the app runs on.
-> - **1,936 tests,** including one asserting PARIS takes exactly 60/WPM seconds.
+> - **2,067 tests,** including one asserting PARIS takes exactly 60/WPM seconds.
 >
 > https://morse.iamcanturk.dev · MIT: https://github.com/iamcanturk/morseforge
 

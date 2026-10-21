@@ -1,8 +1,8 @@
 # Site changes the launch would benefit from
 
 Nothing here was changed. `src/` is out of scope for the launch session, and
-another session is working on #43/#44 in `src/` right now. Each item says who
-should do it and whether it blocks the launch.
+another session was working on #43/#44 in `src/` at the time. Each item says
+who should do it and whether it blocks the launch.
 
 ## 1. Per-route link cards (nice to have, not blocking)
 
@@ -28,10 +28,8 @@ The repo was renamed to `iamcanturk/morseforge`. Fixed in this branch:
 `README.md` (clone command, issue links #43/#44) and `package.json`
 (`repository`, `bugs`).
 
-**Still open:** `src/config/site.ts` → `repo: 'https://github.com/iamcanturk/morse'`,
-which the site uses for its GitHub links. GitHub redirects, so nothing is
-broken. It's under `src/` (another session is working there on #43/#44) and
-only goes live with a deploy, so change it in the next release.
+`src/config/site.ts` was fixed in the #43/#44 release (a402f6f). Nothing
+left.
 
 ## 3. Release version (small)
 
