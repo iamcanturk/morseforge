@@ -1,0 +1,37 @@
+name: Where I got stuck
+description: You were learning and it stopped working for you. Where, and what happened?
+title: "Stuck: "
+labels: ["ui"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Nothing on the site reports back, by design, so the place people quit is invisible from the inside. This is the most useful thing a learner can tell us.
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - Front page key
+        - Lesson (a stage)
+        - Practice
+        - Copy practice
+        - Daily
+        - 60-second challenge
+        - Telegraph
+        - A game
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you expected, what it did, and roughly how far you were (stage, characters, speed).
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and browser
+      placeholder: iPhone 15, Safari / Windows laptop, Chrome

@@ -1,0 +1,34 @@
+name: Bug
+description: Something on the site is broken.
+labels: ["bug"]
+body:
+  - type: input
+    id: page
+    attributes:
+      label: Page
+      placeholder: https://morse.iamcanturk.dev/telegraph/
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps and what happened
+      description: What you did, what you expected, what happened instead. A screenshot helps.
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and browser
+      placeholder: Pixel 8, Chrome 141 / macOS, Firefox
+    validations:
+      required: true
+  - type: dropdown
+    id: signal
+    attributes:
+      label: Signal setting
+      options:
+        - Sound
+        - Lamp
+        - Both
+        - Not sure

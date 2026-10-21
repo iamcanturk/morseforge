@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Privacy — what is counted
+    url: https://morse.iamcanturk.dev/privacy/
+    about: What Cloudflare's analytics and the site's own counter can and cannot see.

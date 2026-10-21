@@ -1,0 +1,13 @@
+# Generated, large, or paid-for media. Rebuild with the tools in tools/;
+# the final renders are copied outside the repo for posting.
+hf/node_modules/
+hf/*/
+!hf/package.json
+renders/
+en/build/
+tr/build/
+*.log
+assets/music.mp3
+assets/rec/*.mp4
+assets/stills/
+hf/package-lock.json

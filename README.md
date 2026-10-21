@@ -434,8 +434,8 @@ Settings; what each one sees is spelled out on the
 ## Running it locally
 
 ```bash
-git clone https://github.com/iamcanturk/morse.git
-cd morse
+git clone https://github.com/iamcanturk/morseforge.git
+cd morseforge
 npm install
 npm run dev
 ```
@@ -540,10 +540,10 @@ it is invisible from the inside — nothing here reports back, by design.
 
 **If you write code**, the ideas that would move this furthest:
 
-- **[Iambic keyer and paddle support](https://github.com/iamcanturk/morse/issues/43)** —
+- **[Iambic keyer and paddle support](https://github.com/iamcanturk/morseforge/issues/43)** —
   the biggest single gap. Straight key only right now, and paddles are what most
   operators actually use.
-- **[Translations](https://github.com/iamcanturk/morse/issues/44)** — everything
+- **[Translations](https://github.com/iamcanturk/morseforge/issues/44)** — everything
   is English. Say which language before you start, so two people do not
   translate the same thing.
 - **Screen-reader testing.** The markup has been audited and the obvious
