@@ -2,8 +2,8 @@
 import BaseLayout from '../layouts/BaseLayout.astro'
 import PageShell from '../components/PageShell.astro'
 import ThemeToggle from '../components/ThemeToggle.astro'
-import { SettingsScreen } from '../components/Settings/SettingsScreen'
-import { breadcrumbTrail, getPage } from '../config/pages'
+import { SettingsIsland } from '../components/Settings/SettingsScreen'
+import { useTranslations } from '../i18n/server'
 import '../styles/pkg-j.css'
 
 /**
@@ -14,19 +14,20 @@ import '../styles/pkg-j.css'
  * The theme switch is the header's own component, handed to the island as a
  * slot, so there is one implementation of theme switching, not two.
  */
-const page = getPage('/settings/')
+const t = useTranslations(Astro)
+const page = t.page('/settings/')
 ---
 
 <BaseLayout title={page.title} description={page.description} path={page.path}>
   <PageShell
     width="tool"
-    trail={breadcrumbTrail(page.path)}
-    eyebrow="Applies instantly · Stored in this browser only"
+    trail={t.trail(page.key)}
+    eyebrow={t('settings.eyebrow')}
     h1={page.h1}
     intro={page.intro}
   >
-    <SettingsScreen client:load>
+    <SettingsIsland client:load i18n={t.island('settings')}>
       <ThemeToggle slot="theme" />
-    </SettingsScreen>
+    </SettingsIsland>
   </PageShell>
 </BaseLayout>

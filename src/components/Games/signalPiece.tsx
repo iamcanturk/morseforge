@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import { MORSE_ALPHABET } from '../../data/morseAlphabet'
+import { useT } from '../../i18n/react'
 
 /**
  * What a Signal Defender piece shows (DEC-027).
@@ -34,10 +35,6 @@ const ELEMENT_CLASS = {
   '-': 'block h-[0.35em] w-[1.05em] rounded-full bg-current',
 } as const
 
-/** "dash dot dash": the sequence, for a screen reader, since the drawing is silent. */
-export const spokenCode = (code: string): string =>
-  [...code].map((element) => (element === '-' ? 'dash' : 'dot')).join(' ')
-
 export function SignalPiece({
   character,
   x,
@@ -51,6 +48,7 @@ export function SignalPiece({
   y: number
   danger: boolean
 }) {
+  const t = useT()
   const code = MORSE_ALPHABET[character] ?? ''
   return (
     <div
@@ -67,7 +65,7 @@ export function SignalPiece({
           />
         ))}
       </span>
-      <span className="sr-only">{spokenCode(code)}</span>
+      <span className="sr-only">{t.spokenCode(code)}</span>
     </div>
   )
 }

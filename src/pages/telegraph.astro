@@ -2,19 +2,22 @@
 import BaseLayout from '../layouts/BaseLayout.astro'
 import Faq from '../components/Faq.astro'
 import PageShell from '../components/PageShell.astro'
-import { TelegraphScreen } from '../components/MorseKey/TelegraphScreen'
-import { breadcrumbTrail, getPage } from '../config/pages'
-import { faqFor } from '../data/faq'
+import Rich from '../components/I18n/Rich.astro'
+import { TelegraphIsland } from '../components/MorseKey/TelegraphScreen'
+import { presetLabel } from '../components/MorseKey/keyCopy'
 import { formatSeconds } from '../data/format'
 import { findWord, wordLabel } from '../data/words'
 import { dotDuration } from '../engine/timingEngine'
 import { encode, prettify } from '../engine/morseEncoder'
 import { breadcrumbs, webPage } from '../seo/schema'
 import { KEYER_PRESETS, WPM_PRESETS, defaultSettings } from '../storage/settings'
+import { useTranslations } from '../i18n/server'
+import type { RichTags } from '../i18n/richTags'
 
-const page = getPage('/telegraph/')
-const faq = faqFor(page.path)
-const trail = breadcrumbTrail(page.path)
+const t = useTranslations(Astro)
+const page = t.page('/telegraph/')
+const faq = t.faq(page.key)
+const trail = t.trail(page.key)
 const schema = [
   webPage({ path: page.path, name: page.h1, description: page.description }),
   breadcrumbs(trail),
@@ -28,8 +31,8 @@ const learningWordGap = formatSeconds(KEYER_PRESETS.learning.wordGapMs)
 const operatorWpm = WPM_PRESETS.normal
 // A character ends after three units of silence (the inter-character gap).
 const operatorGapMs = Math.round(3 * dotDuration(operatorWpm))
-const manual = KEYER_PRESETS.manual.label
-const learning = KEYER_PRESETS.learning.label
+const manual = presetLabel(t, 'manual')
+const learning = presetLabel(t, 'learning')
 
 const word = (slug: string) => {
   const entry = findWord(slug)
@@ -45,6 +48,10 @@ const cq = word('cq')
 const regards = word('73')
 const love = word('88')
 const s = prettify(encode('S'))
+/** The word links to its page; its code is set in the mono face. */
+function wordTags(href: string): RichTags {
+  return { word: { href }, code: { el: 'span', class: 'font-mono tracking-code' } }
+}
 ---
 
 <BaseLayout title={page.title} description={page.description} path={page.path} schema={schema}>
@@ -54,66 +61,49 @@ const s = prettify(encode('S'))
          element and sits in the first screenful, and someone who lands here
          presses Space straight away. */
     }
-    <TelegraphScreen client:load />
+    <TelegraphIsland client:load i18n={t.island('telegraph')} />
 
     <div slot="more" class="mf-prose">
-      <h2>How to send Morse code with a keyboard</h2>
+      <h2>{t('telegraphPage.howHeading')}</h2>
+      <p>{t('telegraphPage.howBody', { dashAfter })}</p>
       <p>
-        The Space bar is the key. Press it and the sidetone sounds for as long as you hold it: let
-        go quickly for a dot, hold it past {dashAfter} ms for a dash. Then stop. When the key has been
-        quiet long enough, the elements you sent are read as one character and printed on the tape. Stay
-        quiet a little longer and the word ends too. On a phone or tablet, press and hold the brass key
-        on the screen instead; it behaves exactly the same.
+        <Rich
+          nodes={t.rich('telegraphPage.letterBody', { code: s })}
+          tags={{ b: { el: 'strong' } }}
+        />
       </p>
+
+      <h2>{t('telegraphPage.waitHeading')}</h2>
       <p>
-        To send the letter S, tap three times ({s}) and wait. To send the word, send each letter the
-        same way, with a pause between them. If a character finishes before you meant it to, press{
-          ' '
+        {
+          t('telegraphPage.waitBody', {
+            wpm: operatorWpm,
+            gap: operatorGapMs,
+            learning,
+            characterGap: learningGap,
+            wordGap: learningWordGap,
+            manual,
+          })
         }
-        <strong>Finish</strong> yourself next time, or give the key more time below it.
       </p>
 
-      <h2>Why the key waits for you</h2>
-      <p>
-        How patient the key is has nothing to do with speed. At {operatorWpm} WPM a character ends after
-        {operatorGapMs} ms of silence, which is right for a practised operator and hopeless for a beginner
-        who means to send S and, after a moment of doubt, has sent E three times. So the telegraph starts
-        on {learning}: a character ends after {learningGap} seconds of quiet and a word after {
-          learningWordGap
-        }. Switch to {manual} and nothing finishes until you say so. The fuse between the tape and the
-        key shows how long you have left.
-      </p>
-
-      <h2>What to send first</h2>
-      <p>
-        Pick a target above the key and the tape checks it letter by letter as you send. A few words
-        every operator knows are worth trying:
-      </p>
+      <h2>{t('telegraphPage.firstHeading')}</h2>
+      <p>{t('telegraphPage.firstBody')}</p>
       <ul>
         <li>
-          <a href={sos.href}>{sos.label}</a> (<span class="font-mono tracking-code">{sos.code}</span
-          >), the distress signal, which also works sent as one unbroken character.
+          <Rich nodes={t.rich('telegraphPage.sos', sos)} tags={wordTags(sos.href)} />
         </li>
         <li>
-          <a href={cq.href}>{cq.label}</a> (<span class="font-mono tracking-code">{cq.code}</span>),
-          a call to any station listening.
+          <Rich nodes={t.rich('telegraphPage.cq', cq)} tags={wordTags(cq.href)} />
         </li>
         <li>
-          <a href={regards.href}>{regards.label}</a> (<span class="font-mono tracking-code"
-            >{regards.code}</span
-          >), best regards, the usual sign-off.
+          <Rich nodes={t.rich('telegraphPage.regards', regards)} tags={wordTags(regards.href)} />
         </li>
         <li>
-          <a href={love.href}>{love.label}</a> (<span class="font-mono tracking-code"
-            >{love.code}</span
-          >), love and kisses.
+          <Rich nodes={t.rich('telegraphPage.love', love)} tags={wordTags(love.href)} />
         </li>
       </ul>
-      <p>
-        The text you key is never uploaded, and the telegram you can share at the end is drawn on
-        your own screen. If anonymous counters are on in Settings, the site counts that a word was
-        sent, and which of the four words above turned up; nothing more.
-      </p>
+      <p>{t('telegraphPage.privacyBody')}</p>
     </div>
 
     <Faq slot="more" items={faq} />

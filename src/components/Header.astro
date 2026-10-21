@@ -1,13 +1,14 @@
 ---
 import { Logo, LogoMark } from './brand/Logo'
 import ThemeMenu from './ThemeMenu.astro'
-import { MENU_TILES, NAV_GROUPS, PHONE_GROUPS, PRIMARY_NAV, isCurrent } from './ui/siteNav'
+import { isCurrent, siteNav } from './ui/siteNav'
 import { SITE } from '../config/site'
 import { SKILLS } from '../game/mastery'
 import { LESSON_STAGES } from '../game/nextAction'
 import { STREAK_GRACE_DAYS } from '../game/progression'
 import { PROGRESS_KEY } from '../storage/progress'
 import { STATS_KEY } from '../storage/stats'
+import { useTranslations } from '../i18n/server'
 
 /**
  * Site header: one 56px row at every width (DEC-040).
@@ -37,8 +38,28 @@ import { STATS_KEY } from '../storage/stats'
  * `Logo` is a React component with no client directive, so Astro renders it to
  * static HTML and ships zero JavaScript for it.
  */
+const t = useTranslations(Astro)
+const {
+  primary: PRIMARY_NAV,
+  groups: NAV_GROUPS,
+  tiles: MENU_TILES,
+  phoneGroups: PHONE_GROUPS,
+} = siteNav(t)
 const pathname = Astro.url.pathname
 const current = (href: string) => (isCurrent(href, pathname) ? 'page' : undefined)
+const settingsHref = t.href('/settings/')
+
+/** What the progress chip's script says and where it points, in the page's language. */
+const chip = {
+  labels: {
+    continue: t('header.chipContinue'),
+    progress: t('header.chipProgress'),
+    days: t.raw('header.chipDays'),
+    streak: t.raw('header.chipStreak'),
+    today: t('header.chipPractisedToday'),
+  },
+  hrefs: { learn: t.href('/learn/'), practice: t.href('/practice/'), stats: t.href('/stats/') },
+}
 ---
 
 <header class="mf-header">
@@ -48,9 +69,9 @@ const current = (href: string) => (isCurrent(href, pathname) ? 'page' : undefine
         the negative margin keeps the lockup where it was. */
     }
     <a
-      href="/"
+      href={t.href('/')}
       class="-ml-2 flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-control px-2"
-      aria-label={`${SITE.name} home`}
+      aria-label={t('header.home', { site: SITE.name })}
     >
       {
         /* The header's optical size of the lockup: 18 px of mark on a phone,
@@ -61,7 +82,7 @@ const current = (href: string) => (isCurrent(href, pathname) ? 'page' : undefine
       <Logo size={20} compact decorative className="hidden sm:block" />
     </a>
 
-    <nav aria-label="Main" class="ml-10 hidden items-center gap-7 lg:flex">
+    <nav aria-label={t('header.mainNav')} class="ml-10 hidden items-center gap-7 lg:flex">
       {
         PRIMARY_NAV.map(({ href, label }) => (
           <a href={href} aria-current={current(href)} class="mf-nav-link">
@@ -72,7 +93,7 @@ const current = (href: string) => (isCurrent(href, pathname) ? 'page' : undefine
 
       <details name="mf-menu" class="group" data-menu>
         <summary class="mf-summary mf-nav-link gap-1.5 text-muted hover:text-ink">
-          All tools
+          {t('header.allTools')}
           <svg
             width="12"
             height="12"
@@ -124,10 +145,10 @@ const current = (href: string) => (isCurrent(href, pathname) ? 'page' : undefine
           width. Its accessible name starts with exactly what it shows, so a
           voice user can say what they see (A-17). */
       }
-      <a href="/learn/" class="mf-chip ml-2 mr-1 sm:mr-2" hidden data-progress-chip>
+      <a href={chip.hrefs.learn} class="mf-chip ml-2 mr-1 sm:mr-2" hidden data-progress-chip>
         <span class="mf-lamp" data-tone="amber" data-chip-lamp aria-hidden="true"></span>
         <span data-chip-streak class="mf-chip-streak"></span>
-        <span data-chip-label class="mf-chip-label">Continue</span>
+        <span data-chip-label class="mf-chip-label">{chip.labels.continue}</span>
         <svg
           width="12"
           height="12"
@@ -149,6 +170,8 @@ const current = (href: string) => (isCurrent(href, pathname) ? 'page' : undefine
           graceDays: STREAK_GRACE_DAYS,
           stages: LESSON_STAGES,
           skills: SKILLS,
+          labels: chip.labels,
+          hrefs: chip.hrefs,
         }}
       >
         // Envelope `{ version, data }`, as src/storage/store.ts writes it.
@@ -203,11 +226,11 @@ const current = (href: string) => (isCurrent(href, pathname) ? 'page' : undefine
             }
 
             // The course first, digits included, then practice once every stage is done.
-            let href = unfinished === -1 ? '/practice/' : '/learn/'
-            let label = 'Continue'
+            let href = unfinished === -1 ? hrefs.practice : hrefs.learn
+            let label = labels.continue
             if (href === location.pathname) {
-              href = '/stats/'
-              label = 'Progress'
+              href = hrefs.stats
+              label = labels.progress
             }
             const lamp = chip.querySelector('[data-chip-lamp]')
             const count = chip.querySelector('[data-chip-streak]')
@@ -216,16 +239,18 @@ const current = (href: string) => (isCurrent(href, pathname) ? 'page' : undefine
             labelEl.textContent = label
             // With no number to show, the label is the content: never hide it.
             chip.dataset.streak = days > 0 ? 'true' : 'false'
-            count.textContent = days > 0 ? `${days}d` : ''
+            const daysText = labels.days.replace('{days}', String(days))
+            count.textContent = days > 0 ? daysText : ''
             count.hidden = days === 0
             lamp.hidden = days === 0
             lamp.dataset.on = String(lit)
             // The name starts with what a sighted user reads, word for word
             // ("5d" on a phone, "5d Continue" from sm up), then says it in full.
             const shown = wide.matches || days === 0
-            const streakText = `${days}-day streak${lit ? ', practised today' : ''}`
+            const streakText =
+              labels.streak.replace('{days}', String(days)) + (lit ? labels.today : '')
             const parts =
-              days > 0 ? [shown ? `${days}d ${label}` : `${days}d`, streakText] : [label]
+              days > 0 ? [shown ? `${daysText} ${label}` : daysText, streakText] : [label]
             if (days > 0 && !shown) parts.splice(1, 0, label)
             chip.setAttribute('aria-label', parts.join(', '))
             chip.title = days > 0 ? streakText : ''
@@ -247,10 +272,10 @@ const current = (href: string) => (isCurrent(href, pathname) ? 'page' : undefine
       <ThemeMenu />
 
       <a
-        href="/settings/"
-        aria-label="Settings"
-        aria-current={current('/settings/')}
-        title="Settings"
+        href={settingsHref}
+        aria-label={t('header.settings')}
+        aria-current={current(settingsHref)}
+        title={t('header.settings')}
         class="mf-icon-btn"
       >
         <svg
@@ -282,7 +307,7 @@ const current = (href: string) => (isCurrent(href, pathname) ? 'page' : undefine
       }
       <details name="mf-menu" class="group lg:hidden" data-menu>
         <summary class="mf-summary mf-icon-btn text-ink">
-          <span class="sr-only">Menu</span>
+          <span class="sr-only">{t('header.menu')}</span>
           <svg
             width="20"
             height="20"
@@ -312,7 +337,7 @@ const current = (href: string) => (isCurrent(href, pathname) ? 'page' : undefine
         </summary>
 
         <nav
-          aria-label="Main"
+          aria-label={t('header.mainNav')}
           class="mf-menu-panel max-h-[calc(100svh-3.5rem)] overflow-y-auto overscroll-contain border-b border-line-strong bg-panel shadow-2xl"
         >
           <div class="mx-auto max-w-3xl px-4 pt-4 pb-6 sm:px-6">
@@ -352,7 +377,7 @@ const current = (href: string) => (isCurrent(href, pathname) ? 'page' : undefine
               <a
                 href={SITE.repo}
                 rel="noopener"
-                class="mf-btn mf-btn-ghost mf-btn-sm -ml-3 min-h-11">Source on GitHub</a
+                class="mf-btn mf-btn-ghost mf-btn-sm -ml-3 min-h-11">{t('header.source')}</a
               >
             </div>
           </div>

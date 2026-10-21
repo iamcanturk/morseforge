@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { MorseKey } from './MorseKey'
+import { inIsland } from '../../i18n/testing'
 
 const noop = () => {}
 const handlers = {
@@ -13,14 +14,17 @@ const handlers = {
 
 const render = (isDown: boolean) =>
   renderToStaticMarkup(
-    createElement(MorseKey, {
-      isDown,
-      pending: isDown ? '.' : '',
-      preview: isDown ? 'E' : null,
-      commitProgress: 0,
-      autoCommit: true,
-      pointerHandlers: handlers,
-    }),
+    inIsland(
+      createElement(MorseKey, {
+        isDown,
+        pending: isDown ? '.' : '',
+        preview: isDown ? 'E' : null,
+        commitProgress: 0,
+        autoCommit: true,
+        pointerHandlers: handlers,
+      }),
+      'telegraph',
+    ),
   )
 
 describe('the on-screen Morse key (A11Y-21)', () => {

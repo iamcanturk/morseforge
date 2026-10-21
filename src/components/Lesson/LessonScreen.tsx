@@ -15,7 +15,6 @@ import {
   HEAR_FIRST_HASH,
   LESSON_ORDER,
   LESSON_STAGES,
-  STEP_COPY,
   TEACH_STEPS,
   commitOnTarget,
   courseProgress,
@@ -26,13 +25,13 @@ import {
   stageDay,
   stageStart,
   stageStatuses,
+  stepCopy,
   targetCode,
   type LessonPosition,
   type StageStatus,
 } from './lesson'
 import { track } from '../../analytics/track'
 import { prettify } from '../../engine/morseEncoder'
-import { spokenCode } from '../../engine/spokenCode'
 import { UNKNOWN_CHARACTER } from '../../engine/morseDecoder'
 import type { Achievement } from '../../game/achievements'
 import { XP, xpForAnswer } from '../../game/progression'
@@ -50,6 +49,11 @@ import {
 import { createSettingsStore, defaultSettings, type SettingsRecord } from '../../storage/settings'
 import { achievementSnapshot } from '../../storage/snapshot'
 import { createStatsStore } from '../../storage/stats'
+import { useT, withI18n } from '../../i18n/react'
+import { commitLabel, keyLabel as keyCap } from '../MorseKey/keyCopy'
+import { renderRich } from '../../i18n/richReact'
+import type { MessageKey } from '../../i18n/keys'
+import { achievementCopy } from '../Stats/achievementCopy'
 
 /**
  * The guided lesson (PROJECT.md §4.1, §45, §46, §48).
@@ -75,6 +79,12 @@ export interface NextStep {
 export interface LessonScreenProps {
   /** Where to go after the course: built from the page registry by the page. */
   nextSteps?: readonly NextStep[]
+  /**
+   * Each stage's plan-day title, in the page's language, in stage order. The
+   * plan is content the page reads from the catalog; the island only shows it.
+   * Absent: the plan's own titles.
+   */
+  dayTitles?: readonly string[]
 }
 
 type Phase = 'teach' | 'cleared' | 'drill' | 'complete'
@@ -114,16 +124,17 @@ function stageLabel(characters: readonly string[]): string {
   return characters.join(' ')
 }
 
-const STATUS_TEXT: Record<StageStatus, string> = {
-  done: 'done',
-  current: 'in progress',
-  todo: 'not started',
+const STATUS_TEXT: Record<StageStatus, MessageKey> = {
+  done: 'lesson.statusDone',
+  current: 'lesson.statusCurrent',
+  todo: 'lesson.statusTodo',
 }
 
 /** Every stage of the course, so the learner always knows how far there is to go. */
 function StageRail({ statuses }: { statuses: readonly StageStatus[] }) {
+  const t = useT()
   return (
-    <ol aria-label="Course stages" className="grid grid-cols-7 gap-1.5 sm:gap-2">
+    <ol aria-label={t('lesson.courseStages')} className="grid grid-cols-7 gap-1.5 sm:gap-2">
       {LESSON_STAGES.map((characters, index) => {
         const status = statuses[index] ?? 'todo'
         return (
@@ -149,7 +160,11 @@ function StageRail({ statuses }: { statuses: readonly StageStatus[] }) {
               {stageLabel(characters).replaceAll(' ', '')}
             </span>
             <span className="sr-only">
-              Stage {index + 1}, {stageLabel(characters)}: {STATUS_TEXT[status]}
+              {t('lesson.stageStatus', {
+                stage: index + 1,
+                characters: stageLabel(characters),
+                status: t.raw(STATUS_TEXT[status]),
+              })}
             </span>
           </li>
         )
@@ -160,9 +175,10 @@ function StageRail({ statuses }: { statuses: readonly StageStatus[] }) {
 
 /** See · Hear · Send, as plates: done is lit, current is amber, to come is dark. */
 function StepPlates({ step }: { step: LessonPosition['step'] }) {
+  const t = useT()
   const current = TEACH_STEPS.indexOf(step)
   return (
-    <ol aria-label="Steps for this character" className="grid grid-cols-3 gap-2">
+    <ol aria-label={t('lesson.stepsForCharacter')} className="grid grid-cols-3 gap-2">
       {TEACH_STEPS.map((entry, index) => {
         const status: StageStatus =
           index < current ? 'done' : index === current ? 'current' : 'todo'
@@ -175,9 +191,11 @@ function StepPlates({ step }: { step: LessonPosition['step'] }) {
           >
             <Lamp on={status !== 'todo'} tone={status === 'current' ? 'amber' : 'signal'} />
             <span className="font-mono text-control text-muted uppercase group-data-[status=current]:text-ink">
-              {STEP_COPY[entry].label}
+              {stepCopy(t, entry).label}
             </span>
-            <span className="sr-only">: {STATUS_TEXT[status]}</span>
+            <span className="sr-only">
+              {t('lesson.stepStatus', { status: t.raw(STATUS_TEXT[status]) })}
+            </span>
           </li>
         )
       })}
@@ -192,12 +210,13 @@ function StepPlates({ step }: { step: LessonPosition['step'] }) {
  * sit a layer below the letters the tree diagram draws.
  */
 function PathRibbon({ character, code }: { character: string; code: string }) {
+  const t = useT()
   return (
     <ol
-      aria-label={`Path from the start: ${spokenCode(code)}, then ${character}`}
+      aria-label={t('lesson.pathLabel', { code: t.spokenCode(code), character })}
       className="flex flex-wrap items-center justify-center gap-x-2 gap-y-3"
     >
-      <li className="mf-engraved">Start</li>
+      <li className="mf-engraved">{t('lesson.pathStart')}</li>
       {[...code].map((element, index) => (
         <li key={index} aria-hidden="true" className="flex items-center gap-2">
           <span className="text-muted">→</span>
@@ -225,8 +244,13 @@ function PathRibbon({ character, code }: { character: string; code: string }) {
  * a speck next to a 136px letter.
  */
 function CodePulses({ code }: { code: string }) {
+  const t = useT()
   return (
-    <span role="img" aria-label={`Code: ${spokenCode(code)}`} className="flex items-center gap-3">
+    <span
+      role="img"
+      aria-label={t('lesson.codeLabel', { code: t.spokenCode(code) })}
+      className="flex items-center gap-3"
+    >
       {[...code].map((element, index) => (
         <span
           key={index}
@@ -242,21 +266,27 @@ function CodePulses({ code }: { code: string }) {
 
 /** Newly earned achievements, as telegram slips inside the lesson (no global toast). */
 function AchievementSlips({ earned }: { earned: readonly Achievement[] }) {
+  const t = useT()
   if (earned.length === 0) return null
   return (
-    <ul aria-label="Achievements received" className="grid gap-3">
-      {earned.map((achievement) => (
-        <li key={achievement.id} className="mf-tape mf-slip flex items-center gap-4 pr-8">
-          <span aria-hidden="true" className="text-h3 tracking-normal">
-            {achievement.icon}
-          </span>
-          <span className="min-w-0 flex-1 tracking-normal">
-            <span className="block font-display text-base font-bold">{achievement.title}</span>
-            <span className="block text-sm text-paper-muted">{achievement.description}</span>
-          </span>
-          <span className="font-mono text-label text-paper-muted uppercase">Received</span>
-        </li>
-      ))}
+    <ul aria-label={t('lesson.achievementsReceived')} className="grid gap-3">
+      {earned.map((achievement) => {
+        const copy = achievementCopy(t, achievement)
+        return (
+          <li key={achievement.id} className="mf-tape mf-slip flex items-center gap-4 pr-8">
+            <span aria-hidden="true" className="text-h3 tracking-normal">
+              {achievement.icon}
+            </span>
+            <span className="min-w-0 flex-1 tracking-normal">
+              <span className="block font-display text-base font-bold">{copy.title}</span>
+              <span className="block text-sm text-paper-muted">{copy.description}</span>
+            </span>
+            <span className="font-mono text-label text-paper-muted uppercase">
+              {t('lesson.received')}
+            </span>
+          </li>
+        )
+      })}
     </ul>
   )
 }
@@ -270,12 +300,18 @@ function AchievementSlips({ earned }: { earned: readonly Achievement[] }) {
  * bars over their real text, so they wrap exactly as the real ones will.
  */
 function LessonSkeleton() {
+  const t = useT()
+  const see = stepCopy(t, 'see')
   const bar = 'rounded-chip bg-elevated text-transparent [box-decoration-break:clone]'
   return (
-    <section aria-busy="true" aria-label="Loading the lesson" className="mf-instrument p-5 sm:p-8">
+    <section
+      aria-busy="true"
+      aria-label={t('lesson.loadingLabel')}
+      className="mf-instrument p-5 sm:p-8"
+    >
       <div className="flex items-center justify-between gap-4">
-        <span className="mf-engraved">Lesson</span>
-        <span className="mf-engraved">Loading</span>
+        <span className="mf-engraved">{t('lesson.lesson')}</span>
+        <span className="mf-engraved">{t('lesson.loading')}</span>
       </div>
       <div className="mt-5 grid grid-cols-7 gap-1.5 sm:gap-2" aria-hidden="true">
         {LESSON_STAGES.map((_, index) => (
@@ -294,10 +330,10 @@ function LessonSkeleton() {
         </div>
         <div className="sm:col-start-1 sm:row-start-1">
           <p className="font-display text-h3 font-bold">
-            <span className={bar}>{STEP_COPY.see.title}</span>
+            <span className={bar}>{see.title}</span>
           </p>
           <p className="mt-1 max-w-[60ch]">
-            <span className={bar}>{STEP_COPY.see.body}</span>
+            <span className={bar}>{see.body}</span>
           </p>
         </div>
       </div>
@@ -323,7 +359,14 @@ function LessonSkeleton() {
   )
 }
 
-export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
+/** The /learn/ page's island: `LessonScreen` with its messages from the page. */
+export const LessonIsland = withI18n(LessonScreen)
+
+export function LessonScreen({ nextSteps = [], dayTitles }: LessonScreenProps) {
+  const t = useT()
+  /** A stage's plan-day title, in the page's language. */
+  const dayTitle = (stage: number): string | undefined =>
+    dayTitles?.[stage] ?? stageDay(stage)?.title
   const progressStore = useMemo(() => createProgressStore(), [])
   const settingsStore = useMemo(() => createSettingsStore(), [])
   const statsStore = useMemo(() => createStatsStore(), [])
@@ -425,7 +468,7 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
   const stageCharacters = LESSON_STAGES[position.stage] ?? []
   const character = stageCharacters[position.characterIndex] ?? ''
   const code = targetCode(character)
-  const day = stageDay(position.stage)
+  const day = dayTitle(position.stage)
 
   // Meeting a character counts as seeing it, which is what lights its node.
   useEffect(() => {
@@ -539,6 +582,8 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
     wordGapMs: settings.timing.wordGapMs,
     autoCommit: settings.timing.autoCommit,
     bindings: settings.keys,
+    keyer: settings.keyer.type,
+    swapPaddles: settings.keyer.swapPaddles,
     frequency: settings.audio.frequency,
     volume: settings.audio.enabled ? settings.audio.volume : 0,
     disabled: !sending || transitioning,
@@ -630,20 +675,20 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
     return (
       <section ref={rootRef} aria-labelledby="lesson-complete" className="mf-instrument p-5 sm:p-8">
         <div className="flex items-center justify-between gap-4">
-          <span className="mf-engraved">Lesson · all {stageCount} stages</span>
-          <Lamp on tone="amber" label="Course complete" />
+          <span className="mf-engraved">{t('lesson.allStages', { count: stageCount })}</span>
+          <Lamp on tone="amber" label={t('lesson.courseComplete')} />
         </div>
         <div className="mt-5">
           <StageRail statuses={statuses} />
         </div>
 
         <Screen powerOn grid className="mt-6 grid place-items-center px-6 py-10 text-center">
-          <p className="mf-engraved">Course complete</p>
+          <p className="mf-engraved">{t('lesson.courseComplete')}</p>
           <p className="mt-3 font-mono text-readout-xl text-signal tabular-nums mf-phosphor">
             {LESSON_ORDER.length}
           </p>
           <p className="mt-3 text-lead text-ink">
-            characters taught, every letter and digit, in {stageCount} stages
+            {t('lesson.charactersTaught', { count: stageCount })}
           </p>
         </Screen>
 
@@ -654,14 +699,11 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
             tabIndex={-1}
             className="font-display text-h2 font-bold text-ink outline-none"
           >
-            You have the whole code.
+            {t('lesson.wholeCode')}
           </h2>
-          <span className="mf-stamp mf-stamp-in text-amber">Course complete</span>
+          <span className="mf-stamp mf-stamp-in text-amber">{t('lesson.courseComplete')}</span>
         </div>
-        <p className="mt-3 max-w-[60ch] text-muted">
-          Knowing every character is the first half. The second is hearing them at speed, and that
-          comes from short, regular practice. Pick one of these and keep the streak going.
-        </p>
+        <p className="mt-3 max-w-[60ch] text-muted">{t('lesson.completeBody')}</p>
 
         {earned.length > 0 && (
           <div className="mt-6">
@@ -676,7 +718,7 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
                 <a href={step.href} className="mf-card flex w-full flex-col gap-1 p-5">
                   <span className="font-display text-h3 font-bold text-ink">{step.label}</span>
                   <span className="text-sm text-muted">{step.hint}</span>
-                  <span className="mt-2 mf-engraved text-signal">Open →</span>
+                  <span className="mt-2 mf-engraved text-signal">{t('lesson.open')}</span>
                 </a>
               </li>
             ))}
@@ -684,17 +726,18 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
         )}
 
         <div className="mt-8 border-t border-line pt-6">
-          <h3 className="font-display text-h3 font-bold text-ink">Go over a stage again</h3>
-          <p className="mt-1 text-sm text-muted">
-            Teaching a stage again never takes anything away; your practice pool stays as it is.
-          </p>
+          <h3 className="font-display text-h3 font-bold text-ink">{t('lesson.goOver')}</h3>
+          <p className="mt-1 text-sm text-muted">{t('lesson.goOverNote')}</p>
           <ul className="mt-4 flex flex-wrap gap-2">
             {LESSON_STAGES.map((characters, index) => (
               <li key={index}>
                 <button
                   type="button"
                   className="mf-btn mf-btn-secondary mf-btn-sm"
-                  aria-label={`Teach stage ${index + 1} again: ${stageLabel(characters)}`}
+                  aria-label={t('lesson.teachStageAgainLabel', {
+                    stage: index + 1,
+                    characters: stageLabel(characters),
+                  })}
                   onClick={() => goToStage(index)}
                 >
                   <span className="tabular-nums">{index + 1}</span>
@@ -723,9 +766,9 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
       <section ref={rootRef} aria-labelledby="stage-cleared" className="mf-instrument p-5 sm:p-8">
         <div className="flex items-center justify-between gap-4">
           <span className="mf-engraved">
-            Stage {report.stage + 1} of {stageCount}
+            {t('lesson.stageOf', { stage: report.stage + 1, total: stageCount })}
           </span>
-          <Lamp on tone="amber" label="Stage cleared" />
+          <Lamp on tone="amber" label={t('lesson.stageCleared')} />
         </div>
         <div className="mt-5">
           <StageRail statuses={cleared} />
@@ -734,7 +777,7 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
         <div className="relative mt-8">
           {/* D5: the stage prints onto the tape one character at a time. */}
           <p className="mf-tape flex flex-wrap items-baseline gap-x-5 gap-y-2 pt-8 pr-10 pb-5 font-display text-h2 font-bold">
-            <span className="sr-only">Characters in this stage: </span>
+            <span className="sr-only">{t('lesson.charactersInStage')}</span>
             {characters.map((entry, index) => (
               <span
                 key={entry}
@@ -748,7 +791,7 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
             ))}
           </p>
           <span className="mf-stamp mf-stamp-in absolute -top-4 right-2 bg-panel text-signal sm:right-6">
-            Stage {report.stage + 1} cleared
+            {t('lesson.stageClearedStamp', { stage: report.stage + 1 })}
           </span>
         </div>
 
@@ -758,31 +801,35 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
           tabIndex={-1}
           className="mt-8 font-display text-h2 font-bold text-ink outline-none"
         >
-          {stageDay(report.stage)?.title ?? `Stage ${report.stage + 1}`}: taught.
+          {t('lesson.taught', {
+            title: dayTitle(report.stage) ?? t('lesson.stageFallback', { stage: report.stage + 1 }),
+          })}
         </h2>
         <p className="mt-2 max-w-[60ch] text-muted">
-          {report.sends > 0
-            ? 'Now hear them mixed with everything from earlier stages. A character you can only recognise on its own is not one you know yet.'
-            : 'You skipped the sending, so nothing was checked yet. The drill does that by ear: it mixes these with everything from earlier stages.'}
+          {report.sends > 0 ? t('lesson.mixedNext') : t('lesson.skippedNext')}
         </p>
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <Readout
-            label="XP this stage"
-            value={`+${report.xp}`}
+            label={t('lesson.xpThisStage')}
+            value={t('lesson.plusValue', { value: report.xp })}
             tone="amber"
             lamp={report.xp > 0}
           />
-          <Readout label="Course" value={`${percent}%`} caption="of characters answered" />
           <Readout
-            label="Letters in practice"
+            label={t('lesson.course')}
+            value={t('lesson.percent', { value: percent })}
+            caption={t('lesson.ofAnswered')}
+          />
+          <Readout
+            label={t('lesson.lettersInPractice')}
             value={report.pool}
             caption={
               report.unlocked.length > 0
-                ? `New in practice: ${report.unlocked.join(' ')}`
+                ? t('lesson.newInPractice', { characters: report.unlocked.join(' ') })
                 : report.covered
-                  ? 'Already holds this stage'
-                  : 'Your method adds these at its own pace'
+                  ? t('lesson.alreadyHolds')
+                  : t('lesson.ownPace')
             }
             className="col-span-2 sm:col-span-1"
           />
@@ -804,7 +851,7 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
               setPhase('drill')
             }}
           >
-            Drill stage {report.stage + 1}
+            {t('lesson.drillStage', { stage: report.stage + 1 })}
           </button>
           <button
             type="button"
@@ -815,14 +862,14 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
               setPhase('complete')
             }}
           >
-            {last ? 'Finish the course' : `Skip to stage ${report.stage + 2} →`}
+            {last ? t('lesson.finishCourse') : t('lesson.skipToStage', { stage: report.stage + 2 })}
           </button>
           <button
             type="button"
             className="mf-btn mf-btn-ghost"
             onClick={() => goToStage(report.stage)}
           >
-            Teach it again
+            {t('lesson.teachAgain')}
           </button>
           {install && (
             <button
@@ -830,7 +877,7 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
               className="mf-btn mf-btn-ghost"
               onClick={() => void install.prompt()}
             >
-              Install for offline
+              {t('lesson.install')}
             </button>
           )}
         </div>
@@ -846,8 +893,10 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
     const last = stage >= stageCount - 1
     const next = {
       label: last
-        ? 'Finish the course'
-        : `Next stage: ${stageLabel(LESSON_STAGES[stage + 1] ?? []).replaceAll(' ', '')} →`,
+        ? t('lesson.finishCourse')
+        : t('lesson.nextStage', {
+            characters: stageLabel(LESSON_STAGES[stage + 1] ?? []).replaceAll(' ', ''),
+          }),
       onClick: () => {
         if (!last) return goToStage(stage + 1)
         scrollIntent.current = 'top'
@@ -863,18 +912,21 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
         <section aria-labelledby="drill-heading" className="mf-instrument p-5 sm:p-8">
           <div className="flex items-center justify-between gap-4">
             <span className="mf-engraved">
-              Drill · stage {stage + 1} of {stageCount}
+              {t('lesson.drillOf', { stage: stage + 1, total: stageCount })}
             </span>
-            <span className="mf-engraved">{preset.length} prompts</span>
+            <span className="mf-engraved">{t('lesson.prompts', { count: preset.length })}</span>
           </div>
           <div className="mt-5">
             <StageRail statuses={drillStatuses} />
           </div>
           <h2 id="drill-heading" className="mt-6 font-display text-h3 font-bold text-ink">
-            Everything so far, by ear
+            {t('lesson.drillHeading')}
           </h2>
           <p className="mt-1 text-sm text-muted">
-            {preset.characters.length} characters: {stageLabel(preset.characters)}
+            {t('lesson.drillCharacters', {
+              count: preset.characters.length,
+              characters: stageLabel(preset.characters),
+            })}
           </p>
         </section>
 
@@ -892,11 +944,11 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
         <div className="flex flex-wrap gap-3">
           {!drillDone && (
             <button type="button" className="mf-btn mf-btn-ghost" onClick={next.onClick}>
-              {last ? 'Skip the drill and finish' : 'Skip the drill'}
+              {last ? t('lesson.skipDrillFinish') : t('lesson.skipDrill')}
             </button>
           )}
           <button type="button" className="mf-btn mf-btn-ghost" onClick={() => goToStage(stage)}>
-            Teach stage {stage + 1} again
+            {t('lesson.teachStageAgain', { stage: stage + 1 })}
           </button>
         </div>
       </div>
@@ -905,7 +957,7 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
 
   /* ------------------------------------------------------------------- teach */
 
-  const copy = STEP_COPY[position.step]
+  const copy = stepCopy(t, position.step)
   const isDigit = /\d/.test(character)
   const stepNumber = TEACH_STEPS.indexOf(position.step) + 1
 
@@ -930,11 +982,16 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
     <section ref={rootRef} aria-labelledby="lesson-step" className="mf-instrument p-5 sm:p-8">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <span className="mf-engraved">
-          Stage {position.stage + 1} of {stageCount}
-          <span className="hidden sm:inline"> · {day?.title}</span>
+          {t('lesson.stageOf', { stage: position.stage + 1, total: stageCount })}
+          <span className="hidden sm:inline">
+            {t('lesson.stageDayTitle', { title: day ?? '' })}
+          </span>
         </span>
         <span className="mf-engraved tabular-nums">
-          Character {position.characterIndex + 1} of {stageCharacters.length}
+          {t('lesson.characterOf', {
+            index: position.characterIndex + 1,
+            total: stageCharacters.length,
+          })}
         </span>
       </div>
 
@@ -956,10 +1013,10 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
             className="font-display text-h3 font-bold text-ink outline-none"
           >
             <span className="sr-only">
-              Step {stepNumber} of {TEACH_STEPS.length}:{' '}
+              {t('lesson.stepOf', { step: stepNumber, total: TEACH_STEPS.length })}
             </span>
             {copy.title}
-            <span className="sr-only">, {character}</span>
+            <span className="sr-only">{t('lesson.characterSuffix', { character })}</span>
           </h2>
           <p className="mt-1 max-w-[60ch] text-muted">{copy.body}</p>
         </div>
@@ -994,9 +1051,9 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
             <CodePulses code={code} />
             {position.step === 'send' && (
               <span className="mt-1 flex h-6 items-center gap-2">
-                <Lamp on={feedback?.correct === true} label="Signal detected" />
+                <Lamp on={feedback?.correct === true} label={t('lesson.signalDetected')} />
                 <span className="mf-engraved">
-                  {feedback?.correct ? 'Signal detected' : 'Listening for your key'}
+                  {feedback?.correct ? t('lesson.signalDetected') : t('lesson.listeningForKey')}
                 </span>
               </span>
             )}
@@ -1008,7 +1065,7 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
               aria-hidden="true"
               className="mf-rise-hold absolute top-5 right-6 z-[3] font-mono text-control text-amber"
             >
-              +{feedback.xp} XP
+              {t('lesson.xpGain', { xp: feedback.xp })}
             </span>
           )}
         </Screen>
@@ -1024,19 +1081,23 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
               preview={key.state.preview}
               commitProgress={key.state.commitProgress}
               autoCommit={settings.timing.autoCommit}
-              keyLabel={settings.keys.key === ' ' ? 'SPACE' : settings.keys.key.toUpperCase()}
-              commitLabel={(settings.keys.submit ?? 'Control').toUpperCase()}
+              keyLabel={keyCap(t, settings.keys.key)}
+              commitLabel={commitLabel(t, settings.keys.submit)}
               disabled={transitioning}
               pointerHandlers={key.pointerHandlers}
+              paddles={key.paddles}
+              toneOn={key.state.toneOn}
             />
 
             <p aria-live="polite" className="mt-4 min-h-12 text-center">
               {feedback?.correct && (
                 <span className="text-signal">
-                  That is {character}.{' '}
+                  {t('lesson.thatIs', { character })}{' '}
                   {feedback.xp > 0 && (
                     <span className="font-mono text-amber">
-                      +{feedback.xp} XP{feedback.firstSignal ? ', your first signal' : ''}
+                      {feedback.firstSignal
+                        ? t('lesson.xpFirstSignal', { xp: feedback.xp })
+                        : t('lesson.xpGain', { xp: feedback.xp })}
                     </span>
                   )}
                 </span>
@@ -1045,21 +1106,30 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
                 // The glyphs are for the eye; a screen reader hears the code
                 // as words ("dash dot"), not "minus middle dot" (A-11).
                 <span className="text-danger">
-                  {feedback.sent === UNKNOWN_CHARACTER ? (
-                    <>
-                      <span aria-hidden="true">{prettify(feedback.code)}</span>
-                      <span className="sr-only">{spokenCode(feedback.code)}</span> is not a
-                      character.
-                    </>
-                  ) : (
-                    <>
-                      That was {feedback.sent}{' '}
-                      <span aria-hidden="true">({prettify(feedback.code)})</span>
-                      <span className="sr-only">, {spokenCode(feedback.code)}</span>.
-                    </>
-                  )}{' '}
-                  {character} is <span aria-hidden="true">{prettify(code)}</span>
-                  <span className="sr-only">{spokenCode(code)}</span>. Try it again.
+                  {feedback.sent === UNKNOWN_CHARACTER
+                    ? renderRich(
+                        t.rich('lesson.notACharacter', {
+                          shown: prettify(feedback.code),
+                          spoken: t.spokenCode(feedback.code),
+                        }),
+                        CODE_TAGS,
+                      )
+                    : renderRich(
+                        t.rich('lesson.thatWas', {
+                          sent: feedback.sent,
+                          shown: prettify(feedback.code),
+                          spoken: t.spokenCode(feedback.code),
+                        }),
+                        CODE_TAGS,
+                      )}{' '}
+                  {renderRich(
+                    t.rich('lesson.targetIs', {
+                      character,
+                      shown: prettify(code),
+                      spoken: t.spokenCode(code),
+                    }),
+                    CODE_TAGS,
+                  )}
                 </span>
               )}
             </p>
@@ -1071,7 +1141,7 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
         <>
           {/* The way on sits right under the character, before the tree, so
               it is on the first screen on a phone and a laptop (V-02). */}
-          {stepButton('Now hear it')}
+          {stepButton(t('lesson.nowHear'))}
           <div className="mt-6">
             {/* Where it sits, so the code stops looking arbitrary the moment it
                 is introduced rather than a screen later. */}
@@ -1079,7 +1149,7 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
               <PathRibbon character={character} code={code} />
               {isDigit && (
                 <p className="mt-3 text-center text-sm text-muted">
-                  Digits sit below the letters on the tree, {code.length} elements from the start.
+                  {t('lesson.digitsBelow', { count: code.length })}
                 </p>
               )}
             </div>
@@ -1108,7 +1178,7 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
         </div>
       )}
       {/* After the player, so its Play control comes first in the tab order. */}
-      {position.step === 'hear' && stepButton('Now send it')}
+      {position.step === 'hear' && stepButton(t('lesson.nowSend'))}
 
       {position.step === 'send' && (
         <div className="mt-4">
@@ -1130,7 +1200,7 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
               disabled={key.state.pending === '' || transitioning}
               className="mf-btn mf-btn-secondary"
             >
-              Finish character
+              {t('lesson.finishCharacter')}
             </button>
             <button
               type="button"
@@ -1141,11 +1211,11 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
               disabled={transitioning}
               className="mf-btn mf-btn-ghost"
             >
-              Skip sending
+              {t('lesson.skipSending')}
             </button>
           </div>
           <p className="mt-2 text-center text-sm text-muted">
-            No keyboard, or no sound? Skip it: the drill checks {character} by ear.
+            {t('lesson.noKeyboard', { character })}
           </p>
 
           {!isDigit && (
@@ -1158,7 +1228,7 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
                 />
               </div>
               <details className="mt-6 sm:hidden">
-                <summary className="mf-btn mf-btn-ghost">Where you are on the tree</summary>
+                <summary className="mf-btn mf-btn-ghost">{t('lesson.whereOnTree')}</summary>
                 <div className="mt-3">
                   <SignalTree
                     livePath={key.state.pending}
@@ -1174,6 +1244,12 @@ export function LessonScreen({ nextSteps = [] }: LessonScreenProps) {
     </section>
   )
 }
+
+/** The glyphs are for the eye, the spoken form for a screen reader (A-11). */
+const CODE_TAGS = {
+  shown: { el: 'span', 'aria-hidden': 'true' },
+  spoken: { el: 'span', class: 'sr-only' },
+} as const
 
 /** Add newly earned achievements once each, oldest first. */
 function mergeEarned(list: readonly Achievement[], more: readonly Achievement[]): Achievement[] {

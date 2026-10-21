@@ -1,8 +1,12 @@
 import { useId, type KeyboardEvent, type PointerEvent, type Ref } from 'react'
-import type { KeyedElement } from './useMorseKey'
+import type { KeyedElement, PaddleControls } from './useMorseKey'
+import { PaddleKey } from './PaddleKey'
 import { prettify } from '../../engine/morseEncoder'
 import { canVibrate } from '../../engine/vibrationEngine'
 import { DARK } from '../../styles/palette'
+import { useT } from '../../i18n/react'
+import { renderRich } from '../../i18n/richReact'
+import { keyLabel as keyCap } from './keyCopy'
 import '../../styles/pkg-c.css'
 
 /**
@@ -67,6 +71,13 @@ export interface MorseKeyProps {
   muted?: boolean
   /** Lets a caller hand focus to the key, e.g. after typing a target. */
   keyRef?: Ref<HTMLButtonElement>
+  /**
+   * The paddle keyer's controls (`useMorseKey().paddles`). When set, the
+   * paddle pair is drawn instead of the straight key, with the same readout.
+   */
+  paddles?: PaddleControls | null
+  /** The tone is sounding, for the paddles' TX jewel. Defaults to `isDown`. */
+  toneOn?: boolean
   className?: string
 }
 
@@ -76,8 +87,8 @@ export function MorseKey({
   preview,
   commitProgress,
   autoCommit,
-  keyLabel = 'SPACE',
-  commitLabel = 'CTRL',
+  keyLabel: keyLabelProp,
+  commitLabel: commitLabelProp,
   disabled = false,
   pointerHandlers,
   readout = true,
@@ -86,8 +97,13 @@ export function MorseKey({
   frequency,
   muted = false,
   keyRef,
+  paddles = null,
+  toneOn = isDown,
   className,
 }: MorseKeyProps) {
+  const t = useT()
+  const keyLabel = keyLabelProp ?? keyCap(t, ' ')
+  const commitLabel = commitLabelProp ?? keyCap(t, 'Control')
   const showCountdown = autoCommit && pending !== '' && !isDown
 
   const onPointerDown = (event: PointerEvent) => {
@@ -143,7 +159,7 @@ export function MorseKey({
                 {prettify(pending)}
               </span>
               <span aria-hidden="true" className="mf-engraved">
-                {preview ? `= ${preview}` : 'Not a character yet'}
+                {preview ? t('key.preview', { preview }) : t('key.notACharacter')}
               </span>
               <Fuse
                 progress={commitProgress}
@@ -152,78 +168,87 @@ export function MorseKey({
               />
             </>
           ) : (
-            <span className="mf-engraved">Ready</span>
+            <span className="mf-engraved">{t('key.ready')}</span>
           )}
         </div>
       )}
 
-      <button
-        ref={keyRef}
-        type="button"
-        disabled={disabled}
-        // Names both inputs rather than assuming a keyboard: the same control
-        // is a Space bar on a laptop and a thumb on a phone.
-        aria-label={`Morse key. Press and hold this button, or hold the ${keyLabel} key. A short press sends a dot, a long press sends a dash.`}
-        // No `aria-pressed`: that makes it a latching toggle ("toggle button,
-        // not pressed"), and a straight key springs back. What was keyed is
-        // read out by the status line instead (A11Y-21).
-        data-down={isDown}
-        className="kc-key group relative w-full max-w-xl touch-none select-none rounded-bezel px-2 pt-3 pb-4 disabled:opacity-45 sm:px-4"
-        {...pointerHandlers}
-        onPointerDown={onPointerDown}
-        onKeyDown={onKeyDown}
-        onKeyUp={onKeyUp}
-        // A long press is a dash, not a request for the context menu or, on
-        // iOS, the callout (the CSS side is in pkg-c.css).
-        onContextMenu={(event) => event.preventDefault()}
-      >
-        <BrassKey isDown={isDown} />
+      {paddles ? (
+        <PaddleKey
+          paddles={paddles}
+          toneOn={toneOn}
+          disabled={disabled}
+          haptics={haptics}
+          frequency={frequency}
+          muted={muted}
+          keyRef={keyRef}
+        />
+      ) : (
+        <button
+          ref={keyRef}
+          type="button"
+          disabled={disabled}
+          // Names both inputs rather than assuming a keyboard: the same control
+          // is a Space bar on a laptop and a thumb on a phone.
+          aria-label={t('key.label', { key: keyLabel })}
+          // No `aria-pressed`: that makes it a latching toggle ("toggle button,
+          // not pressed"), and a straight key springs back. What was keyed is
+          // read out by the status line instead (A11Y-21).
+          data-down={isDown}
+          className="kc-key group relative w-full max-w-xl touch-none select-none rounded-bezel px-2 pt-3 pb-4 disabled:opacity-45 sm:px-4"
+          {...pointerHandlers}
+          onPointerDown={onPointerDown}
+          onKeyDown={onKeyDown}
+          onKeyUp={onKeyUp}
+          // A long press is a dash, not a request for the context menu or, on
+          // iOS, the callout (the CSS side is in pkg-c.css).
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          <BrassKey isDown={isDown} />
 
-        {/* The key's own plates. Text lives in HTML, not in the SVG, so it
+          {/* The key's own plates. Text lives in HTML, not in the SVG, so it
             keeps to the 12px floor at every width the drawing scales to. */}
-        <span className="mt-2 flex items-center justify-between gap-3 px-2 sm:px-6">
-          <span className="flex items-center gap-2" aria-hidden="true">
-            <span className="mf-lamp" data-on={isDown} data-tone="amber" />
-            <span className={['mf-engraved', isDown ? 'text-amber' : ''].join(' ')}>TX</span>
-          </span>
+          <span className="mt-2 flex items-center justify-between gap-3 px-2 sm:px-6">
+            <span className="flex items-center gap-2" aria-hidden="true">
+              <span className="mf-lamp" data-on={isDown} data-tone="amber" />
+              <span className={['mf-engraved', isDown ? 'text-amber' : ''].join(' ')}>
+                {t('key.tx')}
+              </span>
+            </span>
 
-          <span
-            aria-hidden="true"
-            className={['kc-nameplate mf-engraved', isDown ? 'text-amber' : 'text-brass'].join(' ')}
-          >
-            {isDown ? (
-              'Transmitting'
-            ) : (
-              <>
-                {/* A phone has no Space bar and no Ctrl key. Swapping the copy
+            <span
+              aria-hidden="true"
+              className={['kc-nameplate mf-engraved', isDown ? 'text-amber' : 'text-brass'].join(
+                ' ',
+              )}
+            >
+              {isDown ? (
+                t('key.transmitting')
+              ) : (
+                <>
+                  {/* A phone has no Space bar and no Ctrl key. Swapping the copy
                     by pointer type in CSS keeps both variants in the
                     prerendered HTML, so there is no hydration mismatch and no
                     flash of the wrong instruction. */}
-                <span className="pointer-coarse:hidden">Hold {keyLabel}</span>
-                <span className="hidden pointer-coarse:inline">Hold to send</span>
-              </>
-            )}
-          </span>
+                  <span className="pointer-coarse:hidden">{t('key.hold', { key: keyLabel })}</span>
+                  <span className="hidden pointer-coarse:inline">{t('key.holdToSend')}</span>
+                </>
+              )}
+            </span>
 
-          <span className="mf-engraved tabular-nums" aria-hidden="true">
-            {muted ? 'Sound off' : frequency ? `${frequency} Hz` : ''}
+            <span className="mf-engraved tabular-nums" aria-hidden="true">
+              {muted ? t('key.soundOff') : frequency ? t('key.hertz', { frequency }) : ''}
+            </span>
           </span>
-        </span>
-      </button>
+        </button>
+      )}
 
       {hint && (
         <p className="max-w-md text-center text-sm leading-relaxed text-muted">
-          Tap for a dot, hold for a dash.{' '}
-          {autoCommit ? (
-            'Pause to finish the character; the bar above shows how long you have.'
-          ) : (
-            <>
-              Take as long as you like, then
-              <span className="pointer-coarse:hidden"> press {commitLabel} </span>
-              <span className="hidden pointer-coarse:inline"> use the button below </span>
-              to finish the character.
-            </>
-          )}
+          <KeyingLead paddles={paddles} />{' '}
+          {autoCommit
+            ? t('key.pauseHint')
+            : renderRich(t.rich('key.manualHint', { key: commitLabel }), POINTER_TAGS)}
         </p>
       )}
     </div>
@@ -238,13 +263,20 @@ export function MorseKey({
  * whole character as one mark.
  */
 export function PendingSpeech({ pending, preview }: { pending: string; preview: string | null }) {
+  const t = useT()
+  const code = t.spokenCode(pending)
   return (
     <span className="sr-only">
-      {[...pending].map((element) => (element === '.' ? 'dot' : 'dash')).join(' ')}
-      {preview ? `, ${preview}` : ', not a character yet'}
+      {preview ? t('key.pendingPreview', { code, preview }) : t('key.pendingNone', { code })}
     </span>
   )
 }
+
+/** The keyboard and the touch variants of a hint, swapped by pointer type in CSS. */
+export const POINTER_TAGS = {
+  desk: { el: 'span', class: 'pointer-coarse:hidden' },
+  touch: { el: 'span', class: 'hidden pointer-coarse:inline' },
+} as const
 
 /**
  * The commit countdown: a thin amber fuse burning down toward the moment the
@@ -265,6 +297,7 @@ export function Fuse({
   active: boolean
   className?: string
 }) {
+  const t = useT()
   const left = active ? 1 - progress : 0
   return (
     <span
@@ -272,7 +305,7 @@ export function Fuse({
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(left * 100)}
-      aria-label="Time left before this character is committed"
+      aria-label={t('key.fuse')}
       className={['kc-fuse', className ?? ''].join(' ')}
       data-late={active && progress > 0.75}
     >
@@ -492,6 +525,7 @@ export function SignalTrace({
   thresholdMs: number
   className?: string
 }) {
+  const t = useT()
   return (
     <div
       className={[
@@ -500,7 +534,7 @@ export function SignalTrace({
       ].join(' ')}
     >
       {elements.length === 0 ? (
-        <span className="mf-engraved mx-auto">No signal</span>
+        <span className="mf-engraved mx-auto">{t('key.noSignal')}</span>
       ) : (
         // Newest on the right, like the tape, so the strip reads the same way
         // as everything else on the desk. Older elements fall off the left.
@@ -513,7 +547,10 @@ export function SignalTrace({
             return (
               <span
                 key={keyed.id}
-                title={`${keyed.element === '.' ? 'dot' : 'dash'}, ${Math.round(keyed.heldMs)} ms`}
+                title={t('key.traceTitle', {
+                  element: keyed.element === '.' ? t('format.dotWord') : t('format.dashWord'),
+                  ms: Math.round(keyed.heldMs),
+                })}
                 className={[
                   'h-2.5 shrink-0 rounded-full',
                   keyed.element === '.' ? 'bg-cyan' : 'bg-signal',
@@ -525,5 +562,26 @@ export function SignalTrace({
         </span>
       )}
     </div>
+  )
+}
+
+/**
+ * The first sentence of every keying hint: how this key makes a dot and a
+ * dash. A phone has no bracket keys, so the paddle copy names the keys only
+ * where there is a keyboard (swapped by pointer type in CSS, as above).
+ */
+export function KeyingLead({ paddles }: { paddles: PaddleControls | null | undefined }) {
+  const t = useT()
+  if (!paddles) return <>{t('key.tapLead')}</>
+  return (
+    <>
+      <span className="pointer-coarse:hidden">
+        {t('key.paddleLeadDesk', {
+          dit: keyCap(t, paddles.keys.dit),
+          dah: keyCap(t, paddles.keys.dah),
+        })}
+      </span>
+      <span className="hidden pointer-coarse:inline">{t('key.paddleLeadTouch')}</span>
+    </>
   )
 }

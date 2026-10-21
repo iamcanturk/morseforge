@@ -11,6 +11,9 @@
  *   keyed screen follows). Anywhere else on the page it scrolls.
  * - The AudioContext is created on the first press (a user gesture), and never
  *   at all when Settings → Sound is off.
+ * - It is a straight key first, because it teaches the first signal by hand.
+ *   With paddles chosen in Settings, the paddle keys work here too (the
+ *   on-screen key and Space stay a straight key, through the keyer's jack).
  * - What the visitor does is real: correct sends are recorded as sending
  *   answers, elements are banked through `bankActivity` (which pays the
  *   one-time first-signal XP), and /learn/ picks up where the drill stops.
@@ -18,7 +21,8 @@
 
 import { track } from '../../analytics/track'
 import { AudioEngine } from '../../engine/audioEngine'
-import { KeyEngine, bindKeyboard } from '../../engine/keyEngine'
+import { bindKeyboard, contactFor, swapPaddles } from '../../engine/keyEngine'
+import { createKeyer } from '../../engine/keyer'
 import { LiveDecoder } from '../../engine/morseDecoder'
 import { bankActivity } from '../../storage/activity'
 import { answer, createProgressStore, unlockTaught } from '../../storage/progress'
@@ -96,7 +100,7 @@ export function mountStation(root: HTMLElement): () => void {
   const settings = createSettingsStore().read()
   const progressStore = createProgressStore()
   const statsStore = createStatsStore()
-  const bindings = settings.keys
+  const bindings = settings.keyer.swapPaddles ? swapPaddles(settings.keys) : settings.keys
   const soundOn = settings.audio.enabled && settings.audio.volume > 0
 
   find('[data-sound-on]').hidden = !soundOn
@@ -208,8 +212,10 @@ export function mountStation(root: HTMLElement): () => void {
 
   /* ------------------------------------------------------------- the fuse */
 
-  function startFuse() {
-    fuse.style.setProperty('--fuse-ms', `${engine.thresholds.characterGapMs}ms`)
+  /** `silentMs`: how much of the gap has passed already (a paddle's element space). */
+  function startFuse(silentMs = 0) {
+    const left = Math.max(engine.thresholds.characterGapMs - silentMs, 0)
+    fuse.style.setProperty('--fuse-ms', `${left}ms`)
     replay(fuse, 'is-burning')
   }
 
@@ -328,7 +334,8 @@ export function mountStation(root: HTMLElement): () => void {
     tx.dataset.on = String(down)
   }
 
-  function startTone() {
+  /** `toneMs`: a paddle element's exact length, scheduled on the audio clock. */
+  function startTone(toneMs?: number) {
     if (!soundOn) return
     // Created here, inside the press, because browsers only let an
     // AudioContext start from a user gesture.
@@ -336,7 +343,8 @@ export function mountStation(root: HTMLElement): () => void {
       frequency: settings.audio.frequency,
       volume: settings.audio.volume,
     })
-    void audio.keyDown().catch(() => {})
+    const started = toneMs === undefined ? audio.keyDown() : audio.keyFor(toneMs)
+    void started.catch(() => {})
   }
 
   /**
@@ -369,7 +377,8 @@ export function mountStation(root: HTMLElement): () => void {
     root.addEventListener(type, stamp, { capture: true })
   }
 
-  const engine = new KeyEngine(
+  const engine = createKeyer(
+    settings.keyer.type,
     {
       wpm: settings.timing.wpm,
       dotDashThresholdMs: settings.timing.dotDashThresholdMs,
@@ -380,15 +389,16 @@ export function mountStation(root: HTMLElement): () => void {
       autoCommit: true,
     },
     {
-      onKeyDown: () => {
+      onKeyDown: (toneMs) => {
         stopFuse()
         // Pressing again ends the moment early: an eager learner should not
         // have to wait out the celebration to send the next letter.
         if (state.phase === 'detected' || state.phase === 'wrong') leaveMoment()
-        startTone()
+        startTone(toneMs)
         setDown(true)
       },
       onKeyUp: () => {
+        // A scheduled paddle tone ends itself; this only ends a held one.
         audio?.keyUp()
         setDown(false)
       },
@@ -396,6 +406,7 @@ export function mountStation(root: HTMLElement): () => void {
       // resets the engine before `cancelHold` runs): the tone stops here.
       onCancel: () => {
         audio?.keyUp()
+        audio?.stopKeyed()
         setDown(false)
       },
       onElement: (element) => {
@@ -409,7 +420,11 @@ export function mountStation(root: HTMLElement): () => void {
           return
         }
         renderPending()
-        startFuse()
+      },
+      // The fuse burns from when the key went quiet with a character still
+      // open: at once on the straight key, after the element space on paddles.
+      onIdle: (silentMs) => {
+        if (decoder.pending) startFuse(silentMs)
       },
       onCharacterGap: () => {
         if (decoder.pending) commit()
@@ -430,6 +445,7 @@ export function mountStation(root: HTMLElement): () => void {
     // early return left the tone sounding.
     if (engine.isPressed) engine.reset()
     audio?.keyUp()
+    audio?.stopKeyed()
     setDown(false)
   }
 
@@ -442,7 +458,15 @@ export function mountStation(root: HTMLElement): () => void {
     renderPending()
   }
 
-  const isKeyingKey = (name: string) => name === bindings.key || name === bindings.alternative
+  // Keydown passes its modifiers, so Cmd+[ stays the browser's; a paddle on
+  // Left or Right Ctrl is matched by code inside `bindKeyboard` on the face.
+  const contactOf = (event: KeyboardEvent, down = true) =>
+    contactFor(
+      event.key,
+      bindings,
+      engine.kind,
+      down ? { ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey } : {},
+    )
 
   // The key button answers for itself: `bindKeyboard` deliberately ignores
   // events aimed at a button, so a focused key would otherwise be deaf.
@@ -450,16 +474,18 @@ export function mountStation(root: HTMLElement): () => void {
   // a keyup aimed at a button and reset the engine, cancelling the gap timer
   // that ends the character.
   key.addEventListener('keydown', (event) => {
-    if (!isKeyingKey(event.key)) return
+    const contact = contactOf(event)
+    if (!contact) return
     event.preventDefault()
     event.stopPropagation()
-    if (!event.repeat) engine.press()
+    if (!event.repeat) engine.press(undefined, contact)
   })
   key.addEventListener('keyup', (event) => {
-    if (!isKeyingKey(event.key)) return
+    const contact = contactOf(event, false)
+    if (!contact) return
     event.preventDefault()
     event.stopPropagation()
-    engine.release()
+    engine.release(undefined, contact)
   })
 
   key.addEventListener('pointerdown', (event) => {
@@ -483,7 +509,7 @@ export function mountStation(root: HTMLElement): () => void {
   // this element, so the page scrolls normally everywhere else.
   const unbind = bindKeyboard(
     engine,
-    { key: bindings.key, alternative: bindings.alternative },
+    { key: bindings.key, alternative: bindings.alternative, dit: bindings.dit, dah: bindings.dah },
     root,
   )
 
@@ -510,8 +536,11 @@ export function mountStation(root: HTMLElement): () => void {
         )
       : null
   observer?.observe(root)
-  const pageKeys = [bindings.key, bindings.alternative].filter((name): name is string =>
-    Boolean(name),
+  // The paddle keys join in only when paddles are chosen; on the straight
+  // key `[` and `]` are left to the page.
+  const paddleKeys = engine.kind === 'straight' ? [] : [bindings.dit, bindings.dah]
+  const pageKeys = [bindings.key, bindings.alternative, ...paddleKeys].filter(
+    (name): name is string => Boolean(name),
   )
   const onPageKey = (event: KeyboardEvent) => {
     const active = document.activeElement
@@ -527,7 +556,7 @@ export function mountStation(root: HTMLElement): () => void {
     // Focus moves to the face without scrolling, so the release (and every
     // press after it) reaches the station's own listeners.
     root.focus({ preventScroll: true })
-    engine.press(event.timeStamp)
+    engine.press(event.timeStamp, contactOf(event) ?? 'key')
   }
   document.addEventListener('keydown', onPageKey)
 

@@ -17,6 +17,7 @@
 import type { FaqItem } from '../data/faq'
 import { jsonLd } from '../seo/head'
 import { faqPage } from '../seo/schema'
+import { useTranslations } from '../i18n/server'
 
 export interface Props {
   items: readonly FaqItem[]
@@ -30,7 +31,8 @@ export interface Props {
   schema?: boolean
 }
 
-const { items, heading = 'Common questions', id = 'faq', schema = true } = Astro.props
+const t = useTranslations(Astro)
+const { items, heading = t('faq.heading'), id = 'faq', schema = true } = Astro.props
 
 type Part = { text: string; href?: string }
 
@@ -75,7 +77,7 @@ function parts(item: FaqItem): Part[] {
               {parts(item).map((part) =>
                 part.href ? (
                   <a
-                    href={part.href}
+                    href={t.href(part.href)}
                     class="text-signal underline decoration-signal/40 underline-offset-4 hover:decoration-signal"
                   >
                     {part.text}

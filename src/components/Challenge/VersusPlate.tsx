@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import type { Versus } from '../../game/challengeLink'
+import { useT } from '../../i18n/react'
 import '../../styles/pkg-e.css'
 
 /**
@@ -9,20 +10,21 @@ import '../../styles/pkg-e.css'
  * fake number this product promises not to show.
  */
 export function VersusPlate({ versus, className }: { versus: Versus; className?: string }) {
+  const t = useT()
   // Both numbers are sized for the longer one, so a four-digit score on a
   // phone stays in its column instead of running into the slash.
   const digits = Math.max(String(versus.you).length, String(versus.them).length, 3)
   const size = { '--pe-digits': digits } as CSSProperties
   return (
     <section
-      aria-label={`You ${versus.you}, them ${versus.them}`}
+      aria-label={t('challenge.versusLabel', { you: versus.you, them: versus.them })}
       className={['mf-panel p-5 sm:p-6', className ?? ''].filter(Boolean).join(' ')}
     >
       <div className="pe-versus" style={size}>
         <div>
           <span className="mf-engraved flex items-center gap-2">
             <span className="mf-lamp" data-on="true" aria-hidden="true" />
-            You
+            {t('challenge.you')}
           </span>
           <span className="pe-versus-value mt-2 block font-mono text-readout-xl text-signal tabular-nums">
             {versus.you}
@@ -33,7 +35,7 @@ export function VersusPlate({ versus, className }: { versus: Versus; className?:
         </span>
         <div className="text-right">
           <span className="mf-engraved flex items-center justify-end gap-2">
-            Them
+            {t('challenge.them')}
             <span className="mf-lamp" data-on="true" data-tone="amber" aria-hidden="true" />
           </span>
           <span className="pe-versus-value mt-2 block font-mono text-readout-xl text-amber tabular-nums">
@@ -42,9 +44,7 @@ export function VersusPlate({ versus, className }: { versus: Versus; className?:
         </div>
       </div>
       <p className="mt-4 text-sm text-muted">
-        {versus.sameSequence
-          ? 'Their score is the one the link claims; nothing checks it. The characters, their order and the speed were the same for you both.'
-          : 'Their score is the one the link claims; nothing checks it. That link is older than fixed sequences, so the characters you heard were not the same as theirs.'}
+        {versus.sameSequence ? t('challenge.versusSame') : t('challenge.versusOlder')}
       </p>
     </section>
   )

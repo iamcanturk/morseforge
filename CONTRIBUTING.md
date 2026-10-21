@@ -80,6 +80,14 @@ a sentence quotes (counts, speeds, durations) come from `src/config/facts.ts`,
 and FAQs from `src/data/faq.ts`, which is also what produces the FAQPage
 JSON-LD. A figure typed into a page is a figure that goes stale.
 
+**Interface strings live in the catalog.** Visible text, `aria-label`s and
+announcements come from `src/i18n/en/*.ts` through `t()` (Astro:
+`useTranslations(Astro)`; React islands: `useT()`, with the page passing
+`i18n={t.island(...)}`). Numbers and codes are placeholders filled from the
+data, never typed into a message. A test fails on English left in the JSX of an
+extracted folder. To translate the site, see [docs/TRANSLATING.md](docs/TRANSLATING.md),
+and open an issue for your language first.
+
 **Storage goes through the shared stores and `bankActivity`.** Never call
 `localStorage` from a component, and never keep a second copy of a store in
 component state. Use the page's shared instances from `src/storage`, so every

@@ -42,6 +42,27 @@ export interface NextAction {
   href: string
   /** One or two sentences: why this, and why now. */
   reason: string
+  /**
+   * The figures the copy quotes, so a translation can say the same thing
+   * without recomputing it (`src/components/Stats/nextActionCopy.ts`).
+   */
+  facts: NextActionFacts
+}
+
+export interface NextActionFacts {
+  /** Lesson stages finished, and how many there are. */
+  taught: number
+  stages: number
+  /** The characters of the stage the action is about. */
+  characters: readonly string[]
+  /** Daily lines, and the daily streak through yesterday. */
+  lines: number
+  running: number
+  /** The weakest skill and its accuracy as a percentage, when that is the action. */
+  skill: Skill | null
+  percent: number | null
+  /** The challenge's length. */
+  seconds: number
 }
 
 /**
@@ -100,6 +121,16 @@ export function nextBestAction(
 ): NextAction {
   const taught = lessonStagesDone(progress, now)
   const stages = LESSON_STAGES.length
+  const base: NextActionFacts = {
+    taught,
+    stages,
+    characters: [],
+    lines: LINES,
+    running: 0,
+    skill: null,
+    percent: null,
+    seconds: Math.round((SIXTY_SECOND_CHALLENGE.durationMs ?? 0) / 1000),
+  }
 
   // 1. The first signal.
   if (!hasSentFirstSignal(stats)) {
@@ -110,6 +141,7 @@ export function nextBestAction(
         label: 'Start lesson 1',
         href: '/learn/',
         reason: `Lesson 1 teaches ${joinList(first)}, the ${numberWord(first.length)} shortest characters in the code. Send one back and the first pad of your tree lights up.`,
+        facts: { ...base, characters: first },
       }
     }
     // Lessons can be passed by ear and by eye, so someone can be several
@@ -120,6 +152,7 @@ export function nextBestAction(
       href: '/telegraph/',
       reason:
         'You have learned characters by eye and by ear but never keyed one. Tap out any letter on the telegraph key; it takes a few seconds.',
+      facts: base,
     }
   }
 
@@ -133,6 +166,7 @@ export function nextBestAction(
       reason: `Stage ${taught + 1} of ${stages} teaches ${plural(stage.length, 'new character')}: ${joinList(stage)}. ${
         taught === 0 ? 'It picks up where you left off.' : `${plural(taught, 'stage')} done so far.`
       }`,
+      facts: { ...base, characters: stage },
     }
   }
 
@@ -150,6 +184,7 @@ export function nextBestAction(
           ? `It keeps your ${running}-day daily streak going.`
           : 'Take it again tomorrow and you have a streak.'
       }`,
+      facts: { ...base, running },
     }
   }
 
@@ -163,6 +198,7 @@ export function nextBestAction(
       label: words.verb,
       href: '/practice/',
       reason: `Your ${words.noun} accuracy is ${Math.round(accuracy.accuracy * 100)}%, the lowest of your three skills. A character counts as mastered with ${MASTERY_RULE}.`,
+      facts: { ...base, skill: weakest, percent: Math.round(accuracy.accuracy * 100) },
     }
   }
 
@@ -173,5 +209,6 @@ export function nextBestAction(
     label: `Take the ${seconds}-second challenge`,
     href: '/challenge/',
     reason: `Today's daily is done. See how many characters you can copy in ${seconds} seconds, then send the link to someone.`,
+    facts: base,
   }
 }

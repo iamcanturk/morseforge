@@ -71,11 +71,17 @@ const bestCpm = (s: AchievementSnapshot) => s.bestWpm * 5
 /** The first lesson stage, named in First Ring. */
 const FIRST_STAGE = LESSON_STAGES[0] ?? []
 
-/** Thresholds for the count badges, so their copy cannot drift from the rule. */
-const CIRCUIT_STARTED_SEEN = 5
-const WEEK_ONE_DAYS = 7
-const HALF_WAY_MASTERED = Math.floor(ALL_LETTERS.length / 2)
-const SIGNAL_MASTER_MASTERED = ALL_LETTERS.length
+/**
+ * Thresholds for the count badges, so their copy cannot drift from the rule.
+ * Exported for the translated copy (`src/components/Stats/achievementCopy.ts`).
+ */
+export const CIRCUIT_STARTED_SEEN = 5
+export const WEEK_ONE_DAYS = 7
+export const HALF_WAY_MASTERED = Math.floor(ALL_LETTERS.length / 2)
+export const SIGNAL_MASTER_MASTERED = ALL_LETTERS.length
+
+/** The first lesson stage, named in First Ring. Exported for the translated copy. */
+export const FIRST_RING_STAGE: readonly string[] = LESSON_STAGES[0] ?? []
 
 /** The §49 list, in the order it is shown. */
 export const ACHIEVEMENTS: readonly Achievement[] = [

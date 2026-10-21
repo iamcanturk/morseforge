@@ -19,13 +19,14 @@
  * answer engine matches against.
  */
 
-import { CITATIONS, SITE } from '../config/site'
+import { CITATIONS } from '../config/site'
 import { FACTS, prosignFacts, wordFacts } from '../config/facts'
 import { encode } from '../engine/morseEncoder'
 import {
   PARIS_KEYING_UNITS,
   PARIS_SPACING_UNITS,
   PARIS_UNITS,
+  UNITS,
   buildTimeline,
   resolveTiming,
   timelineDuration,
@@ -48,7 +49,8 @@ import {
   codeLength,
 } from './morseAlphabet'
 import { codeGroup } from './practiceText'
-import { SIGNAL_LABELS, SIGNAL_MODES } from '../storage/settings'
+import { DEFAULT_KEY_BINDINGS, KEYER_KINDS } from '../engine/keyEngine'
+import { KEYER_LABELS, SIGNAL_LABELS, SIGNAL_MODES } from '../storage/settings'
 import { MORSE_TREE, treeDepth } from './tree'
 import { wordLabel, type MorseWord } from './words'
 
@@ -264,12 +266,17 @@ const CHALLENGE: readonly FaqItem[] = [
   },
 ]
 
+const keyerChoices = joinList(KEYER_KINDS.map((kind) => KEYER_LABELS[kind]))
+
 const TELEGRAPH: readonly FaqItem[] = [
   {
     question: 'Can I use a real Morse key or paddle?',
-    answer:
-      'Not yet. The telegraph works as a straight key on your keyboard or touchscreen. Iambic paddle support is the most requested missing feature and is tracked as an open issue on GitHub.',
-    links: [{ text: 'open issue on GitHub', href: `${SITE.repo}/issues/43` }],
+    answer: `Yes. Settings has a Key type: ${keyerChoices}. The straight key is timed by hand. With iambic paddles, hold ${DEFAULT_KEY_BINDINGS.dit} for dits and ${DEFAULT_KEY_BINDINGS.dah} for dahs, or use the two on-screen paddles on a touchscreen, and Swap paddles reverses them for a left hand. A physical key or paddle works through an adapter that turns it into key presses, as long as each paddle sends a different key: bind those keys in Settings.`,
+    links: [{ text: 'Settings', href: '/settings/#key' }],
+  },
+  {
+    question: 'What is the difference between iambic mode A and mode B?',
+    answer: `Both send dits or dahs for as long as you hold a paddle, timed exactly from your speed: a dit is ${numberWord(UNITS.DOT)} unit long and a dah ${numberWord(UNITS.DASH)}, each followed by ${numberWord(UNITS.ELEMENT_GAP)} unit of silence. Squeeze both paddles and they alternate. The difference is what happens when you let go of a squeeze: mode A finishes the element it is sending and stops, while mode B sends one more, the opposite element. Both remember a paddle tapped during an element and send it next.`,
   },
 ]
 
@@ -496,7 +503,7 @@ const HOW_TO: readonly FaqItem[] = [
 ]
 
 /** FAQs for the fixed pages, keyed by the page's path in the registry. */
-export const PAGE_FAQ: Readonly<Record<string, readonly FaqItem[]>> = {
+export const PAGE_FAQ = {
   '/': HOME,
   '/learn-morse-code-in-7-days/': PLAN,
   '/morse-code-alphabet/': ALPHABET,
@@ -513,11 +520,14 @@ export const PAGE_FAQ: Readonly<Record<string, readonly FaqItem[]>> = {
   '/tree/': TREE,
   '/games/signal-defender/': SIGNAL_DEFENDER,
   '/games/morse-runner/': MORSE_RUNNER,
-}
+} as const satisfies Readonly<Record<string, readonly FaqItem[]>>
+
+/** The pages that have an FAQ, as a type: what a per-language catalog must cover. */
+export type FaqPath = keyof typeof PAGE_FAQ
 
 /** The FAQ for a page, or an empty list when the page has none. */
 export function faqFor(path: string): readonly FaqItem[] {
-  return PAGE_FAQ[path] ?? []
+  return (PAGE_FAQ as Readonly<Record<string, readonly FaqItem[]>>)[path] ?? []
 }
 
 /**

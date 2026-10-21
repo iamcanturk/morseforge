@@ -8,6 +8,26 @@ import { CURRICULUM } from '../data/curriculum'
 import { ALL_DIGITS, ALL_LETTERS } from '../data/morseAlphabet'
 import { WORDS, wordLabel } from '../data/words'
 import { characterTable, wordMarkdownPath } from '../seo/markdown'
+import { publishedLocales } from '../i18n/locales'
+import { translatorFor } from '../i18n/server'
+
+/**
+ * The same pages in every other published language, one list each. Empty
+ * while English is the only published language, so nothing is printed today.
+ */
+function otherLanguages(): string {
+  return publishedLocales()
+    .filter((locale) => locale.path !== '')
+    .map((locale) => {
+      const t = translatorFor(locale.code)
+      const lines = t
+        .indexablePages()
+        .filter((page) => hasPage(page.key) && page.path !== page.key)
+        .map((page) => `- [${page.h1}](${pageUrl(page.path)}): ${page.llmsSummary}`)
+      return [`## ${locale.label} (${locale.lang})`, '', ...lines].join('\n')
+    })
+    .join('\n\n')
+}
 
 /**
  * llms.txt, per the llmstxt.org convention.
@@ -79,14 +99,14 @@ Built by ${AUTHOR.name} (${AUTHOR.url}, ${AUTHOR_X_URL}). Source: ${SITE.repo}
 
 - Teaches the Morse alphabet in the order the code is structured, shortest characters first
 - Generates real CW sidetone audio with the Web Audio API, at adjustable speed and pitch
-- Turns the keyboard into a straight key: tap for a dot, hold for a dash, decoded live
+- Turns the keyboard into a straight key (tap for a dot, hold for a dash) or a pair of iambic paddles, modes A and B, decoded live
 - Tracks three skills separately per character: recognition, listening and sending
 - Schedules review with spaced repetition
 - Grades copied lines character by character, aligned so a dropped character costs one mark, not the rest of the line
 - Works offline
 
 ${sections}
-
+${otherLanguages() ? `\n${otherLanguages()}\n` : ''}
 ## Notes
 
 ${notes}

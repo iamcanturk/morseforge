@@ -5,6 +5,8 @@ import sitemap from '@astrojs/sitemap'
 import tailwindcss from '@tailwindcss/vite'
 import { pwa } from './src/pwa/integration'
 import { inSitemap } from './src/seo/sitemap'
+import { i18nRouting } from './src/i18n/integration'
+import { sitemapI18n } from './src/i18n/alternates'
 import { createLastmod } from './scripts/lastmod.mjs'
 import { THEME_COLOR } from './src/styles/palette'
 
@@ -28,8 +30,13 @@ export default defineConfig({
   trailingSlash: 'always',
 
   integrations: [
+    // Language routing (issue #44). English stays unprefixed; see src/i18n/locales.ts.
+    i18nRouting(),
     react(),
     sitemap({
+      // Alternates between languages, once a second one is published. Undefined
+      // while English is the only one, so the sitemap carries no xhtml:link.
+      i18n: sitemapI18n(),
       // Every page the registry marks `indexable: false` (stats, settings, the
       // 404) plus the author's own tools, from the same flag that noindexes
       // them in the layout, so the two lists cannot disagree.

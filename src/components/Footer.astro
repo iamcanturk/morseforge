@@ -1,6 +1,9 @@
 ---
 import { Logo } from './brand/Logo'
-import { NAV_GROUPS } from './ui/siteNav'
+import { siteNav } from './ui/siteNav'
+import Rich from './I18n/Rich.astro'
+import LocaleSwitcher from './I18n/LocaleSwitcher.astro'
+import { useTranslations } from '../i18n/server'
 import { AUTHOR, AUTHOR_X_URL, SITE } from '../config/site'
 import { encode, prettify } from '../engine/morseEncoder'
 
@@ -19,7 +22,11 @@ import { encode, prettify } from '../engine/morseEncoder'
 
 // "73" is the operator's sign-off: best regards. Encoded here rather than
 // typed, so it is whatever the alphabet says it is.
-const signOff = prettify(encode('73'))
+const SIGN_OFF = '73'
+const signOff = prettify(encode(SIGN_OFF))
+
+const t = useTranslations(Astro)
+const { groups: NAV_GROUPS } = siteNav(t)
 
 /** The project row: engraved plate labels, each a 32px row, 44px under a finger (A-12). */
 const projectLink =
@@ -32,31 +39,32 @@ const projectLink =
   >
     <div class="max-w-sm">
       <a
-        href="/"
+        href={t.href('/')}
         class="inline-flex items-center rounded-control pointer-coarse:min-h-11"
-        aria-label={`${SITE.name} home`}
+        aria-label={t('footer.home', { site: SITE.name })}
       >
         <Logo size={32} decorative />
       </a>
       <p class="mt-5 text-sm leading-relaxed text-muted">
-        {
-          /* Explicit entities: the newlines the formatter introduces around the
-            link collapse to nothing, so the words run together. */
-        }
-        Built by&#32;<a
-          href={AUTHOR.url}
-          rel="me"
-          class="text-ink underline decoration-signal/50 decoration-1 underline-offset-4 hover:decoration-signal"
-          >{AUTHOR.name}</a
-        >&#32;— your progress stays on your device.
+        <Rich
+          nodes={t.rich('footer.builtBy', { name: AUTHOR.name })}
+          tags={{
+            author: {
+              href: AUTHOR.url,
+              rel: 'me',
+              class:
+                'text-ink underline decoration-signal/50 decoration-1 underline-offset-4 hover:decoration-signal',
+            },
+          }}
+        />
       </p>
       <p class="mf-engraved mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span class="font-mono tracking-code text-signal-dim" aria-hidden="true">{signOff}</span>
-        <span>73 — best regards</span>
+        <span>{t('footer.signOff', { code: SIGN_OFF })}</span>
       </p>
     </div>
 
-    <nav aria-label="All pages" class="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4">
+    <nav aria-label={t('footer.allPages')} class="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4">
       {
         NAV_GROUPS.map((group) => (
           <div>
@@ -84,18 +92,19 @@ const projectLink =
       class="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-6"
     >
       <nav
-        aria-label="Project and author links"
+        aria-label={t('footer.projectLinks')}
         class="flex flex-wrap items-center gap-x-6 gap-y-1"
       >
-        <a href="/settings/" class={projectLink}>Settings</a>
-        <a href="/privacy/" class={projectLink}>Privacy</a>
-        <a href={SITE.repo} rel="noopener" class={projectLink}>Source on GitHub</a>
+        <a href={t.href('/settings/')} class={projectLink}>{t('footer.settings')}</a>
+        <a href={t.href('/privacy/')} class={projectLink}>{t('footer.privacy')}</a>
+        <a href={SITE.repo} rel="noopener" class={projectLink}>{t('footer.source')}</a>
         <a href={AUTHOR_X_URL} rel="me noopener" class={projectLink}>@{AUTHOR.x}</a>
         <a href={AUTHOR.url} rel="me noopener" class={projectLink}>
           {new URL(AUTHOR.url).host}
         </a>
       </nav>
-      <p class="mf-engraved">No account · No ads · Works offline</p>
+      <LocaleSwitcher />
+      <p class="mf-engraved">{t('footer.promises')}</p>
     </div>
   </div>
 </footer>

@@ -1,0 +1,44 @@
+---
+/**
+ * A message with inline markup, rendered as elements and never as HTML.
+ *
+ *   <Rich nodes={t.rich('learnPage.seeIt')} tags={{ tree: { href: '/tree/' } }} />
+ *
+ * Links are localised to the page's language. Recursive through `Astro.self`
+ * for nested tags.
+ */
+import type { RichNode } from '../../i18n/rich'
+import { resolveTag, type RichTags } from '../../i18n/richTags'
+import { useTranslations } from '../../i18n/server'
+
+export interface Props {
+  nodes: readonly RichNode[]
+  tags?: RichTags
+}
+
+const { nodes, tags } = Astro.props
+const t = useTranslations(Astro)
+const Self = Astro.self
+---
+
+{
+  nodes.map((node) => {
+    if (typeof node === 'string') return node
+    const spec = resolveTag(node.tag, tags)
+    if (!spec) return <Self nodes={node.children} tags={tags} />
+    const El = spec.el ?? 'span'
+    return (
+      <El
+        href={spec.href === undefined ? undefined : t.href(spec.href)}
+        class={spec.class}
+        rel={spec.rel}
+        title={spec.title}
+        lang={spec.lang}
+        target={spec.target}
+        aria-hidden={spec['aria-hidden']}
+      >
+        <Self nodes={node.children} tags={tags} />
+      </El>
+    )
+  })
+}

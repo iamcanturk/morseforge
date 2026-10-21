@@ -2,11 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { SCORE, charsPerMinute, type SessionSummary } from '../../game/session'
 import { AUTHOR, SITE } from '../../config/site'
 import { prettify } from '../../engine/morseEncoder'
-import { spokenCode } from '../../engine/spokenCode'
 import { ALL_LETTERS, MORSE_ALPHABET } from '../../data/morseAlphabet'
 import { currentStreak, dayKey, xpForAnswer } from '../../game/progression'
 import { WEAK_SKILL_ACCURACY } from '../../game/nextAction'
-import { joinList } from '../../data/format'
 import type { Achievement } from '../../game/achievements'
 import {
   DEFAULT_CHALLENGE,
@@ -17,7 +15,11 @@ import {
 } from '../../game/challengeLink'
 import { createStatsStore } from '../../storage/stats'
 import { createProgressStore, masteredCharacters } from '../../storage/progress'
-import { LESSON_STAGES, STEP_COPY, TEACH_STEPS, currentStageIndex } from '../Lesson/lesson'
+import { LESSON_STAGES, TEACH_STEPS, currentStageIndex, stepCopy } from '../Lesson/lesson'
+import { useT } from '../../i18n/react'
+import { renderRich } from '../../i18n/richReact'
+import type { Translator } from '../../i18n/translator'
+import { achievementCopy } from '../Stats/achievementCopy'
 import { Screen } from '../ui/Screen'
 import { Readout } from '../ui/Readout'
 import { ShareSheet } from '../Challenge/ShareSheet'
@@ -81,11 +83,14 @@ export interface SessionResultProps {
  * /learn/ itself uses (J-15). It used to count the tree's four layers, and
  * sent people on stage 5 to the daily.
  */
-export function nextStep(stage: number): { href: string; label: string } {
+export function nextStep(t: Translator, stage: number): { href: string; label: string } {
   if (stage < LESSON_STAGES.length) {
-    return { href: '/learn/', label: stage === 0 ? 'Start lesson 1' : `Stage ${stage + 1}` }
+    return {
+      href: '/learn/',
+      label: stage === 0 ? t('result.startLesson') : t('result.stage', { stage: stage + 1 }),
+    }
   }
-  return { href: '/daily/', label: "Today's daily wire" }
+  return { href: '/daily/', label: t('result.dailyWire') }
 }
 
 /**
@@ -117,13 +122,18 @@ export function offersLessonPath(summary: Pick<SessionSummary, 'accuracy'>): boo
  * open, what it teaches, and how. Null once the course is finished, when
  * there is no lesson left to point at.
  */
-export function lessonPath(stage: number): { href: string; label: string; line: string } | null {
+export function lessonPath(
+  t: Translator,
+  stage: number,
+): { href: string; label: string; line: string } | null {
   const characters = LESSON_STAGES[stage]
   if (!characters) return null
-  const steps = TEACH_STEPS.map((step) => STEP_COPY[step].title.toLowerCase()).join(', ')
+  const steps = TEACH_STEPS.map((step) =>
+    stepCopy(t, step).title.toLocaleLowerCase(t.locale.lang),
+  ).join(', ')
   return {
-    ...nextStep(stage),
-    line: `Stage ${stage + 1} of the lesson teaches ${joinList(characters)}, one at a time: ${steps}.`,
+    ...nextStep(t, stage),
+    line: t('result.pathLine', { stage: stage + 1, characters: t.list(characters), steps }),
   }
 }
 
@@ -132,19 +142,36 @@ export function lessonPath(stage: number): { href: string; label: string; line: 
  * points per character (weighted by its length), times accuracy squared,
  * times a clamped speed factor.
  */
-export const SCORE_RULE = `Score is ${SCORE.perCorrect} points for each character you got, a little more for longer codes, times your accuracy squared, times a speed factor between ${SCORE.speedFloor} and ${SCORE.speedCeiling}. Guessing scores next to nothing.`
-
-/** What the result announces when it appears: the headline numbers, in one sentence. */
-export function resultAnnouncement(summary: SessionSummary, challenge: boolean): string {
-  const accuracy = Math.round(summary.accuracy * 100)
-  const what = challenge ? 'decoded' : 'right'
-  return `Session over. Accuracy ${accuracy}%, ${summary.correct} of ${summary.total} ${what}. Score ${summary.score}.`
+export function scoreRule(t: Translator): string {
+  return t('result.scoreRule', {
+    perCorrect: SCORE.perCorrect,
+    floor: SCORE.speedFloor,
+    ceiling: SCORE.speedCeiling,
+  })
 }
 
-function formatSeconds(ms: number): string {
+/** What the result announces when it appears: the headline numbers, in one sentence. */
+export function resultAnnouncement(
+  t: Translator,
+  summary: SessionSummary,
+  challenge: boolean,
+): string {
+  const params = {
+    accuracy: Math.round(summary.accuracy * 100),
+    correct: summary.correct,
+    total: summary.total,
+    score: summary.score,
+  }
+  return challenge ? t('result.announcementChallenge', params) : t('result.announcement', params)
+}
+
+function formatSeconds(t: Translator, ms: number): string {
   const seconds = Math.round(ms / 1000)
-  if (seconds < 60) return `${seconds}s`
-  return `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, '0')}s`
+  if (seconds < 60) return t('result.secondsShort', { seconds })
+  return t('result.minutesShort', {
+    minutes: Math.floor(seconds / 60),
+    seconds: String(seconds % 60).padStart(2, '0'),
+  })
 }
 
 export function SessionResult({
@@ -155,13 +182,15 @@ export function SessionResult({
   onAgain,
   primaryAction,
   secondaryAction,
-  againLabel = 'Again',
+  againLabel,
   time = DEFAULT_CHALLENGE.time,
   versus = null,
   share,
   shareBlurb,
   onDrill,
 }: SessionResultProps) {
+  const t = useT()
+  const again = againLabel ?? t('practice.again')
   const accuracy = Math.round(summary.accuracy * 100)
 
   // Recomputed rather than passed down: it is the same pure function the
@@ -204,8 +233,8 @@ export function SessionResult({
       target.focus({ preventScroll: true })
       if (target.getBoundingClientRect().top < 0) target.scrollIntoView({ block: 'start' })
     }
-    setAnnouncement(resultAnnouncement(summary, challenge))
-  }, [summary, challenge])
+    setAnnouncement(resultAnnouncement(t, summary, challenge))
+  }, [summary, challenge, t])
 
   const cardData = useMemo<CardData>(
     () => ({
@@ -235,13 +264,13 @@ export function SessionResult({
   }, [share, inviteSeed, summary.accuracy, summary.total])
 
   const weakest = summary.weakest.slice(0, 8)
-  const step = nextStep(stage)
-  const main = primaryAction ?? { label: againLabel, onClick: onAgain }
+  const step = nextStep(t, stage)
+  const main = primaryAction ?? { label: again, onClick: onAgain }
   // The share is the point of the challenge, so it sits right under the
   // numbers being shared (J-08). A run that was mostly guesses gets the way
   // to learn instead (J-10): nobody should be invited to send a near-zero.
   const lowChallenge = challenge && summary.total > 0 && offersLessonPath(summary)
-  const path = lowChallenge ? lessonPath(stage) : null
+  const path = lowChallenge ? lessonPath(t, stage) : null
   const shareShown = summary.total > 0 && message !== null && !lowChallenge
 
   const shareSheet = shareShown && (
@@ -249,10 +278,7 @@ export function SessionResult({
       message={message}
       kind={challenge ? 'challenge' : 'practice'}
       card={cardData}
-      blurb={
-        shareBlurb ??
-        `The link opens a fresh ${DEFAULT_CHALLENGE.time}-second test for whoever you send it to. Nothing is stored anywhere.`
-      }
+      blurb={shareBlurb ?? t('result.inviteBlurb', { seconds: DEFAULT_CHALLENGE.time })}
     />
   )
 
@@ -266,7 +292,7 @@ export function SessionResult({
           className="mf-engraved flex items-center gap-2 outline-none"
         >
           <span className="mf-lamp" data-on="true" aria-hidden="true" />
-          {challenge ? `${time}-second challenge` : 'Session report'}
+          {challenge ? t('result.challengeHeading', { seconds: time }) : t('result.reportHeading')}
         </h2>
         {date && (
           <span className="mf-engraved shrink-0 whitespace-nowrap tabular-nums">{date}</span>
@@ -283,11 +309,13 @@ export function SessionResult({
           className="pe-accuracy mf-readout mf-readout-xl relative z-[3]"
           data-tone={accuracyTone(summary.accuracy)}
         >
-          <span className="mf-readout-label mf-engraved">Accuracy</span>
-          <span className="mf-readout-value">{accuracy}%</span>
+          <span className="mf-readout-label mf-engraved">{t('result.accuracy')}</span>
+          <span className="mf-readout-value">{t('result.percent', { value: accuracy })}</span>
         </div>
         <p className="relative z-[3] text-lead text-ink">
-          {summary.correct} of {summary.total} {challenge ? 'decoded' : 'right'}
+          {challenge
+            ? t('result.ofDecoded', { correct: summary.correct, total: summary.total })
+            : t('result.ofRight', { correct: summary.correct, total: summary.total })}
         </p>
         {summary.attempts.length > 0 && (
           <div className="relative z-[3] w-full max-w-xl">
@@ -302,9 +330,7 @@ export function SessionResult({
                 </span>
               ))}
             </div>
-            <p className="mt-3 text-center text-sm text-muted">
-              Each lamp is one answer, in order. A ring is a miss.
-            </p>
+            <p className="mt-3 text-center text-sm text-muted">{t('result.stripNote')}</p>
           </div>
         )}
       </Screen>
@@ -315,49 +341,48 @@ export function SessionResult({
         <section aria-labelledby="path-heading" className="mf-panel mt-6 p-5 sm:p-6">
           <h3 id="path-heading" className="mf-engraved flex items-center gap-2">
             <span className="mf-lamp" data-on="true" data-tone="amber" aria-hidden="true" />
-            Next on the wire
+            {t('result.nextOnWire')}
           </h3>
-          <p className="mt-3 font-display text-h3 font-bold text-ink">
-            Not there yet, and that is normal.
-          </p>
+          <p className="mt-3 font-display text-h3 font-bold text-ink">{t('result.notThereYet')}</p>
           {path ? (
             <>
               <p className="mt-2 max-w-[60ch] text-muted">{path.line}</p>
-              <a href={path.href} className="mf-btn mf-btn-primary mf-btn-lg mt-5 w-full sm:w-auto">
+              <a
+                href={t.href(path.href)}
+                className="mf-btn mf-btn-primary mf-btn-lg mt-5 w-full sm:w-auto"
+              >
                 {path.label} →
               </a>
             </>
           ) : (
-            <p className="mt-2 max-w-[60ch] text-muted">
-              Drill the characters you missed, then run it again.
-            </p>
+            <p className="mt-2 max-w-[60ch] text-muted">{t('result.drillMissed')}</p>
           )}
-          <p className="mt-4 max-w-[60ch] text-sm text-muted">{SCORE_RULE}</p>
+          <p className="mt-4 max-w-[60ch] text-sm text-muted">{scoreRule(t)}</p>
         </section>
       )}
 
       {challenge && shareSheet && <div className="mt-6">{shareSheet}</div>}
 
       <div className="pe-readouts mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Readout label="Score" value={summary.score} tone="signal" />
+        <Readout label={t('result.score')} value={summary.score} tone="signal" />
         {/* Correct answers a minute. Not WPM: in listening and reading modes
             this is typing speed, and the honest unit says so (DEC-006). */}
-        <Readout label="Chars / min" value={charsPerMinute(summary)} />
-        <Readout label="Time" value={formatSeconds(summary.elapsedMs)} />
+        <Readout label={t('result.charsPerMinute')} value={charsPerMinute(summary)} />
+        <Readout label={t('result.time')} value={formatSeconds(t, summary.elapsedMs)} />
         <Readout
-          label="Streak"
-          value={streak > 0 ? `${streak} ${streak === 1 ? 'day' : 'days'}` : '—'}
+          label={t('result.streak')}
+          value={streak > 0 ? t('result.streakDays', { count: streak }) : '—'}
           tone={streak > 0 ? 'amber' : 'ink'}
           lamp={streak > 0}
         />
       </div>
 
       {(xpEarned > 0 || unlocked || earned.length > 0) && (
-        <ul className="mt-6 grid gap-3" aria-label="Earned this session">
+        <ul className="mt-6 grid gap-3" aria-label={t('result.earnedThisSession')}>
           {xpEarned > 0 && (
             <li className="relative flex items-center gap-3">
               <span className="font-mono text-readout text-amber tabular-nums">+{xpEarned}</span>
-              <span className="mf-engraved">XP banked</span>
+              <span className="mf-engraved">{t('result.xpBanked')}</span>
               {/* A copy that rises and fades, for the moment; the static one
                   above is what stays readable (and all there is under reduced
                   motion). */}
@@ -373,26 +398,35 @@ export function SessionResult({
             <li className="mf-tape mf-slip pe-slip">
               <span className="font-display text-h2 font-bold">{unlocked}</span>
               <span>
-                <span className="block font-mono text-control uppercase">Unlocked</span>
+                <span className="block font-mono text-control uppercase">
+                  {t('result.unlocked')}
+                </span>
                 <span className="pe-paper-muted mt-1 block text-sm">
-                  You cleared the bar, so the next step in your order joins the pool.
+                  {t('result.unlockedNote')}
                 </span>
               </span>
-              <span className="mf-stamp mf-stamp-in pe-paper-stamp text-base">New</span>
+              <span className="mf-stamp mf-stamp-in pe-paper-stamp text-base">
+                {t('result.newStamp')}
+              </span>
             </li>
           )}
-          {earned.map((achievement) => (
-            <li key={achievement.id} className="mf-tape mf-slip pe-slip">
-              <span aria-hidden="true" className="text-3xl">
-                {achievement.icon}
-              </span>
-              <span>
-                <span className="block font-mono text-control uppercase">{achievement.title}</span>
-                <span className="pe-paper-muted mt-1 block text-sm">{achievement.description}</span>
-              </span>
-              <span className="mf-stamp mf-stamp-in pe-paper-stamp text-base">Received</span>
-            </li>
-          ))}
+          {earned.map((achievement) => {
+            const copy = achievementCopy(t, achievement)
+            return (
+              <li key={achievement.id} className="mf-tape mf-slip pe-slip">
+                <span aria-hidden="true" className="text-3xl">
+                  {achievement.icon}
+                </span>
+                <span>
+                  <span className="block font-mono text-control uppercase">{copy.title}</span>
+                  <span className="pe-paper-muted mt-1 block text-sm">{copy.description}</span>
+                </span>
+                <span className="mf-stamp mf-stamp-in pe-paper-stamp text-base">
+                  {t('result.received')}
+                </span>
+              </li>
+            )
+          })}
         </ul>
       )}
 
@@ -406,7 +440,7 @@ export function SessionResult({
         </button>
         {primaryAction && (
           <button type="button" onClick={onAgain} className="mf-btn mf-btn-secondary mf-btn-lg">
-            {againLabel}
+            {again}
           </button>
         )}
         {secondaryAction && (
@@ -419,7 +453,7 @@ export function SessionResult({
           </button>
         )}
         {!primaryAction && !path && (
-          <a href={step.href} className="mf-btn mf-btn-ghost mf-btn-lg">
+          <a href={t.href(step.href)} className="mf-btn mf-btn-ghost mf-btn-lg">
             {step.label} →
           </a>
         )}
@@ -430,7 +464,7 @@ export function SessionResult({
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <h3 id="weak-heading" className="mf-engraved">
-                Practise these
+                {t('result.practiseThese')}
               </h3>
               <ul className="mt-3 flex flex-wrap gap-2">
                 {weakest.map(({ character, misses }) => (
@@ -440,8 +474,10 @@ export function SessionResult({
                       {prettify(MORSE_ALPHABET[character] ?? '')}
                     </span>
                     <span className="sr-only">
-                      , {spokenCode(MORSE_ALPHABET[character] ?? '')}, missed {misses} time
-                      {misses === 1 ? '' : 's'}
+                      {t('result.missedTimes', {
+                        count: misses,
+                        code: t.spokenCode(MORSE_ALPHABET[character] ?? ''),
+                      })}
                     </span>
                   </li>
                 ))}
@@ -453,7 +489,9 @@ export function SessionResult({
                 className="mf-btn mf-btn-secondary"
                 onClick={() => onDrill(weakest.map((entry) => entry.character))}
               >
-                Drill {weakest.length === 1 ? 'this character' : `these ${weakest.length}`}
+                {weakest.length === 1
+                  ? t('result.drillThis')
+                  : t('result.drillThese', { count: weakest.length })}
               </button>
             )}
           </div>
@@ -462,22 +500,26 @@ export function SessionResult({
 
       {summary.total === 0 && (
         <p className="mt-6 text-sm text-muted">
-          Nothing answered, so nothing was saved. If no prompt reached you, check the{' '}
-          <a href="/settings/#signal" className="text-ink underline underline-offset-4">
-            Signal setting
-          </a>
-          .
+          {renderRich(
+            t.rich('result.nothingAnswered'),
+            {
+              signal: { href: '/settings/#signal', class: 'text-ink underline underline-offset-4' },
+            },
+            t,
+          )}
         </p>
       )}
 
       {!challenge && shareSheet && <div className="mt-8">{shareSheet}</div>}
 
       <p className="mt-6 text-sm text-muted">
-        Saved to this browser only; nothing was sent anywhere. Built by{' '}
-        <a href={AUTHOR.url} rel="me" className="text-ink underline underline-offset-4">
-          {AUTHOR.name}
-        </a>
-        .
+        {renderRich(
+          t.rich('result.savedLocally', { name: AUTHOR.name }),
+          {
+            author: { href: AUTHOR.url, rel: 'me', class: 'text-ink underline underline-offset-4' },
+          },
+          t,
+        )}
       </p>
     </section>
   )

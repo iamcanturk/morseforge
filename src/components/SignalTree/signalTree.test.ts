@@ -3,9 +3,10 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { NodeState } from '../../data/tree'
 import { NodeSwatch, SignalTree } from './SignalTree'
+import { inIsland } from '../../i18n/testing'
 
 const render = (props: Parameters<typeof SignalTree>[0]) =>
-  renderToStaticMarkup(createElement(SignalTree, props))
+  renderToStaticMarkup(inIsland(createElement(SignalTree, props), 'tree'))
 
 /** The `<g>` of one pad, by its accessible name's first letter. */
 const pad = (html: string, character: string) =>

@@ -19,6 +19,8 @@ import {
 } from '../../data/tree'
 import { Lamp } from '../ui/Lamp'
 import { releaseFocus } from '../MorseKey/releaseFocus'
+import type { MessageKey } from '../../i18n/keys'
+import { useT } from '../../i18n/react'
 import '../../styles/pkg-g.css'
 
 /**
@@ -157,17 +159,12 @@ export function NodeSwatch({ state, size = 18 }: { state: NodeState; size?: numb
   )
 }
 
-/** A code read aloud, so a screen reader says "dot dash" rather than ".-". */
-function spoken(code: string): string {
-  return [...code].map((mark) => (mark === '.' ? 'dot' : 'dash')).join(' ')
-}
-
 /** Human names for the states, matching the legend on the tree page. */
-const STATE_LABEL: Record<NodeState, string> = {
-  locked: 'not met yet',
-  discovered: 'met',
-  active: 'learning',
-  mastered: 'mastered',
+const STATE_LABEL: Record<NodeState, MessageKey> = {
+  locked: 'tree.stateLocked',
+  discovered: 'tree.stateDiscovered',
+  active: 'tree.stateActive',
+  mastered: 'tree.stateMastered',
 }
 
 export interface SignalTreeProps {
@@ -319,6 +316,7 @@ export function SignalTree({
   beacons = [],
   className,
 }: SignalTreeProps) {
+  const t = useT()
   const uid = useId().replace(/:/g, '')
   const glowId = `mf-tree-glow-${uid}`
   const titleId = `mf-tree-title-${uid}`
@@ -453,7 +451,7 @@ export function SignalTree({
           // region pans it; the key binding leaves focusable regions alone.
           {...(selectable || !edges.scrollable
             ? {}
-            : { tabIndex: 0, role: 'region', 'aria-label': 'Morse code tree, scrollable' })}
+            : { tabIndex: 0, role: 'region', 'aria-label': t('tree.scrollable') })}
         >
           <svg
             viewBox={`0 0 ${VIEWBOX.width} ${VIEWBOX.height}`}
@@ -464,9 +462,13 @@ export function SignalTree({
             aria-labelledby={`${titleId} ${descId}`}
             aria-describedby={selectable ? hintId : undefined}
           >
-            <title id={titleId}>Morse code tree</title>
+            <title id={titleId}>{t('tree.title')}</title>
             <desc id={descId}>
-              {`The Morse code binary tree across ${depth} levels. From the root, a dot branches left and a dash branches right. ${masteredCount} of ${ALL_LETTERS.length} letters are mastered.`}
+              {t('tree.description', {
+                depth,
+                mastered: masteredCount,
+                total: ALL_LETTERS.length,
+              })}
             </desc>
 
             <defs>
@@ -481,10 +483,10 @@ export function SignalTree({
             {root && (
               <g aria-hidden="true" className="mf-tree-branch-label">
                 <text x={root.cx - 64} y={root.cy} textAnchor="end" dominantBaseline="central">
-                  ← DOT
+                  {t('tree.dotBranch')}
                 </text>
                 <text x={root.cx + 64} y={root.cy} textAnchor="start" dominantBaseline="central">
-                  DASH →
+                  {t('tree.dashBranch')}
                 </text>
               </g>
             )}
@@ -536,7 +538,11 @@ export function SignalTree({
                 const canSelect = selectable && character !== null
                 const isBeacon = character !== null && beacons.includes(character)
                 const label = character
-                  ? `${character}, ${spoken(code)}, ${STATE_LABEL[state]}`
+                  ? t('tree.padLabel', {
+                      character,
+                      code: t.spokenCode(code),
+                      state: t.raw(STATE_LABEL[state]),
+                    })
                   : undefined
 
                 if (isRoot) {
@@ -691,8 +697,7 @@ export function SignalTree({
         <span aria-hidden="true" className="mf-tree-fade mf-tree-fade-right" />
         {selectable && (
           <span id={hintId} className="sr-only">
-            Arrow left follows a dot, arrow right follows a dash, arrow up goes back towards the
-            root. Enter or Space picks a letter.
+            {t('tree.keysHint')}
           </span>
         )}
       </div>
@@ -702,9 +707,11 @@ export function SignalTree({
           <div>
             <span className="mf-engraved flex items-center gap-2">
               <Lamp on={powerPercent > 0} />
-              Network power
+              {t('tree.networkPower')}
             </span>
-            <p className="mt-2 font-mono text-readout text-signal tabular-nums">{powerPercent}%</p>
+            <p className="mt-2 font-mono text-readout text-signal tabular-nums">
+              {t('tree.percent', { value: powerPercent })}
+            </p>
             {/* Scaled rather than resized: a transform runs on the compositor
                 and touches nothing else on the page. */}
             <span
@@ -717,8 +724,8 @@ export function SignalTree({
               />
             </span>
             <p className="mt-2 text-sm text-muted">
-              {masteredCount} of {ALL_LETTERS.length} mastered
-              {learningCount > 0 ? ` · ${learningCount} learning` : ''}
+              {t('tree.masteredOf', { mastered: masteredCount, total: ALL_LETTERS.length })}
+              {learningCount > 0 ? t('tree.learningSuffix', { count: learningCount }) : ''}
             </p>
           </div>
 

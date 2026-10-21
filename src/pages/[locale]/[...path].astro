@@ -1,0 +1,56 @@
+---
+/**
+ * Every page in every language but English, from the same page files.
+ *
+ * `/de/tree/` renders `src/pages/tree.astro`, which reads its language from
+ * the URL (`useTranslations(Astro)`), so a page is written once and no file is
+ * copied per language. The list of routes is `src/i18n/routes.ts`: empty in a
+ * build while English is the only language enabled, so this file produces no
+ * output today; the pseudo-locale under `astro dev`.
+ */
+import type { AstroComponentFactory } from 'astro/runtime/server/index.js'
+import type { GetStaticPaths } from 'astro'
+import { localizablePages, localizedRoutes, type DynamicRoute } from '../../i18n/routes'
+import { viewFor } from '../../i18n/views'
+import CharacterView, {
+  getStaticPaths as characterPaths,
+} from '../morse-code-alphabet/[char].astro'
+import WordView, { getStaticPaths as wordPaths } from '../words/[slug].astro'
+
+export const getStaticPaths = (async () => {
+  const pages = localizablePages((path) => viewFor(path) !== undefined)
+  const characters = await characterPaths()
+  const words = await wordPaths()
+  const dynamic: DynamicRoute[] = [
+    ...characters.map((entry) => ({
+      view: 'character',
+      path: `/morse-code-alphabet/${entry.params.char}/`,
+      props: entry.props,
+    })),
+    ...words.map((entry) => ({
+      view: 'word',
+      path: `/words/${entry.params.slug}/`,
+      props: entry.props,
+    })),
+  ]
+  return localizedRoutes({ dev: import.meta.env.DEV }, pages, dynamic)
+}) satisfies GetStaticPaths
+
+interface Props {
+  view: string
+  key: string
+  locale: string
+  props: Record<string, unknown>
+}
+
+const DYNAMIC: Record<string, AstroComponentFactory> = {
+  character: CharacterView,
+  word: WordView,
+}
+
+const { view, props } = Astro.props
+const View = DYNAMIC[view] ?? viewFor(view)
+if (!View) throw new Error(`No page renders "${view}".`)
+---
+
+<View {...props} />

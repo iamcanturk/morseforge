@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { NodeSwatch, SignalTree } from './SignalTree'
 import { CharacterDrill, type DrillAttempt } from './CharacterDrill'
 import { characterFacts } from '../../data/characters'
-import { describeElements } from '../../data/format'
+
 import { ALL_LETTERS, LEARNING_STAGES, MORSE_ALPHABET } from '../../data/morseAlphabet'
 import { type NodeState, levelToNodeState, pathTo } from '../../data/tree'
 import { AudioEngine, type Playback } from '../../engine/audioEngine'
@@ -31,6 +31,11 @@ import { createStatsStore } from '../../storage/stats'
 import { achievementSnapshot } from '../../storage/snapshot'
 import { Lamp } from '../ui/Lamp'
 import { Screen } from '../ui/Screen'
+import type { MessageKey } from '../../i18n/keys'
+import { useT, withI18n } from '../../i18n/react'
+import { renderRich } from '../../i18n/richReact'
+import { achievementCopy } from '../Stats/achievementCopy'
+import { FACTS } from '../../config/facts'
 
 /**
  * The Signal Tree screen (PROJECT.md §3, §16, §17).
@@ -41,11 +46,11 @@ import { Screen } from '../ui/Screen'
  */
 
 /** The four node states as the legend names them, in order of progress. */
-const LEGEND: { state: NodeState; label: string }[] = [
-  { state: 'locked', label: 'Not met' },
-  { state: 'discovered', label: 'Met' },
-  { state: 'active', label: 'Learning' },
-  { state: 'mastered', label: 'Mastered' },
+const LEGEND: { state: NodeState; label: MessageKey }[] = [
+  { state: 'locked', label: 'tree.legendLocked' },
+  { state: 'discovered', label: 'tree.legendDiscovered' },
+  { state: 'active', label: 'tree.legendActive' },
+  { state: 'mastered', label: 'tree.legendMastered' },
 ]
 
 /**
@@ -129,7 +134,11 @@ function useTransmitter(settings: SettingsRecord) {
   return { transmit, lit, busy }
 }
 
+/** The /tree/ page's island: `SignalTreeScreen` with its messages from the page. */
+export const SignalTreeIsland = withI18n(SignalTreeScreen)
+
 export function SignalTreeScreen() {
+  const t = useT()
   const store = useMemo(() => createProgressStore(), [])
   const statsStore = useMemo(() => createStatsStore(), [])
   const settingsStore = useMemo(() => createSettingsStore(), [])
@@ -227,23 +236,23 @@ export function SignalTreeScreen() {
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
       <section
         className="mf-instrument -mx-3 min-w-0 p-2 sm:mx-0 sm:p-6"
-        aria-label="Morse code tree"
+        aria-label={t('tree.title')}
       >
         <div className="mb-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 pt-3 sm:px-0 sm:pt-0">
           <span className="mf-engraved flex items-center gap-2">
             <Lamp on={lit} tone="cyan" />
-            Signal tree · {ALL_LETTERS[0]}–{ALL_LETTERS.at(-1)}
+            {t('tree.boardHeading', { first: ALL_LETTERS[0]!, last: ALL_LETTERS.at(-1)! })}
           </span>
           {/* On the glass, like the board: the pads are drawn from the board's
               own styles, so in either theme the key matches what it explains. */}
           <ul
             className="mf-screen mf-screen-flush grid w-full grid-cols-2 gap-x-4 gap-y-2 rounded-chip px-3 py-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center"
-            aria-label="Legend"
+            aria-label={t('tree.legend')}
           >
             {LEGEND.map(({ state, label }) => (
               <li key={state} className="flex items-center gap-2 text-sm text-ink">
                 <NodeSwatch state={state} />
-                {label}
+                {t.raw(label)}
               </li>
             ))}
           </ul>
@@ -266,15 +275,15 @@ export function SignalTreeScreen() {
       >
         <div className="flex items-center justify-between gap-4">
           <h2 id="tree-inspector-title" className="mf-engraved">
-            {selected ? 'Node' : 'Start here'}
+            {selected ? t('tree.node') : t('tree.startHere')}
           </h2>
-          {selected && <span className="mf-engraved">Tap any pad to switch</span>}
+          {selected && <span className="mf-engraved">{t('tree.tapToSwitch')}</span>}
         </div>
 
         {selected && code ? (
           <div>
             <p className="sr-only" aria-live="polite">
-              {selected}: {facts?.spelled ?? ''}
+              {t('tree.spelledOut', { character: selected, spelled: t.spokenCode(code) })}
             </p>
             <Screen grid className="mt-4 px-5 pt-5 pb-4">
               <div className="relative z-[3] flex items-center justify-between gap-4">
@@ -288,7 +297,10 @@ export function SignalTreeScreen() {
               </p>
               {facts && (
                 <p className="relative z-[3] mt-1 font-mono text-sm text-muted">
-                  “{facts.spoken}” · {describeElements(code)}
+                  {t('tree.spokenLine', {
+                    spoken: facts.spoken,
+                    elements: t.describeElements(code),
+                  })}
                 </p>
               )}
             </Screen>
@@ -301,20 +313,24 @@ export function SignalTreeScreen() {
                 className="mf-btn mf-btn-audio mf-btn-sm"
               >
                 <Lamp on={busy} tone="cyan" />
-                {busy ? 'Sending…' : settings.audio.enabled ? 'Play again' : 'Flash again'}
+                {busy
+                  ? t('tree.sending')
+                  : settings.audio.enabled
+                    ? t('tree.playAgain')
+                    : t('tree.flashAgain')}
               </button>
               {!settings.audio.enabled && (
                 <a
-                  href="/settings/#signal"
+                  href={t.href('/settings/#signal')}
                   className="text-sm text-muted underline underline-offset-4"
                 >
-                  Sound is off in settings
+                  {t('tree.soundOff')}
                 </a>
               )}
             </div>
 
             <div className="mt-6">
-              <h3 className="mf-engraved">Path from the root</h3>
+              <h3 className="mf-engraved">{t('tree.pathHeading')}</h3>
               <ol className="mt-3 flex flex-wrap items-center gap-1.5 font-mono text-label tracking-label">
                 {path.map((node, index) => (
                   <li key={node.code || 'root'} className="flex items-center gap-1.5">
@@ -332,8 +348,16 @@ export function SignalTreeScreen() {
                       ].join(' ')}
                     >
                       {index === 0
-                        ? 'START'
-                        : `${node.code.at(-1) === '.' ? 'DOT' : 'DASH'}${node.character ? ` ${node.character}` : ''}`}
+                        ? t('tree.pathStart')
+                        : node.character
+                          ? t('tree.pathStep', {
+                              step:
+                                node.code.at(-1) === '.' ? t('tree.pathDot') : t('tree.pathDash'),
+                              character: node.character,
+                            })
+                          : node.code.at(-1) === '.'
+                            ? t('tree.pathDot')
+                            : t('tree.pathDash')}
                     </span>
                   </li>
                 ))}
@@ -344,7 +368,7 @@ export function SignalTreeScreen() {
               <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
                 {facts.mirror && (
                   <div>
-                    <dt className="mf-engraved">Mirror</dt>
+                    <dt className="mf-engraved">{t('tree.mirror')}</dt>
                     <dd className="mt-1 text-ink">
                       <button
                         type="button"
@@ -353,19 +377,21 @@ export function SignalTreeScreen() {
                       >
                         {facts.mirror}
                       </button>{' '}
-                      <span className="text-muted">dots and dashes swapped</span>
+                      <span className="text-muted">{t('tree.mirrorNote')}</span>
                     </dd>
                   </div>
                 )}
                 {facts.planDay !== null && (
                   <div>
-                    <dt className="mf-engraved">7-day plan</dt>
+                    <dt className="mf-engraved">
+                      {t('tree.planHeading', { days: FACTS.planDays })}
+                    </dt>
                     <dd className="mt-1 text-ink">
                       <a
-                        href="/learn-morse-code-in-7-days/"
+                        href={t.href('/learn-morse-code-in-7-days/')}
                         className="underline underline-offset-4"
                       >
-                        Day {facts.planDay}
+                        {t('tree.planDay', { day: facts.planDay })}
                       </a>
                     </dd>
                   </div>
@@ -382,38 +408,47 @@ export function SignalTreeScreen() {
             />
 
             {(earned.length > 0 || bonusXp > 0) && (
-              <ul className="mt-5 grid gap-3" aria-label="Just earned">
+              <ul className="mt-5 grid gap-3" aria-label={t('tree.justEarned')}>
                 {bonusXp > 0 && (
                   <li className="mf-tape mf-slip flex items-center justify-between gap-3">
-                    <span>First signal</span>
-                    <span className="font-bold">+{bonusXp} XP</span>
+                    <span>{t('tree.firstSignal')}</span>
+                    <span className="font-bold">{t('tree.xpGain', { xp: bonusXp })}</span>
                   </li>
                 )}
-                {earned.map((achievement) => (
-                  <li key={achievement.id} className="mf-tape mf-slip flex items-start gap-3">
-                    <span aria-hidden="true" className="text-xl">
-                      {achievement.icon}
-                    </span>
-                    <span className="min-w-0 flex-1 tracking-normal">
-                      <span className="block font-bold">{achievement.title}</span>
-                      <span className="block text-sm">{achievement.description}</span>
-                    </span>
-                    <span className="mf-stamp mf-stamp-in shrink-0 text-sm text-paper-ink">
-                      Received
-                    </span>
-                  </li>
-                ))}
+                {earned.map((achievement) => {
+                  const copy = achievementCopy(t, achievement)
+                  return (
+                    <li key={achievement.id} className="mf-tape mf-slip flex items-start gap-3">
+                      <span aria-hidden="true" className="text-xl">
+                        {achievement.icon}
+                      </span>
+                      <span className="min-w-0 flex-1 tracking-normal">
+                        <span className="block font-bold">{copy.title}</span>
+                        <span className="block text-sm">{copy.description}</span>
+                      </span>
+                      <span className="mf-stamp mf-stamp-in shrink-0 text-sm text-paper-ink">
+                        {t('tree.received')}
+                      </span>
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </div>
         ) : (
           <div className="mt-4">
-            <p className="font-display text-h3 font-bold text-ink">Start at the core.</p>
+            <p className="font-display text-h3 font-bold text-ink">{t('tree.startAtCore')}</p>
             <p className="mt-2 text-muted">
-              {firstStage
-                .map((letter) => `${letter} is ${describeElements(MORSE_ALPHABET[letter] ?? '')}`)
-                .join(', ')}
-              . Every other letter grows from those two: a dot to the left, a dash to the right.
+              {t('tree.coreBody', {
+                letters: firstStage
+                  .map((letter) =>
+                    t('tree.coreLetter', {
+                      character: letter,
+                      elements: t.describeElements(MORSE_ALPHABET[letter] ?? ''),
+                    }),
+                  )
+                  .join(', '),
+              })}
             </p>
             <div className="mt-5 grid grid-cols-2 gap-3">
               {firstStage.map((letter) => (
@@ -430,9 +465,7 @@ export function SignalTreeScreen() {
                 </button>
               ))}
             </div>
-            <p className="mt-5 text-sm text-muted">
-              Pick any pad to hear it, see its path from the root, and drill it right here.
-            </p>
+            <p className="mt-5 text-sm text-muted">{t('tree.pickAny')}</p>
           </div>
         )}
       </aside>
@@ -446,12 +479,9 @@ export function SignalTreeScreen() {
  * shape of the signal. Read out as words for a screen reader.
  */
 function CodePulses({ code }: { code: string }) {
+  const t = useT()
   return (
-    <span
-      className="flex items-center gap-2"
-      aria-label={[...code].map((m) => (m === '.' ? 'dot' : 'dash')).join(' ')}
-      role="img"
-    >
+    <span className="flex items-center gap-2" aria-label={t.spokenCode(code)} role="img">
       {[...code].map((mark, index) => (
         <span
           key={index}

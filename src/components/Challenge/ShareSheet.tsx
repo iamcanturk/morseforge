@@ -3,6 +3,7 @@ import { clipboardText, shareData, type ShareMessage } from '../../game/share'
 import type { CardData } from '../Share/resultCard'
 import { ShareCard } from '../Share/ShareCard'
 import { track } from '../../analytics/track'
+import { useT } from '../../i18n/react'
 import '../../styles/pkg-e.css'
 
 /**
@@ -39,6 +40,7 @@ async function copyText(text: string): Promise<boolean> {
 }
 
 export function ShareSheet({ message, kind, card, blurb }: ShareSheetProps) {
+  const t = useT()
   const [dismissed, setDismissed] = useState(false)
   const [status, setStatus] = useState('')
   const [canShare, setCanShare] = useState(false)
@@ -64,13 +66,13 @@ export function ShareSheet({ message, kind, card, blurb }: ShareSheetProps) {
       const ok = await copyText(what === 'link' ? message.url : clipboardText(message))
       if (ok) {
         track('share_copy', what === 'link' ? 'link' : kind)
-        say(what === 'link' ? 'Link copied.' : 'Message and link copied. Paste it anywhere.')
+        say(what === 'link' ? t('share.linkCopied') : t('share.messageCopied'))
       } else {
         field.current?.select()
-        say('Copying was blocked. The link is selected: copy it from the box.')
+        say(t('share.copyBlocked'))
       }
     },
-    [message, kind, say],
+    [message, kind, say, t],
   )
 
   const challenge = useCallback(async () => {
@@ -95,14 +97,14 @@ export function ShareSheet({ message, kind, card, blurb }: ShareSheetProps) {
         <div>
           <h3 id="share-heading" className="mf-engraved flex items-center gap-2">
             <span className="mf-lamp" data-on="true" data-tone="amber" aria-hidden="true" />
-            Send it
+            {t('share.sendIt')}
           </h3>
           <p className="mt-2 max-w-[52ch] text-sm text-muted">{blurb}</p>
         </div>
         <button
           type="button"
           className="mf-icon-btn -mt-2 -mr-2"
-          aria-label="Hide the share options"
+          aria-label={t('share.hide')}
           onClick={() => setDismissed(true)}
         >
           <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
@@ -117,19 +119,19 @@ export function ShareSheet({ message, kind, card, blurb }: ShareSheetProps) {
           className="mf-btn mf-btn-amber mf-btn-lg sm:flex-1"
           onClick={() => void challenge()}
         >
-          Challenge a friend
+          {t('share.challengeFriend')}
         </button>
         <button
           type="button"
           className="mf-btn mf-btn-secondary mf-btn-lg"
           onClick={() => void copy('link')}
         >
-          Copy link
+          {t('share.copyLink')}
         </button>
       </div>
 
       <label className="mt-4 block">
-        <span className="sr-only">Challenge link</span>
+        <span className="sr-only">{t('share.linkLabel')}</span>
         <input
           ref={field}
           readOnly
@@ -149,9 +151,11 @@ export function ShareSheet({ message, kind, card, blurb }: ShareSheetProps) {
           onToggle={(event) => setCardOpen(event.currentTarget.open)}
         >
           <summary className="flex min-h-11 items-center justify-between gap-3">
-            <span className="font-mono text-control text-ink uppercase">Image card</span>
+            <span className="font-mono text-control text-ink uppercase">
+              {t('share.imageCard')}
+            </span>
             <span className="flex items-center gap-2 text-sm text-muted">
-              For posting a picture
+              {t('share.imageCardHint')}
               <svg
                 className="pe-chevron"
                 viewBox="0 0 12 12"
