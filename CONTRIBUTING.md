@@ -10,14 +10,19 @@ npm install
 npm run dev
 ```
 
+Node 22.12 or newer (Astro 7 will not start on anything older).
+
 Before opening a pull request:
 
 ```bash
 npm run verify
 ```
 
-That runs the formatter check, the type checker and the tests. CI runs the same
-thing, so if it passes locally it will pass there.
+That runs the formatter check, the type checker, the reachability check and the
+tests. CI runs the same thing, so if it passes locally it will pass there. If
+you changed anything a visitor can see, also run `npm run verify:all`, which
+builds the site and runs the checks against the built output (see "What the
+build checks" below).
 
 ## The one rule that matters
 
@@ -61,6 +66,79 @@ that look arbitrary without their reasoning — why the dot/dash boundary sits a
 two units, why keying patience is separate from WPM, why the tree layout needs
 an explicit comparator. Those comments are load-bearing. Please add them in the
 same spirit rather than narrating the code.
+
+## Rules the redesign added
+
+Short, and each one exists because the opposite happened once.
+
+**Pages are registered, and copy has one home.** Every route is an entry in
+`src/config/pages.ts`: its title, description, H1, intro, nav label and whether
+it is indexable. A page renders those fields rather than retyping them, and the
+header, the footer, the sitemap, `llms.txt` and `noindex` all read the same
+entry. A page file with no entry, or an entry with no file, fails a test. Facts
+a sentence quotes (counts, speeds, durations) come from `src/config/facts.ts`,
+and FAQs from `src/data/faq.ts`, which is also what produces the FAQPage
+JSON-LD. A figure typed into a page is a figure that goes stale.
+
+**Storage goes through the shared stores and `bankActivity`.** Never call
+`localStorage` from a component, and never keep a second copy of a store in
+component state. Use the page's shared instances from `src/storage`, so every
+screen and every browser tab sees the same record. Anything that earns XP, a
+streak day or an achievement does it through `bankActivity` in
+`src/storage/activity.ts`, once, from an event handler and not from inside a
+state updater (React may run an updater twice). A session with zero answers
+banks nothing.
+
+**Only `transform` and `opacity` animate.** No `transition-colors`, no
+`transition-all`, no animating `width`, `left` or `box-shadow`. Honour reduced
+motion from both sources: the OS setting and `html[data-motion=reduce]`, which
+Settings can set in either direction. In practice that means the `mf-motion:`
+and `mf-still:` variants in `global.css`, not a bare `motion-safe:`.
+
+**No hand-typed Morse, now enforced.** The rule above used to rest on review.
+It is now a set of tests that scan the copy files and the reference components
+for a run of dots and dashes inside a string and fail on it (`proseScan.ts` and
+the `reference.test.ts` files). Write `encode('SOS')` or interpolate from
+`MORSE_ALPHABET`.
+
+**Every page but the landing and the 404 uses `PageShell`.** Pass it the registry's
+`h1`, `intro` and `breadcrumbTrail(path)`; it supplies the `<main>`, the
+breadcrumb and the title row, so every H1 sits in the same place. Choose
+`width="tool"` or `"prose"` (those are the only two) and set `instrumentFirst` on
+a tool page, which on a phone puts the instrument straight under the H1 and the
+intro below it (the HTML order does not change). The default slot holds the
+instrument and nothing else; explainers and the FAQ go in `slot="more"`, which
+spaces them itself, so they take no `mt-*` and no `mx-auto`. Do not put
+`overflow` on an ancestor of the instrument: the telegraph's tape is sticky.
+
+**Never hide the focused element, and never set your own scroll offset.**
+`global.css` gives `html` a `scroll-padding-top` that clears the sticky header.
+A page with its own sticky layer publishes its height in `--mf-sticky-extra`; it
+does not add `scroll-mt-*`, which would double the offset. When a screen moves on
+(a new prompt, a result), move focus to it with `preventScroll` and scroll the
+instrument into view yourself.
+
+**Signal is a contract.** Anything that makes a Morse signal reaches the learner
+through `settings.signal` (Sound, Lamp or Both), never through `audio.enabled`
+directly. Read intent with `hasSound` and `hasLamp`, change it only with
+`withSignal`, and send with `useTransmitter`, which drives the tone and the lamp
+from one timeline; draw the lamp with `SignalLamp`. A new listening task must
+work in Lamp mode and must not be disabled when sound is off. Where a code is
+shown as dots and dashes, add its spoken twin for screen readers with
+`spokenCode()` instead of a local copy.
+
+**What the build checks.** After `npm run build`:
+
+- `npm run check:links` fails on any internal link that resolves to nothing.
+- `npm run check:reachable` fails on a module under `src/data`, `src/game`,
+  `src/engine`, `src/storage` or `src/analytics` that no page can reach. It is
+  part of `npm run verify`.
+- `node scripts/check-seo.mjs dist` checks titles and descriptions against
+  their length limits, one visible H1 per page, canonicals, JSON-LD that parses,
+  noindex pages kept out of the sitemap, every `.md` alternate, `robots.txt`
+  and `llms.txt`. `npm run check:build` runs the links and SEO checks along with
+  the rest of its assertions about the build.
+- Dates in the sitemap come from git, so commit before you build.
 
 ## Commits
 

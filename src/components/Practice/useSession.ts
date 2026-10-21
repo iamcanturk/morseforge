@@ -1,12 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   type Attempt,
+  type SessionClock,
   type SessionConfig,
   type SessionSummary,
+  clockElapsed,
+  holdClock,
   isFinished,
   pickNext,
+  releaseClock,
   remainingMs,
+  seededPrompts,
+  startClock,
   summarize,
+  type PromptSource,
 } from '../../game/session'
 import { SESSION_MODES } from '../../game/session'
 import { answer as recordAnswer, createProgressStore, getCharacter } from '../../storage/progress'
@@ -31,6 +38,12 @@ export interface UseSessionResult {
   status: SessionStatus
   /** The character being asked about, or null between prompts. */
   current: string | null
+  /**
+   * Counts prompts. A small pool can ask the same character twice in a row
+   * (J-02), and then `current` does not change, so anything that must happen
+   * once per prompt (sending it, resetting the key) keys on this instead.
+   */
+  promptId: number
   attempts: readonly Attempt[]
   /** Milliseconds left, or null when untimed. */
   remaining: number | null
@@ -42,6 +55,14 @@ export interface UseSessionResult {
   submit: (given: string) => boolean
   stop: () => void
   reset: () => void
+  /**
+   * Stop the clock while the screen waits before the next prompt
+   * (NEXT_PROMPT_DELAY_MS). A timed run neither loses the wait nor ends
+   * during it, and the summary's time excludes it.
+   */
+  holdClock: () => void
+  /** Restart the clock as the prompt begins, crediting the hold back. */
+  releaseClock: () => void
 }
 
 export function useSession(config: SessionConfig): UseSessionResult {
@@ -50,6 +71,7 @@ export function useSession(config: SessionConfig): UseSessionResult {
 
   const [status, setStatus] = useState<SessionStatus>('idle')
   const [current, setCurrent] = useState<string | null>(null)
+  const [promptId, setPromptId] = useState(0)
   const [attempts, setAttempts] = useState<Attempt[]>([])
   const [remaining, setRemaining] = useState<number | null>(config.durationMs)
   const [summary, setSummary] = useState<SessionSummary | null>(null)
@@ -59,10 +81,21 @@ export function useSession(config: SessionConfig): UseSessionResult {
   // be answered by comparing the two — once the session is banked, an
   // achievement earned two months ago looks identical to one earned just now.
   const before = useRef<ReturnType<typeof achievementSnapshot> | null>(null)
-  const startedAt = useRef<number | null>(null)
+  /** The run's clock (`game/session.ts`), null before the first start. */
+  const clock = useRef<SessionClock | null>(null)
   const promptedAt = useRef<number>(0)
   const recent = useRef<string[]>([])
   const timer = useRef<ReturnType<typeof setInterval> | null>(null)
+  /** The seeded sequence, when the config has a seed (the shared challenge). */
+  const source = useRef<PromptSource | null>(null)
+  /**
+   * The answers so far, outside React state. `finish` used to run inside a
+   * `setAttempts` updater, and React may run an updater twice (it does in
+   * development), which banked a session twice. Side effects now read this.
+   */
+  const attemptsRef = useRef<Attempt[]>([])
+  /** Set once a run has been banked, so a late answer or tick cannot bank it again. */
+  const finished = useRef(false)
 
   // The config can be a fresh object every render; the session must not restart
   // because the parent re-rendered.
@@ -74,11 +107,18 @@ export function useSession(config: SessionConfig): UseSessionResult {
     timer.current = null
   }, [])
 
+  /** The learner's time so far, without the screen's own waits. */
+  const elapsedNow = useCallback(
+    () => (clock.current === null ? 0 : clockElapsed(clock.current, performance.now())),
+    [],
+  )
+
   const finish = useCallback(
     (finalAttempts: readonly Attempt[]) => {
       stopTimer()
-      const elapsed = startedAt.current === null ? 0 : performance.now() - startedAt.current
-      const result = summarize(finalAttempts, elapsed)
+      if (finished.current) return
+      finished.current = true
+      const result = summarize(finalAttempts, elapsedNow())
 
       // XP is earned per correct answer, weighted by difficulty, so a session
       // of E and T does not pay the same as one that included Q and Z.
@@ -99,7 +139,7 @@ export function useSession(config: SessionConfig): UseSessionResult {
       setStatus('finished')
       setCurrent(null)
     },
-    [stopTimer, statsStore, progressStore],
+    [stopTimer, elapsedNow, statsStore, progressStore],
   )
 
   /** Schedules per character, so prompts go to whatever is closest to forgotten. */
@@ -115,21 +155,28 @@ export function useSession(config: SessionConfig): UseSessionResult {
   }, [progressStore])
 
   const advance = useCallback(() => {
-    const next = pickNext(configRef.current.characters, {
-      schedules: schedules(),
-      recent: recent.current,
-    })
+    const next = source.current
+      ? source.current.next()
+      : pickNext(configRef.current.characters, {
+          schedules: schedules(),
+          recent: recent.current,
+        })
     setCurrent(next)
+    setPromptId((id) => id + 1)
     promptedAt.current = performance.now()
   }, [schedules])
 
   const start = useCallback(() => {
+    const { seed, characters } = configRef.current
+    source.current = seed === undefined || seed === null ? null : seededPrompts(characters, seed)
+    attemptsRef.current = []
+    finished.current = false
     setAttempts([])
     setSummary(null)
     setEarned([])
     before.current = achievementSnapshot(progressStore.read(), statsStore.read())
     recent.current = []
-    startedAt.current = performance.now()
+    clock.current = startClock(performance.now())
     setStatus('running')
     setRemaining(configRef.current.durationMs)
     advance()
@@ -139,21 +186,16 @@ export function useSession(config: SessionConfig): UseSessionResult {
     if (configRef.current.durationMs !== null) {
       stopTimer()
       timer.current = setInterval(() => {
-        const elapsed = performance.now() - (startedAt.current ?? 0)
+        const elapsed = elapsedNow()
         setRemaining(remainingMs(configRef.current, elapsed))
-        if (elapsed >= (configRef.current.durationMs ?? Infinity)) {
-          setAttempts((collected) => {
-            finish(collected)
-            return collected
-          })
-        }
+        if (elapsed >= (configRef.current.durationMs ?? Infinity)) finish(attemptsRef.current)
       }, 100)
     }
-  }, [advance, finish, stopTimer, progressStore, statsStore])
+  }, [advance, finish, stopTimer, elapsedNow, progressStore, statsStore])
 
   const submit = useCallback(
     (given: string): boolean => {
-      if (status !== 'running' || current === null) return false
+      if (status !== 'running' || current === null || finished.current) return false
 
       const cleaned = given.trim().toUpperCase()
       const correct = cleaned === current
@@ -178,39 +220,63 @@ export function useSession(config: SessionConfig): UseSessionResult {
 
       recent.current = [...recent.current, current].slice(-4)
 
-      setAttempts((collected) => {
-        const next = [...collected, attempt]
-        const elapsed = performance.now() - (startedAt.current ?? 0)
-        if (isFinished(configRef.current, next, elapsed)) finish(next)
-        else advance()
-        return next
-      })
+      const next = [...attemptsRef.current, attempt]
+      attemptsRef.current = next
+      setAttempts(next)
+      if (isFinished(configRef.current, next, elapsedNow())) finish(next)
+      else advance()
 
       return correct
     },
-    [status, current, progressStore, advance, finish],
+    [status, current, progressStore, advance, finish, elapsedNow],
   )
 
-  const stop = useCallback(() => {
-    setAttempts((collected) => {
-      finish(collected)
-      return collected
-    })
-  }, [finish])
+  const stop = useCallback(() => finish(attemptsRef.current), [finish])
 
   const reset = useCallback(() => {
     stopTimer()
     setStatus('idle')
     setCurrent(null)
     setAttempts([])
+    attemptsRef.current = []
+    finished.current = false
+    source.current = null
     setSummary(null)
     setEarned([])
     setRemaining(configRef.current.durationMs)
-    startedAt.current = null
+    clock.current = null
     recent.current = []
   }, [stopTimer])
 
+  const hold = useCallback(() => {
+    if (clock.current === null || finished.current) return
+    clock.current = holdClock(clock.current, performance.now())
+  }, [])
+
+  const release = useCallback(() => {
+    if (clock.current === null || clock.current.heldAt === null) return
+    const now = performance.now()
+    clock.current = releaseClock(clock.current, now)
+    // The prompt reaches the learner now, so the time it took to answer
+    // starts now, not when the previous answer went in.
+    promptedAt.current = now
+  }, [])
+
   useEffect(() => stopTimer, [stopTimer])
 
-  return { status, current, attempts, remaining, summary, earned, start, submit, stop, reset }
+  return {
+    status,
+    current,
+    promptId,
+    attempts,
+    remaining,
+    summary,
+    earned,
+    start,
+    submit,
+    stop,
+    reset,
+    holdClock: hold,
+    releaseClock: release,
+  }
 }

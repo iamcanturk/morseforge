@@ -11,7 +11,7 @@
 import { ALL_LETTERS } from '../data/morseAlphabet'
 import type { AchievementSnapshot } from '../game/achievements'
 import { masteryLevel } from '../game/mastery'
-import { getCharacter, masteredCharacters, type ProgressRecord } from './progress'
+import { getCharacter, masteredCharacters, stagesTaught, type ProgressRecord } from './progress'
 import type { StatsRecord } from './stats'
 
 export function achievementSnapshot(
@@ -28,6 +28,7 @@ export function achievementSnapshot(
       const entry = getCharacter(progress, character, now)
       return masteryLevel(entry.skills, entry.seen) >= 1
     }).length,
+    stagesTaught: stagesTaught(progress, now),
     bestWpm: stats.bestWpm,
     longestStreak: stats.streak.longest,
     sessions: stats.sessions,

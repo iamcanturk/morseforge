@@ -1,42 +1,40 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro'
+import Faq from '../../components/Faq.astro'
+import PageShell from '../../components/PageShell.astro'
 import { SignalDefenderGame } from '../../components/Games/games'
+import { breadcrumbTrail, getPage, pageUrl } from '../../config/pages'
+import { faqFor } from '../../data/faq'
+import { breadcrumbs, webPage } from '../../seo/schema'
 
-const title = 'Signal Defender — A Morse Code Listening Game | MorseForge'
-const description =
-  'Characters fall and sound as they appear. Type each one before it reaches the floor. A Morse code game about copying at speed, not about knowing the alphabet.'
+// Title, description, H1 and intro all come from the registry (SEO-B); the
+// island gets the registry's name and URL for its share text.
+const page = getPage('/games/signal-defender/')
+const trail = breadcrumbTrail(page.path)
+const faq = faqFor(page.path)
+const schema = [
+  webPage({ path: page.path, name: page.h1, description: page.description }),
+  breadcrumbs(trail),
+]
 ---
 
-<BaseLayout title={title} description={description} path="/games/signal-defender/">
-  <main class="mx-auto max-w-3xl px-6 py-14">
-    <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Signal Defender</h1>
-    <p class="mt-3 leading-relaxed text-muted">
-      Characters fall, one sounding as each appears. Type it before it lands.
-    </p>
+<BaseLayout title={page.title} description={page.description} path={page.path} schema={schema}>
+  <PageShell width="tool" trail={trail} h1={page.h1} intro={page.intro} instrumentFirst>
+    <SignalDefenderGame client:idle name={page.navLabel} url={pageUrl(page.path)} />
 
-    <div class="mt-10">
-      <SignalDefenderGame client:load />
-    </div>
-
-    <section class="mt-16 border-t border-line pt-10">
-      <h2 class="font-display text-xl font-bold tracking-tight">What a game is for</h2>
-      <p class="mt-3 leading-relaxed text-muted">
-        Not learning. Practice teaches, and it waits for you — you can sit on a character for ten
-        seconds and still be told you were right. That is correct for learning and useless as a
+    <section slot="more" class="max-w-3xl">
+      <h2 class="font-display text-h2 font-bold">What a game is for</h2>
+      <p class="mt-4 leading-relaxed text-muted">
+        Not learning. Practice teaches, and it waits for you: you can sit on a character for as long
+        as you like and still be told you were right. That is correct for learning and useless as a
         measure, because copying at speed does not fail on characters you cannot decode. It fails on
         characters you cannot decode <em>before the next one arrives</em>.
       </p>
       <p class="mt-4 leading-relaxed text-muted">
-        This is that gap, made visible. Everything you knock down still feeds the same review
-        schedule as practice, so a run is not thrown away — but what it is really for is the list at
-        the end of what got past you.
-      </p>
-
-      <h2 class="mt-8 font-display text-xl font-bold tracking-tight">It plays with sound off</h2>
-      <p class="mt-3 leading-relaxed text-muted">
-        Each falling signal shows its dots and dashes as well as its letter, so with sound off in
-        <a href="/settings/" class="text-signal underline underline-offset-4">settings</a> this becomes
-        a reading game instead of a listening one. Slower to get hard, and still worth playing.
+        This is that gap, made visible. Each signal falls as its code alone, with the letter shown
+        only once you have named it. Everything you knock down, and everything that lands, feeds the
+        same review schedule as practice, so a run is not thrown away. But what it is really for is
+        the list at the end of what got past you.
       </p>
 
       <p class="mt-8 text-sm leading-relaxed text-muted">
@@ -46,5 +44,7 @@ const description =
         >, which is the same idea for sending.
       </p>
     </section>
-  </main>
+
+    <Faq slot="more" items={faq} />
+  </PageShell>
 </BaseLayout>

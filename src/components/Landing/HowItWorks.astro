@@ -1,0 +1,115 @@
+---
+/**
+ * Section 5, how it works (TASK-001 §5.2): the registry's three steps
+ * (`LANDING.steps`), each a link card with a small static drawing. Real text,
+ * no JavaScript; it also carries part of the page's no-JS word count.
+ *
+ * The drawings are made from the codes they illustrate (A's dot and dash for
+ * the waveform), so even the decoration cannot misstate the alphabet.
+ */
+import { LANDING } from '../../config/landing'
+import { MORSE_ALPHABET } from '../../data/morseAlphabet'
+
+const { steps } = LANDING
+
+/** A trace of a code as an SVG path: a dot is one unit high, a dash three wide. */
+function trace(code: string, unit = 9, x0 = 8, base = 34, top = 14): string {
+  let x = x0
+  let d = `M2 ${base} H${x}`
+  for (const element of code) {
+    const width = element === '.' ? unit : unit * 3
+    d += ` V${top} H${x + width} V${base}`
+    x += width + unit
+    d += ` H${x}`
+  }
+  return `${d} H118`
+}
+
+const wave = trace(MORSE_ALPHABET.A ?? '')
+---
+
+<section class="py-16 md:py-24" aria-labelledby="steps-heading">
+  <div class="mx-auto max-w-7xl px-5 sm:px-6">
+    <p class="mf-engraved text-brass">How it works</p>
+    <h2 id="steps-heading" class="mt-3 font-display text-h2 font-bold text-ink">
+      {steps.heading}
+    </h2>
+    <ol class="mt-8 grid gap-4 md:grid-cols-3">
+      {
+        steps.items.map((step, index) => (
+          <li>
+            <a href={step.href} class="mf-card h-full">
+              <span class="flex items-center justify-between">
+                <span class="font-mono text-label text-muted">0{index + 1}</span>
+                <span class="mf-lamp" aria-hidden="true" />
+              </span>{' '}
+              <span
+                class="mf-screen mf-screen-flush grid h-24 place-items-center"
+                aria-hidden="true"
+              >
+                {index === 0 && (
+                  <svg viewBox="0 0 120 48" class="relative z-[3] h-12 w-auto text-cyan">
+                    <path
+                      d={wave}
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.5"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                )}
+                {index === 1 && (
+                  <svg viewBox="0 0 120 48" class="relative z-[3] h-12 w-auto">
+                    <rect x="10" y="34" width="100" height="9" rx="3" fill="var(--color-wood)" />
+                    <rect x="16" y="24" width="82" height="5" rx="2.5" fill="var(--color-brass)" />
+                    <rect x="30" y="27" width="10" height="8" fill="var(--color-brass)" />
+                    <ellipse
+                      cx="96"
+                      cy="20"
+                      rx="14"
+                      ry="6"
+                      fill="var(--color-paper-ink)"
+                      stroke="var(--color-brass)"
+                      stroke-width="1"
+                    />
+                    <circle cx="76" cy="31" r="3" fill="var(--color-amber)" />
+                  </svg>
+                )}
+                {index === 2 && (
+                  <svg viewBox="0 0 120 48" class="relative z-[3] h-12 w-auto text-signal">
+                    <circle
+                      cx="60"
+                      cy="25"
+                      r="18"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-opacity="0.35"
+                      stroke-width="3"
+                    />
+                    <path
+                      d="M60 7 A18 18 0 1 1 42.9 30.6"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="3"
+                      stroke-linecap="round"
+                    />
+                    <path
+                      d="M60 25 V13"
+                      stroke="var(--color-amber)"
+                      stroke-width="2.5"
+                      stroke-linecap="round"
+                    />
+                    <circle cx="60" cy="25" r="2.5" fill="var(--color-amber)" />
+                  </svg>
+                )}
+              </span>{' '}
+              <h3 class="font-display text-h3 font-bold text-ink">{step.title}</h3>
+              <p class="text-sm leading-relaxed text-muted">{step.body}</p>
+              <span class="mt-auto mf-engraved text-signal">Open →</span>
+            </a>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</section>

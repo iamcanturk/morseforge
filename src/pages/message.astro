@@ -1,0 +1,151 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import Faq from '../components/Faq.astro'
+import PageShell from '../components/PageShell.astro'
+import { MessageDesk } from '../components/Message/MessageDesk'
+import { breadcrumbTrail, getPage } from '../config/pages'
+import { FACTS } from '../config/facts'
+import { faqFor } from '../data/faq'
+import { describeElements, numberWord } from '../data/format'
+import { EXTENDED_LETTERS, MORSE_ALPHABET } from '../data/morseAlphabet'
+import { encode, prettify } from '../engine/morseEncoder'
+import { UNITS } from '../engine/timingEngine'
+import { MESSAGE_MAX } from '../game/messageLink'
+import { breadcrumbs, webPage } from '../seo/schema'
+import '../styles/pkg-m.css'
+
+/**
+ * Send a secret message in Morse (flow audit P4, DEC-017).
+ *
+ * The message lives in the URL fragment and is read on the device by the
+ * island. Everything else on the page is static and explains Morse to the
+ * person who was just sent some, because that is who most visitors here are.
+ *
+ * `analytics={false}`: the Cloudflare beacon reports the page URL, and on this
+ * page the URL can carry somebody's message. The app's own counter sends an
+ * event name only (src/analytics/track.ts), never a URL.
+ */
+const page = getPage('/message/')
+const faq = faqFor(page.path)
+const trail = breadcrumbTrail(page.path)
+const schema = [
+  webPage({ path: page.path, name: page.h1, description: page.description }),
+  breadcrumbs(trail),
+]
+
+const code = (text: string) => prettify(encode(text))
+const extended = Object.keys(EXTENDED_LETTERS).join(' ')
+const symbolCount = FACTS.ituPunctuationCount + FACTS.nonItuPunctuationCount
+---
+
+<BaseLayout
+  title={page.title}
+  description={page.description}
+  path={page.path}
+  schema={schema}
+  analytics={false}
+>
+  {
+    /* Before anything below is painted: tells the CSS whether a message is
+      waiting, so a recipient sees the telegram first instead of the pitch for
+      writing one, and the desk is hidden entirely without JavaScript. Reads
+      the hash and nothing else. */
+  }
+  <script is:inline>
+    document.documentElement.dataset.message = /(^#?|&)m=/.test(location.hash)
+      ? 'incoming'
+      : 'compose'
+  </script>
+
+  <PageShell width="prose" trail={trail} h1={page.h1} intro={page.intro} instrumentFirst>
+    <div class="mfm-live">
+      <MessageDesk client:load />
+    </div>
+
+    <noscript>
+      <div class="mf-panel grid gap-3 p-6 sm:p-8">
+        <p class="mf-engraved">Wire office closed</p>
+        <p class="font-display text-h3 text-ink">
+          This desk needs JavaScript to read or write a message.
+        </p>
+        <p class="text-muted">
+          If someone sent you a link, the message is still inside it. Open the same link in your
+          phone's own browser, rather than a chat app's built-in viewer, and it will play. In the
+          meantime, the reading guide below needs nothing at all.
+        </p>
+        <p>
+          <a class="text-signal underline underline-offset-4" href="/learn-morse-code-in-7-days/"
+            >Read the {numberWord(FACTS.planDays)}-day plan</a
+          >
+        </p>
+      </div>
+    </noscript>
+
+    <article slot="more" class="mf-prose text-muted">
+      <h2 class="leading-tight text-ink">Got a message? How to read Morse code</h2>
+      <p>
+        Morse code writes every letter as a short pattern of two signals: a short one, the dot, and
+        a long one, the dash, which lasts {numberWord(UNITS.DASH)} times as long. The letters people use
+        most got the shortest patterns. E is {describeElements(MORSE_ALPHABET.E ?? '')} (<span
+          class="font-mono tracking-code text-ink">{code('E')}</span
+        >), T is {describeElements(MORSE_ALPHABET.T ?? '')} (<span
+          class="font-mono tracking-code text-ink">{code('T')}</span
+        >), and A is the two together (<span class="font-mono tracking-code text-ink"
+          >{code('A')}</span
+        >).
+      </p>
+      <p>
+        The silences carry meaning too. Inside a letter the beats are one dot apart. Between letters
+        the gap stretches to {numberWord(UNITS.CHARACTER_GAP)} dots, and between words to {
+          numberWord(UNITS.WORD_GAP)
+        }. That is how a stream of beeps falls apart into words, and why the message on the tape is
+        printed in groups.
+      </p>
+      <p>
+        To read the message above, press play and listen for the rhythm of each letter rather than
+        counting its beats. Tap any single letter on the tape to hear it alone, as often as you
+        like. The slow setting leaves more space between letters without slowing the letters
+        themselves, which is <a href="/blog/what-farnsworth-timing-is/">Farnsworth timing</a>, the
+        way operators are trained. The lamp flashes with every beat, so the message can be read with
+        the sound off. Stuck on a letter? The <a href="/morse-code-alphabet/">Morse code alphabet</a
+        > lists every pattern.
+      </p>
+
+      <h2 class="leading-tight text-ink">Learning to read it by ear</h2>
+      <p>
+        Looking letters up in a chart gets one message read. Hearing them as sounds is what makes
+        the next one easy, and it takes less time than most people expect. MorseForge teaches the {
+          FACTS.letterCount
+        } letters by ear over {numberWord(FACTS.planDays)} short days, about {FACTS.planTime} of practice
+        in total, starting with E and T. <a href="/learn/">Start the first lesson</a>, or read <a
+          href="/learn-morse-code-in-7-days/">the {numberWord(FACTS.planDays)}-day plan</a
+        > first.
+      </p>
+
+      <h2 class="leading-tight text-ink">Where the message is kept</h2>
+      <p>
+        The message sits after the # sign in the link, the part of a web address called the
+        fragment. Browsers never send the fragment when they ask for a page, so the server behind
+        this site only ever sees a request for the message page, never the message. This page also
+        skips the site's visitor statistics, which would record the full address, and the app's own
+        usage counter sends only that a message link was opened and whether it worked. The message
+        stays in the link and in your browser history.
+      </p>
+      <p>
+        That makes it private from this site, not secret. Morse code is an encoding, not encryption,
+        and anyone who has the link can read it.
+      </p>
+
+      <h2 class="leading-tight text-ink">Writing one back</h2>
+      <p>
+        A message can be up to {MESSAGE_MAX} characters: the {FACTS.letterCount} letters, the {
+          numberWord(FACTS.digitCount)
+        } digits, {symbolCount} punctuation marks and the accented letters {extended}. Emoji and
+        most symbols have no Morse code, and the form says which ones it cannot send. Write your
+        reply, create the link, and send it however you like.
+      </p>
+    </article>
+
+    <Faq slot="more" items={faq} />
+  </PageShell>
+</BaseLayout>

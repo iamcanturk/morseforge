@@ -12,15 +12,28 @@ import {
   masteredCharacters,
   overallMastery,
   setMethod,
+  stagesTaught,
   summarize,
+  isCompleteProgress,
+  newlyUnlocked,
+  unlockForSession,
   unlockNext,
+  unlockTaught,
+  unlockThrough,
   unlockedCharacters,
   accuracyBySkill,
   weakestSkill,
 } from './progress'
 import { createMemoryDriver } from './store'
 import { SKILLS } from '../game/mastery'
+import { MAX_INTERVAL_MS } from '../game/spacedRepetition'
 import { ALL_LETTERS } from '../data/morseAlphabet'
+import { LESSON_STAGES } from '../data/lessonStages'
+import { LESSON_STAGES as NEXT_ACTION_STAGES, lessonStagesDone } from '../game/nextAction'
+import {
+  LESSON_STAGES as LESSON_SCREEN_STAGES,
+  currentStageIndex,
+} from '../components/Lesson/lesson'
 
 const T0 = 1_700_000_000_000
 const empty = emptyProgress
@@ -300,6 +313,121 @@ describe('learning method', () => {
   })
 })
 
+describe('staged unlocking (the default method)', () => {
+  it('starts a fresh record on stage 1', () => {
+    expect(unlockedCharacters(empty())).toEqual(['E', 'T'])
+  })
+
+  it('unlocks the whole next stage at once, not one letter', () => {
+    const record = unlockNext(empty())
+    expect(unlockedCharacters(record)).toEqual(['E', 'T', 'I', 'A', 'N', 'M'])
+    expect(unlockedCharacters(unlockNext(record))).toHaveLength(14)
+  })
+
+  it('stops at the end of the order, digits included', () => {
+    let record = empty()
+    for (let i = 0; i < 20; i++) record = unlockNext(record)
+    expect(unlockedCharacters(record)).toHaveLength(36)
+    expect(unlockNext(record)).toBe(record)
+  })
+})
+
+describe('unlockThrough', () => {
+  it('raises the pool to cover the first `count` characters', () => {
+    expect(unlockedCharacters(unlockThrough(empty(), 6))).toEqual(['E', 'T', 'I', 'A', 'N', 'M'])
+  })
+
+  it('never lowers progress', () => {
+    // The practice screen may already have unlocked further than the lesson
+    // that is now catching up; the lesson must not take characters back.
+    const ahead = unlockNext(unlockNext(empty()))
+    expect(unlockThrough(ahead, 6)).toBe(ahead)
+    expect(unlockThrough(ahead, 0)).toBe(ahead)
+    expect(unlockThrough(ahead, -3)).toBe(ahead)
+    expect(unlockThrough(ahead, Number.NaN)).toBe(ahead)
+  })
+
+  it('is idempotent', () => {
+    const once = unlockThrough(empty(), 14)
+    expect(unlockThrough(once, 14)).toBe(once)
+  })
+
+  it('clamps at the end of the order', () => {
+    expect(unlockedCharacters(unlockThrough(empty(), 9999))).toHaveLength(36)
+  })
+})
+
+describe('unlockTaught', () => {
+  it('unlocks exactly the taught stages under Signal', () => {
+    const record = unlockTaught(empty(), ['E', 'T', 'I', 'A', 'N', 'M'])
+    expect(unlockedCharacters(record)).toEqual(['E', 'T', 'I', 'A', 'N', 'M'])
+  })
+
+  it('does not hand Koch learners characters nobody taught them', () => {
+    // Koch's order is K M R S U A ..., so teaching E and T covers no new
+    // prefix of it. Unlocking through to E would add a dozen unseen letters.
+    const koch = setMethod(empty(), 'koch')
+    expect(unlockTaught(koch, ['E', 'T'])).toBe(koch)
+  })
+
+  it('never lowers progress', () => {
+    const ahead = unlockThrough(empty(), 26)
+    expect(unlockTaught(ahead, ['E', 'T'])).toBe(ahead)
+  })
+})
+
+describe('stagesTaught', () => {
+  it('is zero for a fresh record', () => {
+    expect(stagesTaught(empty(), T0)).toBe(0)
+  })
+
+  it('counts a stage once every character in it has been answered correctly', () => {
+    let record = answer(empty(), 'E', 'sending', true, T0)
+    expect(stagesTaught(record, T0)).toBe(0)
+    record = answer(record, 'T', 'sending', true, T0)
+    expect(stagesTaught(record, T0)).toBe(1)
+  })
+
+  it('counts from the first stage, not a total', () => {
+    // Drilling stage 2 without stage 1 does not put anyone two stages in.
+    let record = empty()
+    for (const character of ['I', 'A', 'N', 'M']) {
+      record = answer(record, character, 'sending', true, T0)
+    }
+    expect(stagesTaught(record, T0)).toBe(0)
+  })
+
+  it('counts the plan days the lesson teaches, not the four tree layers', () => {
+    // Stages 1 to 4 of the lesson are E T / I A N M / S U R W / D K G O: the
+    // first three tree layers. Counted over the layers this read as 3.
+    let record = empty()
+    for (const character of LESSON_STAGES.slice(0, 4).flat()) {
+      record = answer(record, character, 'sending', true, T0)
+    }
+    expect(stagesTaught(record, T0)).toBe(4)
+  })
+
+  it('agrees with the lesson screen and the next-action rule at every stage', () => {
+    expect(LESSON_STAGES).toEqual(LESSON_SCREEN_STAGES)
+    expect(LESSON_STAGES).toEqual(NEXT_ACTION_STAGES)
+    let record = empty()
+    for (let stage = 0; stage <= LESSON_STAGES.length; stage++) {
+      expect(stagesTaught(record, T0), `after ${stage}`).toBe(stage)
+      expect(currentStageIndex(record, T0), `after ${stage}`).toBe(stage)
+      expect(lessonStagesDone(record, T0), `after ${stage}`).toBe(stage)
+      for (const character of LESSON_STAGES[stage] ?? []) {
+        record = answer(record, character, 'sending', true, T0)
+      }
+    }
+  })
+
+  it('does not call the course done when the letters are done but the digits are not', () => {
+    let record = empty()
+    for (const character of ALL_LETTERS) record = answer(record, character, 'sending', true, T0)
+    expect(stagesTaught(record, T0)).toBe(LESSON_STAGES.length - 1)
+  })
+})
+
 describe('accuracyBySkill', () => {
   it('reports each skill separately rather than one average', () => {
     // The §20 point: a single lifetime figure hides that sending runs well
@@ -364,5 +492,84 @@ describe('weakestSkill', () => {
 
   it('says nothing for a fresh learner', () => {
     expect(weakestSkill(empty(), ALL_LETTERS, T0)).toBeNull()
+  })
+})
+
+describe('unlockForSession', () => {
+  const good = { accuracy: 0.95, total: 30 }
+
+  it('unlocks exactly one stage for a good session', () => {
+    expect(unlockedCharacters(unlockForSession(empty(), good))).toHaveLength(6)
+  })
+
+  it('leaves the record alone below the bar or on too few answers', () => {
+    const record = empty()
+    expect(unlockForSession(record, { accuracy: 0.89, total: 30 })).toBe(record)
+    expect(unlockForSession(record, { accuracy: 1, total: 24 })).toBe(record)
+  })
+
+  it('reports which characters arrived', () => {
+    const before = empty()
+    expect(newlyUnlocked(before, unlockForSession(before, good))).toEqual(['I', 'A', 'N', 'M'])
+    expect(newlyUnlocked(before, before)).toEqual([])
+  })
+})
+
+describe('one store per key per page', () => {
+  it('returns the same instance for the same driver', () => {
+    const driver = createMemoryDriver()
+    expect(createProgressStore(driver)).toBe(createProgressStore(driver))
+    expect(createProgressStore(driver)).not.toBe(createProgressStore(createMemoryDriver()))
+  })
+
+  it('keeps the session’s answers through an unlock made by another screen', () => {
+    // The practice screen and its session hook each called the factory. With
+    // separate caches, the screen's unlock wrote its mount-time copy over the
+    // answers the session had just saved, and the next answer undid the unlock.
+    const driver = createMemoryDriver()
+    const screen = createProgressStore(driver)
+    const session = createProgressStore(driver)
+    screen.read()
+    session.read()
+
+    for (let i = 0; i < 30; i++) {
+      session.update((record) => answer(record, 'E', 'listening', true, T0 + i))
+    }
+    screen.update((record) => unlockForSession(record, { accuracy: 1, total: 30 }))
+    session.update((record) => answer(record, 'T', 'listening', true, T0 + 31))
+
+    const stored = createProgressStore(driver)
+    stored.invalidate()
+    const reloaded = stored.read()
+    expect(reloaded.characters['E']?.skills.listening.attempts).toBe(30)
+    expect(unlockedCharacters(reloaded)).toHaveLength(6)
+  })
+})
+
+describe('isCompleteProgress', () => {
+  it('needs a character map, and accepts old exports without a method', () => {
+    expect(isCompleteProgress({ characters: {} })).toBe(true)
+    expect(isCompleteProgress({ method: 'signal' })).toBe(false)
+    expect(isCompleteProgress({ characters: {}, unlocked: 'many' })).toBe(false)
+    expect(isCompleteProgress({ characters: { E: 'garbage' } })).toBe(false)
+    expect(isCompleteProgress({ characters: { E: {} } })).toBe(true)
+  })
+})
+
+describe('schedule ceilings', () => {
+  it('pulls a review due in the far future back within the longest interval', () => {
+    // A due date in 2099 would hide the character from practice for good.
+    const driver = createMemoryDriver()
+    const far = Date.UTC(2099, 0, 1)
+    driver.setItem(
+      PROGRESS_KEY,
+      JSON.stringify({
+        version: PROGRESS_VERSION,
+        data: { characters: { E: { schedule: { dueAt: far, intervalMs: 1e30 } } } },
+      }),
+    )
+    const schedule = getCharacter(createProgressStore(driver).read(), 'E', T0).schedule
+    expect(schedule.dueAt).toBeLessThan(far)
+    expect(schedule.intervalMs).toBe(MAX_INTERVAL_MS)
   })
 })

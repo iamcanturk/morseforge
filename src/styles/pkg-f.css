@@ -1,0 +1,335 @@
+/*
+ * Copy practice and the daily wire (package F).
+ *
+ * Only what the shared Signal Office classes lack: the answer key printed on
+ * tape, the per-line squares, and the punched-tape history. Colours are
+ * tokens or the tape inks (`--tape-*`, set from palette.ts by tapeInk.ts);
+ * nothing here animates, so there is nothing to honour for reduced motion.
+ */
+
+/* ---- Answer key on tape --------------------------------------------- */
+
+.mf-f-key {
+  display: flex;
+  align-items: stretch;
+  gap: 1rem;
+  font-family: var(--font-mono);
+}
+
+.mf-f-key-labels {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  align-items: center;
+  flex: none;
+  padding-inline-end: 1rem;
+  border-inline-end: 1px dashed var(--tape-quiet);
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--tape-quiet);
+}
+
+.mf-f-slots {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.4em;
+  row-gap: 0.75rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.mf-f-key-compact {
+  --strike: 0.75px;
+}
+
+.mf-f-key-compact .mf-f-slots {
+  column-gap: 0.3em;
+  row-gap: 0.5rem;
+  font-size: 1.0625rem;
+}
+
+.mf-f-slot {
+  display: grid;
+  grid-template-rows: auto auto;
+  justify-items: center;
+  min-inline-size: 1.1ch;
+  line-height: 1.2;
+}
+
+.mf-f-sent {
+  color: var(--tape-hit);
+}
+
+.mf-f-given {
+  font-weight: 400;
+  font-size: 0.8em;
+  color: var(--tape-hit);
+}
+
+/* Struck through on the diagonal: a horizontal strike turns Y into ¥. */
+.mf-f-slot[data-mark='miss'] .mf-f-sent,
+.mf-f-slot[data-mark='wrong'] .mf-f-sent {
+  position: relative;
+  color: var(--tape-miss);
+}
+
+.mf-f-slot[data-mark='miss'] .mf-f-sent::after,
+.mf-f-slot[data-mark='wrong'] .mf-f-sent::after {
+  content: '';
+  position: absolute;
+  inset: 8% -12%;
+  background: linear-gradient(
+    to top right,
+    transparent calc(50% - var(--strike, 1.5px)),
+    currentColor calc(50% - var(--strike, 1.5px)) calc(50% + var(--strike, 1.5px)),
+    transparent calc(50% + var(--strike, 1.5px))
+  );
+  pointer-events: none;
+}
+
+.mf-f-slot[data-mark='miss'] .mf-f-given {
+  color: var(--tape-quiet);
+}
+
+.mf-f-slot[data-mark='wrong'] .mf-f-given {
+  color: var(--tape-miss);
+  font-weight: 700;
+}
+
+.mf-f-slot[data-mark='extra'] .mf-f-sent {
+  color: var(--tape-quiet);
+}
+
+.mf-f-slot[data-mark='extra'] .mf-f-given {
+  color: var(--tape-extra);
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.2em;
+}
+
+/* ---- A line on the result list -------------------------------------- */
+
+.mf-f-line {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding-block: 20px 10px;
+}
+
+.mf-f-line-no {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  color: var(--tape-quiet);
+}
+
+.mf-f-line-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  color: var(--tape-hit);
+}
+
+.mf-f-line-text {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--tape-hit);
+}
+
+/* ---- Line squares: a shape per tone, not only a colour -------------- */
+
+.mf-f-tone {
+  --tone: var(--color-line-strong);
+  display: inline-block;
+  flex: none;
+  inline-size: 14px;
+  block-size: 14px;
+  border: 2px solid var(--tone);
+  border-radius: 2px;
+}
+
+.mf-f-tone[data-tone='perfect'] {
+  --tone: var(--tape-clean, var(--color-signal));
+  background: var(--tone);
+}
+
+.mf-f-tone[data-tone='pass'] {
+  --tone: var(--tape-extra, var(--color-amber));
+  background: linear-gradient(to top, var(--tone) 50%, transparent 50%);
+}
+
+.mf-f-tone[data-tone='under'] {
+  --tone: var(--tape-miss, var(--color-danger));
+}
+
+/* Unplayed, while a run is still going. */
+.mf-f-tone[data-tone='pending'] {
+  --tone: var(--color-line-strong);
+  border-style: dashed;
+}
+
+.mf-f-tone-lg {
+  inline-size: 22px;
+  block-size: 22px;
+}
+
+/* ---- Punched-tape history ------------------------------------------- */
+
+.mf-f-holes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-block: 22px 12px;
+}
+
+.mf-f-hole {
+  position: relative;
+  display: inline-block;
+  inline-size: 18px;
+  block-size: 18px;
+  border-radius: 999px;
+  border: 2px solid var(--tape-quiet);
+}
+
+/* Attempted: punched through. Filled in tape ink rather than the desk
+   colour, which is cream in the light theme and would read as a ring. */
+.mf-f-hole[data-state='done'] {
+  border-color: var(--tape-hit);
+  background: var(--tape-hit);
+}
+
+/* Fourteen holes on one row of a phone-width tape. */
+@media (max-width: 39.99rem) {
+  .mf-f-holes {
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+
+  .mf-f-holes .mf-f-hole {
+    inline-size: 12px;
+    block-size: 12px;
+  }
+}
+
+/* Today, not played yet: a ring with a dot to say "this one is open". */
+.mf-f-hole[data-state='open'] {
+  border-style: dashed;
+  border-color: var(--tape-hit);
+}
+
+.mf-f-hole[data-today='true']::after {
+  content: '';
+  position: absolute;
+  inset-inline: -2px;
+  inset-block-start: calc(100% + 4px);
+  block-size: 2px;
+  background: var(--tape-hit);
+}
+
+.mf-f-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+  font-size: 0.875rem;
+  color: var(--color-muted);
+}
+
+.mf-f-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mf-f-legend .mf-f-hole {
+  inline-size: 14px;
+  block-size: 14px;
+}
+
+/* The legend printed on the tape it explains, in tape ink. */
+.mf-f-legend-tape {
+  padding-block-start: 6px;
+  border-block-start: 1px dashed var(--tape-quiet);
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--tape-quiet);
+}
+
+/* ---- The share text as a typed telegram ----------------------------- */
+
+.mf-f-telegram {
+  margin: 0;
+  padding-block: 24px 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  letter-spacing: 0;
+}
+
+/* ---- The copy answer field ------------------------------------------ */
+
+/* A whole line, so mono and tracked like the tape it is checked against,
+   with a placeholder at reading size rather than at 3rem. */
+.mf-f-answer {
+  font-family: var(--font-mono);
+  font-size: clamp(1.5rem, 1rem + 2.5vw, 2.25rem);
+  letter-spacing: 0.16em;
+}
+
+.mf-f-answer::placeholder {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+/* ---- "Received" on an achievement slip ------------------------------ */
+
+/* The stamp motif in tape ink: .mf-stamp's inner ring is panel-coloured,
+   which would show as a dark line on paper. */
+.mf-f-received {
+  flex: none;
+  padding: 0.125rem 0.5rem;
+  border: 2px solid var(--tape-clean);
+  border-radius: 3px;
+  color: var(--tape-clean);
+  font-family: var(--font-display);
+  font-size: var(--text-label);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transform: rotate(-6deg);
+}
+
+/* ---- Copy desk set-up on a phone (V-02) ------------------------------- */
+
+/* One column of text kinds, and only the chosen one keeps its hint: the
+   others are named by their titles, and the rationale under the group
+   explains the chosen one in full. A disabled kind keeps its reason. The
+   hint stays in the accessibility tree through aria-describedby. */
+@media (max-width: 39.99rem) {
+  .mf-f-kinds .mf-option {
+    padding-block: 0.75rem;
+  }
+
+  .mf-f-kinds .mf-option[aria-checked='false']:not([aria-disabled='true']) .mf-option-hint {
+    display: none;
+  }
+
+  /* "My method (12)" in a third of a phone: two lines, not three. */
+  .mf-f-pool .mf-segment {
+    padding-inline: 0.375rem;
+    letter-spacing: 0.02em;
+    line-height: 1.25;
+  }
+}

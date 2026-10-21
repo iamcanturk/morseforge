@@ -1,0 +1,37 @@
+---
+/**
+ * A keycap tile for one character: the character, its code, and an optional
+ * engraved caption ("Mirror image"). A link when the character has a page.
+ */
+import { CHARACTERS } from '../../data/characters'
+import { prettify } from '../../engine/morseEncoder'
+import { characterHref } from './reference'
+
+export interface Props {
+  character: string
+  caption?: string
+  /** Visual size of the character. */
+  size?: 'md' | 'lg'
+}
+
+const { character, caption, size = 'md' } = Astro.props
+const facts = CHARACTERS[character]
+if (!facts) throw new Error(`CharTile: no facts for "${character}"`)
+const href = characterHref(character)
+const Tag = href ? 'a' : 'div'
+/** What the tile shows, in order: a name that starts with it can be spoken to press it (WCAG 2.5.3). */
+const visible = [caption, character, facts.spoken].filter(Boolean).join(' ')
+---
+
+<Tag
+  href={href ?? undefined}
+  class:list={['mf-card pkg-n-tile', size === 'lg' && 'pkg-n-tile-lg']}
+  aria-label={href ? `${visible}: ${character} in Morse code` : undefined}
+>
+  {caption && <span class="mf-engraved">{caption}</span>}{' '}
+  <span class="pkg-n-tile-char font-display font-bold text-ink">{character}</span>{' '}
+  <span class="font-mono tracking-code text-cyan" aria-hidden="true">{prettify(facts.code)}</span>{
+    ' '
+  }
+  <span class="text-sm text-muted">{facts.spoken}</span>
+</Tag>

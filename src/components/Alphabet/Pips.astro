@@ -1,0 +1,22 @@
+---
+/**
+ * A Morse code drawn as engraved pips: a round dot, and a dash three dots
+ * long, spaced by one unit, the proportions the code itself is timed in.
+ *
+ * Decorative: the caller always puts the code in text as well (an accessible
+ * label, a visible readout or the print-only ASCII), so this is aria-hidden.
+ * The code arrives from the alphabet, never typed.
+ */
+export interface Props {
+  code: string
+  size?: 'md' | 'lg'
+  class?: string
+}
+
+const { code, size = 'md', class: className } = Astro.props
+const elements = [...code].filter((element) => element === '.' || element === '-')
+---
+
+<span class:list={['pi-pips', size === 'lg' && 'pi-pips-lg', className]} aria-hidden="true">
+  {elements.map((element) => <span class="pi-pip" data-el={element === '.' ? 'dit' : 'dah'} />)}
+</span>

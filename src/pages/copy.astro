@@ -1,50 +1,47 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro'
+import PageShell from '../components/PageShell.astro'
+import Faq from '../components/Faq.astro'
 import { CopyScreen } from '../components/Copy/CopyScreen'
+import { breadcrumbTrail, getPage } from '../config/pages'
+import { faqFor } from '../data/faq'
+import { breadcrumbs, webPage } from '../seo/schema'
+import '../styles/pkg-f.css'
 
-const title = 'Morse Code Copy Practice — Code Groups, Words and Callsigns | MorseForge'
-const description =
-  'Practise copying whole lines of Morse: random five-character code groups, common words, on-air phrases and callsigns. Every line is graded character by character, so you see exactly what you missed.'
+const page = getPage('/copy/')
+const trail = breadcrumbTrail(page.path)
+const faq = faqFor(page.path)
+const practice = getPage('/practice/')
+const challenge = getPage('/challenge/')
+const daily = getPage('/daily/')
+
+const schema = [
+  webPage({ path: page.path, name: page.h1, description: page.description }),
+  breadcrumbs(trail),
+]
 ---
 
-<BaseLayout title={title} description={description} path="/copy/">
-  <main class="mx-auto max-w-3xl px-6 py-14">
-    <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Copy practice</h1>
-    <p class="mt-3 leading-relaxed text-muted">
-      Knowing every character and being able to copy a line are different skills. A whole line
-      arrives at once here — write down what you got, and see character by character what you
-      missed.
-    </p>
+<BaseLayout title={page.title} description={page.description} path={page.path} schema={schema}>
+  <PageShell
+    width="tool"
+    trail={trail}
+    h1={page.h1}
+    intro={page.intro}
+    instrumentFirst
+    instrumentClass="max-w-4xl"
+  >
+    <CopyScreen client:load />
 
-    <div class="mt-10">
-      <CopyScreen client:load />
+    <div slot="more" class="mf-prose max-w-[68ch]">
+      <p>
+        Working on single characters instead? Try <a href={practice.path}>{practice.navLabel}</a>{
+          ' '
+        }
+        or the <a href={challenge.path}>{challenge.navLabel}</a>. Want the same lines as everyone
+        else today? That is the <a href={daily.path}>{daily.navLabel.toLowerCase()}</a>.
+      </p>
     </div>
 
-    <section class="mt-16 border-t border-line pt-10">
-      <h2 class="font-display text-xl font-bold tracking-tight">Why five-character groups?</h2>
-      <p class="mt-3 leading-relaxed text-muted">
-        Because they cannot be guessed. Real words let you fill in a missing letter from the ones
-        either side, which is a useful skill but hides what you can actually hear. Random groups
-        measure copying and nothing else, which is why every proficiency test has used them for a
-        century. Five is about as much as anyone holds before the next group starts.
-      </p>
-
-      <h2 class="mt-8 font-display text-xl font-bold tracking-tight">
-        Should I write it down or type it?
-      </h2>
-      <p class="mt-3 leading-relaxed text-muted">
-        Type it here so it can be graded, but the habit worth building is copying a character or two
-        <em>behind</em> the sending rather than trying to keep up. Falling behind on purpose is how operators
-        reach high speeds — you are decoding the last character while hearing the next.
-      </p>
-
-      <p class="mt-8 text-sm leading-relaxed text-muted">
-        Working on individual characters instead? Try
-        <a href="/practice/" class="text-signal underline underline-offset-4">practice</a>, or the
-        <a href="/challenge/" class="text-signal underline underline-offset-4">
-          60-second challenge</a
-        >.
-      </p>
-    </section>
-  </main>
+    {faq.length > 0 && <Faq slot="more" items={faq} />}
+  </PageShell>
 </BaseLayout>

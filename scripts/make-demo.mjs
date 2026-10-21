@@ -8,8 +8,9 @@
  *
  * Nothing here is decorative licence. Node positions come from `layoutTree`,
  * the route through the tree from `pathTo`, element durations from
- * `buildTimeline`, and the colours are read out of `global.css`. Change the
- * alphabet and this animation changes with it.
+ * `buildTimeline`, and the colours come from `src/styles/palette.ts`, the
+ * module the share cards and brand assets draw from. Change the alphabet or
+ * the palette and this animation changes with it.
  *
  * Writes SVG frames only. Turning them into a GIF is ImageMagick's job and
  * happens in `npm run demo`, so nothing here shells out.
@@ -28,6 +29,7 @@ const FRAME_DIR = join(ROOT, '.demo-frames')
 const { layoutTree, pathTo } = await import(join(ROOT, 'src/data/tree.ts'))
 const { buildTimeline } = await import(join(ROOT, 'src/engine/timingEngine.ts'))
 const { MORSE_ALPHABET } = await import(join(ROOT, 'src/data/morseAlphabet.ts'))
+const { DARK, SCREEN, SCREEN_GLASS } = await import(join(ROOT, 'src/styles/palette.ts'))
 
 /* -------------------------------------------------------------------------- */
 
@@ -38,23 +40,23 @@ const WIDTH = 760
 const HEIGHT = 400
 export const FPS = 10
 
-/** Read the palette from the stylesheet, so a rebrand cannot leave this behind. */
-function palette() {
-  const css = readFileSync(join(ROOT, 'src/styles/global.css'), 'utf8')
-  const read = (name, fallback) =>
-    (new RegExp(`--color-${name}:\\s*([^;]+);`).exec(css)?.[1] ?? fallback).trim()
-
-  return {
-    void: read('void', '#080b10'),
-    panel: read('panel', '#10151d'),
-    line: read('line', '#202a38'),
-    signal: read('signal', '#00e88f'),
-    cyan: read('cyan', '#22d3ee'),
-    muted: read('muted', '#8b98a5'),
-  }
+/**
+ * The tree is drawn on CRT glass, as it is in the app: phosphor for what has
+ * been sent, amber for the element being keyed right now, and the bezel in
+ * brass. Glass tokens are the same in both themes, so one rendering fits the
+ * README on a light or a dark GitHub.
+ */
+const C = {
+  glass: SCREEN_GLASS,
+  node: SCREEN_GLASS.body,
+  edge: SCREEN['line-strong'],
+  signal: SCREEN.signal,
+  live: SCREEN.amber,
+  muted: SCREEN.muted,
+  bezel: DARK['brass-deep'],
+  plate: DARK.brass,
+  casing: DARK.void,
 }
-
-const C = palette()
 
 /**
  * When each character is keyed, and when each of its elements lands.
@@ -107,7 +109,19 @@ const py = (depth) => PAD_TOP + (depth / 4) * TREE_H
 const escape = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
 function frame(elapsed) {
-  const parts = [`<rect width="${WIDTH}" height="${HEIGHT}" fill="${C.void}"/>`]
+  // ImageMagick's built-in SVG renderer drops everything drawn after a gradient
+  // definition, so the glass is flat fills: the body, then three
+  // stacked ellipses that stand in for the lighter centre.
+  const parts = [
+    `<rect width="${WIDTH}" height="${HEIGHT}" fill="${C.casing}"/>`,
+    `<rect x="6" y="6" width="${WIDTH - 12}" height="${HEIGHT - 12}" rx="14" fill="${C.glass.body}" ` +
+      `stroke="${C.bezel}" stroke-width="3"/>`,
+    ...[0.46, 0.38, 0.3].map(
+      (scale) =>
+        `<ellipse cx="${WIDTH / 2}" cy="${HEIGHT * 0.46}" rx="${WIDTH * scale}" ry="${HEIGHT * scale * 0.9}" ` +
+        `fill="${C.glass.centre}" opacity="0.28"/>`,
+    ),
+  ]
 
   const active = events.find((e) => elapsed >= e.start && elapsed <= e.end)
   const done = events.filter((e) => elapsed > e.end)
@@ -129,7 +143,7 @@ function frame(elapsed) {
     parts.push(
       `<line x1="${px(parent.x).toFixed(1)}" y1="${py(parent.node.depth).toFixed(1)}" ` +
         `x2="${px(entry.x).toFixed(1)}" y2="${py(entry.node.depth).toFixed(1)}" ` +
-        `stroke="${lit ? C.cyan : C.line}" stroke-width="${lit ? 2.4 : 1}"/>`,
+        `stroke="${lit ? C.live : C.edge}" stroke-width="${lit ? 2.4 : 1}"/>`,
     )
   }
 
@@ -142,7 +156,7 @@ function frame(elapsed) {
     const known = learned.has(node.code)
 
     const radius = isRoot ? 9 : 11
-    const fill = known ? C.signal : lit ? C.cyan : C.panel
+    const fill = known ? C.signal : lit ? C.live : C.node
 
     if (known || lit) {
       parts.push(
@@ -151,14 +165,14 @@ function frame(elapsed) {
     }
     parts.push(
       `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${radius}" ` +
-        `fill="${isRoot ? C.cyan : fill}" stroke="${known || lit ? fill : C.line}" stroke-width="1.6"/>`,
+        `fill="${isRoot ? C.live : fill}" stroke="${known || lit ? fill : C.edge}" stroke-width="1.6"/>`,
     )
 
     if (node.character) {
       parts.push(
         `<text x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="middle" ` +
           `font-family="Menlo, monospace" font-size="11" font-weight="700" ` +
-          `fill="${known || lit ? C.void : C.muted}">${escape(node.character)}</text>`,
+          `fill="${known || lit ? C.glass.rim : C.muted}">${escape(node.character)}</text>`,
       )
     }
   }
@@ -174,7 +188,7 @@ function frame(elapsed) {
     parts.push(
       `<text x="${(startX + index * spacing).toFixed(1)}" y="${baseline}" text-anchor="middle" ` +
         `font-family="Helvetica, Arial, sans-serif" font-size="30" font-weight="700" ` +
-        `fill="${isDone ? C.signal : isActive ? C.cyan : C.line}">${escape(character)}</text>`,
+        `fill="${isDone ? C.signal : isActive ? C.live : C.edge}">${escape(character)}</text>`,
     )
   })
 
@@ -184,12 +198,12 @@ function frame(elapsed) {
     : ''
   parts.push(
     `<text x="${WIDTH / 2}" y="${baseline + 32}" text-anchor="middle" ` +
-      `font-family="Menlo, monospace" font-size="15" letter-spacing="3" fill="${C.cyan}">${escape(pretty)}</text>`,
+      `font-family="Menlo, monospace" font-size="15" letter-spacing="3" fill="${C.live}">${escape(pretty)}</text>`,
   )
 
   parts.push(
     `<text x="${WIDTH / 2}" y="${HEIGHT - 18}" text-anchor="middle" ` +
-      `font-family="Menlo, monospace" font-size="11" letter-spacing="2.5" fill="${C.muted}">` +
+      `font-family="Menlo, monospace" font-size="11" letter-spacing="2.5" fill="${C.plate}">` +
       `MORSEFORGE · morse.iamcanturk.dev</text>`,
   )
 

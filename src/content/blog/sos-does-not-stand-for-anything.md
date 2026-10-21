@@ -1,7 +1,9 @@
 ---
 title: SOS does not stand for anything
+seoTitle: What Does SOS Stand For? Nothing — Here Is Why
 description: It was chosen because three dots, three dashes, three dots is unmistakable — not because it abbreviates a phrase. Save Our Souls came afterwards.
 published: 2026-08-23
+updated: 2026-10-21
 answer: SOS was adopted in 1906 because the pattern three dots, three dashes, three dots is impossible to mistake for anything else, even through interference. It is sent as one continuous signal with no gaps between letters, so it is not really the letters S, O and S at all. Save Our Souls and Save Our Ship are backronyms invented later to explain a choice that was made purely on how the signal sounds.
 tags: [history, reference]
 ---
@@ -56,8 +58,8 @@ transmission" signal, not the letters K and A.
 
 Before 1906 the Marconi company used **CQD** — `-.-. --.- -..` — which is
 sometimes explained as "Come Quick, Danger". That is also a backronym. CQ was
-(and remains) the general call to any station, from the French _sécurité_; the
-D was simply appended for distress.
+(and remains) the general call to any station, usually said to come from the
+French _sécurité_; the D was simply appended for distress.
 
 Both were in use for a while. The _Titanic_ sent both in 1912, which is often
 retold as the moment SOS took over, though it had already been the standard for

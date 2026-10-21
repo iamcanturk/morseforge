@@ -1,0 +1,350 @@
+---
+/**
+ * Section 1, "The Station" (TASK-001 §5.2; flow audit P2).
+ *
+ * The H1 and the lead on the left, a working straight key on the right. The
+ * prerendered HTML is step one of the first-signal drill, complete and
+ * readable without JavaScript; `station.ts` takes it over on load. No React:
+ * the instrument is vanilla TypeScript on the framework-agnostic engine.
+ *
+ * Every word comes from the registry (`LANDING.hero`) or is derived from the
+ * alphabet in `hero.ts`; the key's own labels are interface, not copy.
+ */
+import { LANDING } from '../../config/landing'
+import { getPage } from '../../config/pages'
+import { STATS_KEY } from '../../storage/stats'
+import { CONTINUE_LABEL, HERO_TARGETS, codeOf, instructionFor } from './hero'
+
+const { hero, promises } = LANDING
+const page = getPage('/')
+
+/** The H1, with "by ear" lit when the registry's sentence still contains it. */
+const ACCENT = 'by ear'
+const at = page.h1.indexOf(ACCENT)
+const h1 =
+  at < 0
+    ? { before: page.h1, accent: '', after: '' }
+    : {
+        before: page.h1.slice(0, at),
+        accent: ACCENT,
+        after: page.h1.slice(at + ACCENT.length),
+      }
+
+const first = HERO_TARGETS[0] ?? ''
+const firstCode = codeOf(first)
+/** The code as drawn elements: a dot is one unit wide, a dash three (CSS). */
+const elements = (code: string) => [...code].map((element) => (element === '.' ? 'dot' : 'dash'))
+---
+
+<section id="station" class="hero" aria-labelledby="hero-title">
+  <div class="hero-grid mx-auto max-w-7xl px-5 sm:px-6">
+    {
+      /*
+        DOM order is the reading order: H1, lead, station, actions. Below 64rem
+        the grid shows the station straight under the H1 and the lead under the
+        station (DEC-044, J-11), so the key is in the first screenful on a
+        phone. The lead holds no controls, so the tab order still matches what
+        is on screen.
+      */
+    }
+    <div class="hero-head">
+      <p class="flex items-center gap-2.5">
+        <span class="mf-lamp" data-on="true" aria-hidden="true"></span>
+        <span class="mf-engraved text-brass">{hero.eyebrow}</span>
+      </p>
+      <h1 id="hero-title" class="hero-title mt-3 font-display font-bold text-ink sm:mt-5">
+        {h1.before}{h1.accent && <span class="text-signal">{h1.accent}</span>}{h1.after}
+      </h1>
+    </div>
+    <p class="hero-lead max-w-[38ch] text-muted sm:text-lead">{hero.lead}</p>
+
+    <div class="hero-station">
+      {
+        /*
+        The instrument. tabindex=-1 so a click anywhere on its face (not only on
+        the key) gives it focus, and Space keys from there. Space is bound to
+        this element only: anywhere else on the page it still scrolls.
+      */
+      }
+      <div
+        class="station mf-instrument"
+        data-station
+        data-view="drill"
+        data-phase="await"
+        tabindex="-1"
+      >
+        <div class="station-plate">
+          <h2 class="mf-engraved whitespace-nowrap text-ink">
+            <span class="station-heading-first">{hero.key.heading}</span><span
+              class="station-heading-back">{hero.key.welcomeHeading}</span
+            >
+          </h2>
+          <div class="flex items-center gap-4">
+            <span class="station-sound mf-engraved" data-sound>
+              <span data-sound-on class="hidden sm:inline">Sound on</span>
+              <a href="/settings/#signal" class="station-sound-off" data-sound-off hidden
+                >Sound off in Settings</a
+              >
+            </span>
+            <span class="flex items-center gap-2 mf-engraved">
+              <span class="mf-lamp" data-tone="amber" data-tx aria-hidden="true"></span>
+              TX
+            </span>
+          </div>
+        </div>
+
+        <div class="station-screen mf-screen mf-grid" data-screen>
+          <div class="screen-face mf-power-on">
+            <div class="screen-top">
+              <span class="mf-engraved">
+                <span class="hidden sm:inline" data-step-prefix>Your first signal · </span><span
+                  data-step-label>Step 1 of {HERO_TARGETS.length}</span
+                >
+              </span>
+              <ol class="screen-steps" aria-hidden="true">
+                {
+                  HERO_TARGETS.map((target, index) => (
+                    <li data-step-lamp={index}>
+                      <span class="mf-lamp" />
+                      <span>{target}</span>
+                    </li>
+                  ))
+                }
+              </ol>
+            </div>
+
+            {/* Drill: one target at a time. */}
+            <div class="screen-view screen-drill" data-show="drill">
+              <span class="screen-glyph-wrap">
+                <span class="screen-halo" data-halo aria-hidden="true"></span>
+                <span class="screen-glyph font-display mf-phosphor text-signal" data-glyph
+                  >{first}</span
+                >
+              </span>
+              <span class="screen-code">
+                <span class="screen-code-target">
+                  <span class="screen-equals font-mono text-muted" aria-hidden="true">=</span>
+                  <span class="code-els" data-target-code aria-hidden="true">
+                    {elements(firstCode).map((kind) => <span class="code-el" data-el={kind} />)}
+                  </span>
+                </span>
+                <span class="screen-code-sent font-mono" data-sent-code aria-hidden="true"></span>
+              </span>
+            </div>
+
+            {/* Done: the drill is over; the lesson is the next stop. */}
+            <div class="screen-view screen-message" data-show="done">
+              <p class="flex items-center gap-2 mf-engraved text-signal">
+                <span class="mf-lamp" data-on="true" aria-hidden="true"></span>
+                <span data-done-headline>Letters sent</span>
+              </p>
+              <p class="screen-tape-word font-display mf-phosphor text-signal" data-done-word></p>
+              <p class="text-sm text-ink" data-done-detail></p>
+              <div class="flex flex-wrap items-center gap-2">
+                <a href="/learn/" class="mf-btn mf-btn-primary" data-done-link
+                  >Continue in the lesson →</a
+                >
+                <button type="button" class="mf-btn mf-btn-ghost" data-replay>Again</button>
+              </div>
+            </div>
+
+            {/* Welcome back: someone who has keyed before gets a free key. */}
+            {/* "Station open" is the label at the top of the screen; said once (J-01). */}
+            <div class="screen-view screen-message" data-show="welcome">
+              <p class="font-display text-h2 font-bold text-ink">Welcome back.</p>
+              <p class="text-sm text-ink" data-welcome-detail>Pick up where you left off.</p>
+              <div class="flex flex-wrap items-center gap-2">
+                <a href="/learn/" class="mf-btn mf-btn-primary" data-welcome-link
+                  >{CONTINUE_LABEL} →</a
+                >
+                <button type="button" class="mf-btn mf-btn-ghost" data-replay>
+                  Replay {HERO_TARGETS.join(' · ')}
+                </button>
+              </div>
+            </div>
+
+            <div class="screen-foot">
+              <p class="mf-engraved text-signal" data-instruction>{instructionFor(first)}</p>
+              <p class="screen-note text-sm" data-note></p>
+            </div>
+
+            {/* The moment (D1): a flash, a lamp, the stamp line, XP if any was paid. */}
+            <div class="screen-detected" data-detected aria-hidden="true">
+              <span class="mf-lamp mf-lamp-lg" data-on="true"></span>
+              <span class="font-display font-bold text-signal">Signal detected</span>
+              <span class="screen-xp font-mono text-amber" data-xp></span>
+              <span class="screen-award mf-engraved text-amber" data-award></span>
+            </div>
+          </div>
+          <span class="screen-flash" data-flash aria-hidden="true"></span>
+        </div>
+
+        {/* Paper tape: what has been sent, and the code in progress. */}
+        <div class="station-tape mf-tape" aria-hidden="true">
+          <span class="tape-text" data-tape></span><span class="tape-pending" data-tape-pending
+          ></span>
+        </div>
+        <div class="station-fuse" aria-hidden="true">
+          <span class="station-fuse-bar" data-fuse></span>
+        </div>
+
+        <button
+          type="button"
+          id="hero-key"
+          class="station-key"
+          data-key
+          aria-describedby="hero-key-hint"
+          aria-label="Morse key. Press and hold, or focus it and hold Space. A short press sends a dot, a long press sends a dash."
+        >
+          <svg viewBox="0 0 480 140" class="station-key-art" aria-hidden="true" focusable="false">
+            <defs>
+              <linearGradient id="hk-wood" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" class="hk-wood-top"></stop>
+                <stop offset="1" class="hk-wood-bottom"></stop>
+              </linearGradient>
+              <linearGradient id="hk-brass" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" class="hk-brass-hi"></stop>
+                <stop offset="0.55" class="hk-brass-mid"></stop>
+                <stop offset="1" class="hk-brass-lo"></stop>
+              </linearGradient>
+              <radialGradient id="hk-knob" cx="0.4" cy="0.3" r="0.8">
+                <stop offset="0" class="hk-knob-hi"></stop>
+                <stop offset="1" class="hk-knob-lo"></stop>
+              </radialGradient>
+              <radialGradient id="hk-spark" cx="0.5" cy="0.5" r="0.5">
+                <stop offset="0" class="hk-spark-core"></stop>
+                <stop offset="1" class="hk-spark-edge"></stop>
+              </radialGradient>
+            </defs>
+            <ellipse cx="240" cy="134" rx="226" ry="5" class="hk-shadow"></ellipse>
+            <rect x="14" y="92" width="452" height="40" rx="8" fill="url(#hk-wood)"></rect>
+            <path d="M24 103 C 140 99, 300 107, 456 101" class="hk-grain"></path>
+            <path d="M24 114 C 160 118, 290 110, 456 116" class="hk-grain"></path>
+            <path d="M24 124 C 120 121, 330 127, 456 123" class="hk-grain"></path>
+            <rect x="14" y="92" width="452" height="2" rx="1" class="hk-bevel"></rect>
+            <circle cx="196" cy="113" r="7" fill="url(#hk-brass)"></circle>
+            <circle cx="196" cy="113" r="2" class="hk-screw"></circle>
+            <circle cx="262" cy="113" r="7" fill="url(#hk-brass)"></circle>
+            <circle cx="262" cy="113" r="2" class="hk-screw"></circle>
+            <rect x="56" y="70" width="8" height="22" rx="2" fill="url(#hk-brass)"></rect>
+            <path d="M96 92 L104 56 H128 L136 92 Z" fill="url(#hk-brass)"></path>
+            <rect x="320" y="80" width="20" height="12" rx="2" fill="url(#hk-brass)"></rect>
+            <circle cx="330" cy="79" r="13" fill="url(#hk-spark)" class="hk-spark"></circle>
+            <g class="hk-lever">
+              <rect x="44" y="58" width="378" height="11" rx="5.5" fill="url(#hk-brass)"></rect>
+              <rect x="50" y="59" width="364" height="2" rx="1" class="hk-glint"></rect>
+              <rect x="324" y="69" width="12" height="5" rx="1.5" fill="url(#hk-brass)"></rect>
+              <rect x="48" y="50" width="24" height="8" rx="2" fill="url(#hk-brass)"></rect>
+              <rect x="400" y="40" width="14" height="19" rx="3" fill="url(#hk-brass)"></rect>
+              <ellipse cx="407" cy="38" rx="44" ry="13" fill="url(#hk-knob)"></ellipse>
+              <ellipse cx="407" cy="27" rx="34" ry="12" fill="url(#hk-knob)"></ellipse>
+              <path d="M382 22 Q 400 15 424 19" class="hk-knob-glint"></path>
+            </g>
+            <circle cx="116" cy="64" r="5" class="hk-pivot"></circle>
+          </svg>
+          <span class="station-key-plate mf-engraved">
+            {
+              /*
+                The label nearest the thumb says what the screen asks for (J-12):
+                the step's own instruction in the drill, "tap or hold" on the free key.
+              */
+            }
+            <span data-key-plate-idle>
+              <span data-plate-drill>{instructionFor(first)}</span>
+              <span data-plate-free>Tap or hold</span>
+            </span>
+            <span data-key-plate-focus>Or use <kbd class="mf-kbd">Space</kbd></span>
+            <span data-key-plate-down class="text-signal">Transmitting</span>
+          </span>
+        </button>
+
+        <p id="hero-key-hint" class="station-hint text-sm text-muted">{hero.key.hint}</p>
+
+        <noscript>
+          <p class="station-hint text-sm text-ink">
+            Turn on JavaScript to key it — or read the <a
+              href="/learn-morse-code-in-7-days/"
+              class="text-signal underline underline-offset-4"
+              >{getPage('/learn-morse-code-in-7-days/').navLabel}</a
+            >.
+          </p>
+        </noscript>
+
+        <p class="sr-only" role="status" aria-live="polite" data-live></p>
+      </div>
+
+      {
+        /*
+        Before first paint: someone who has keyed before sees the welcome view,
+        not a flash of the first-timer's step one. One synchronous read of the
+        stats envelope; station.ts does the rest once it loads.
+      */
+      }
+      <script is:inline define:vars={{ statsKey: STATS_KEY }}>
+        try {
+          const data = JSON.parse(localStorage.getItem(statsKey) ?? 'null')?.data
+          if (data && (typeof data.firstSignalAt === 'number' || data.elementsSent > 0)) {
+            document.querySelector('[data-station]')?.setAttribute('data-view', 'welcome')
+          }
+        } catch {
+          // Unreadable storage: the first-timer's view stays.
+        }
+      </script>
+    </div>
+
+    <div class="hero-actions">
+      <div class="flex flex-wrap items-center gap-3">
+        {
+          /*
+            One label per visitor (J-07): a first-timer reads the registry's
+            "day 1"; someone who has keyed before (the inline script set the
+            welcome view before first paint) reads where the lesson goes next,
+            which station.ts fills in from their progress.
+          */
+        }
+        <a href={hero.primaryCta.href} class="mf-btn mf-btn-primary mf-btn-lg" data-hero-cta>
+          <span data-cta-first>{hero.primaryCta.label}</span>
+          <span data-cta-back>{CONTINUE_LABEL}</span>
+        </a>
+        <a href={hero.secondaryCta.href} class="mf-btn mf-btn-secondary mf-btn-lg">
+          <span class="mf-lamp" data-tone="amber" aria-hidden="true"></span>
+          {hero.secondaryCta.label}
+        </a>
+      </div>
+      <a
+        href={hero.tertiaryCta.href}
+        class="mt-4 inline-block text-sm text-muted underline decoration-line-strong underline-offset-4 hover:text-ink"
+      >
+        {hero.tertiaryCta.label}
+      </a>
+      {/* A promise that can be checked links to the proof (JI-3). */}
+      <ul class="mt-7 flex flex-wrap gap-x-5 gap-y-2.5" aria-label="Promises">
+        {
+          promises.map((promise) => (
+            <li class="flex items-center gap-2 mf-engraved">
+              <span class="mf-lamp" aria-hidden="true" />
+              {promise.href ? (
+                <a
+                  href={promise.href}
+                  class="inline-flex min-h-6 items-center underline decoration-line-strong underline-offset-4 hover:text-ink"
+                  {...(promise.href.startsWith('http') ? { rel: 'noopener' } : {})}
+                >
+                  {promise.text}
+                </a>
+              ) : (
+                promise.text
+              )}
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { mountStation } from './station'
+
+  const root = document.querySelector<HTMLElement>('[data-station]')
+  if (root) mountStation(root)
+</script>

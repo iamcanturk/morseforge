@@ -1,0 +1,99 @@
+---
+/**
+ * The one page frame for every page except the landing and the 404 (C-1,
+ * DEC-043, DEC-044).
+ *
+ * It replaces each page's own `<main>`, breadcrumb and title row, so every
+ * page puts its H1 at the same place: the same left edge for a given width,
+ * and the same top, which is why the eyebrow shares the breadcrumb's rail
+ * instead of adding a line above the H1.
+ *
+ * Two widths only: `tool` (max-w-6xl) for instruments and reference pages,
+ * `prose` (max-w-3xl) for reading and forms.
+ *
+ * `instrumentFirst` (DEC-044): below `sm` the instrument comes straight
+ * after the H1 and the intro moves under it. Only the CSS order changes; the
+ * HTML keeps H1, intro, instrument, so a crawler and a screen reader still
+ * meet the answer-first intro before the controls.
+ *
+ * Slots: `intro` optionally replaces the intro string with rich text. The
+ * default slot is the instrument only (the island or the main plate). Everything under it, explainers and the FAQ, goes in `slot="more"`,
+ * a grid that supplies the spacing, so nothing in it needs `mt-*` or
+ * `mx-auto`. The shell sets no `overflow` anywhere, so a `position: sticky`
+ * child (the telegraph dock) still sticks.
+ */
+import Breadcrumbs from './Alphabet/Breadcrumbs.astro'
+import type { Crumb } from '../config/pages'
+
+export interface Props {
+  /** The two widths DEC-043 allows. 'tool' = max-w-6xl; 'prose' = max-w-3xl. Default 'tool'. */
+  width?: 'tool' | 'prose'
+  /** breadcrumbTrail(page.path). Omit only for the landing and the 404 (neither uses the shell). */
+  trail?: readonly Crumb[]
+  /** Optional brass .mf-engraved line above the H1. */
+  eyebrow?: string
+  /** page.h1. The shell inserts U+00A0 between a number and the next word ("7 days", "day 1"). */
+  h1: string
+  /**
+   * page.intro. Always rendered in the HTML, at every width. A page that needs
+   * links or code in it sends `<Fragment slot="intro">` instead (phrasing
+   * content only: it sits inside a <p>), which must say the same words; this
+   * string is the fallback when no slot is sent.
+   */
+  intro: string
+  /** DEC-044. Below sm: H1, [default slot], intro, [more slot]. From sm up: H1, intro, default, more. Default false. */
+  instrumentFirst?: boolean
+  /** Extra classes on the wrapper of the default slot. It is START-aligned, never centred. */
+  instrumentClass?: string
+}
+
+const {
+  width = 'tool',
+  trail = [],
+  eyebrow,
+  h1,
+  intro,
+  instrumentFirst = false,
+  instrumentClass,
+} = Astro.props
+
+/**
+ * A number and the word beside it never part at a line end: "7 days" and
+ * "day 1" break as a unit. The registry keeps plain spaces, so its strings
+ * stay greppable and the titles keep their measured lengths.
+ */
+/** U+00A0 built from its code point: the formatter rewrites a written escape as the bare character. */
+const NBSP = String.fromCodePoint(0xa0)
+const title = h1.replace(/(\d) (?=\p{L})/gu, `$1${NBSP}`).replace(/(\p{L}) (?=\d)/gu, `$1${NBSP}`)
+
+const hasRail = trail.length > 0 || Boolean(eyebrow)
+const hasMore = Astro.slots.has('more')
+---
+
+<main class="mf-page" data-width={width} data-instrument-first={instrumentFirst ? '' : undefined}>
+  <header class="mf-page-head">
+    {
+      hasRail && (
+        <div class="mf-page-rail">
+          <Breadcrumbs trail={trail} class="mf-page-crumbs" />
+          {eyebrow && <p class="mf-page-eyebrow mf-engraved text-brass">{eyebrow}</p>}
+        </div>
+      )
+    }
+    <h1 class="mf-page-title font-display text-h1 font-bold text-ink">{title}</h1>
+  </header>
+
+  <p class="mf-page-intro text-lead text-muted"><slot name="intro">{intro}</slot></p>
+
+  <div class:list={['mf-page-instrument', instrumentClass]}>
+    <slot />
+  </div>
+
+  {
+    hasMore && (
+      <div class="mf-page-more">
+        <slot name="more" />
+      </div>
+    )
+  }
+</main>

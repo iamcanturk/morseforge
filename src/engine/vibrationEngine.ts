@@ -20,6 +20,25 @@ export function canVibrate(): boolean {
 }
 
 /**
+ * Whether the page may vibrate yet. Chrome refuses `vibrate` until the user
+ * has interacted with the page, and logs every refused call as a console
+ * error, so nothing calls it before then. A browser without the
+ * User Activation API is trusted to decide for itself.
+ */
+function userHasInteracted(): boolean {
+  if (!('userActivation' in navigator)) return true
+  return navigator.userActivation.hasBeenActive
+}
+
+/**
+ * Whether a pattern this module started may still be running. Stopping is
+ * only worth a call when something was started: a page that stops on load
+ * (every player resets its channels when it mounts) must not call
+ * `vibrate(0)` before the user has touched anything.
+ */
+let started = false
+
+/**
  * Convert a Morse timeline into a vibration pattern.
  *
  * The pattern must alternate on, off, on, off… beginning with on. A timeline
@@ -68,11 +87,13 @@ export function toVibrationPattern(timeline: readonly TimedElement[]): number[] 
  * caller has sound and light as well.
  */
 export function vibrateTimeline(timeline: readonly TimedElement[]): boolean {
-  if (!canVibrate()) return false
+  if (!canVibrate() || !userHasInteracted()) return false
   const pattern = toVibrationPattern(timeline)
   if (pattern.length === 0) return false
   try {
-    return navigator.vibrate(pattern)
+    const accepted = navigator.vibrate(pattern)
+    if (accepted) started = true
+    return accepted
   } catch {
     return false
   }
@@ -80,13 +101,13 @@ export function vibrateTimeline(timeline: readonly TimedElement[]): boolean {
 
 /** Stop any vibration in progress. */
 export function stopVibration(): void {
-  if (canVibrate()) {
-    try {
-      navigator.vibrate(0)
-    } catch {
-      // Nothing to stop, or the browser refused. Either way there is no
-      // meaningful recovery and nothing to tell the user.
-    }
+  if (!started || !canVibrate()) return
+  started = false
+  try {
+    navigator.vibrate(0)
+  } catch {
+    // Nothing to stop, or the browser refused. Either way there is no
+    // meaningful recovery and nothing to tell the user.
   }
 }
 

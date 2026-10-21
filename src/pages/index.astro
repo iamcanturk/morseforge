@@ -1,155 +1,144 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro'
-import { Logo } from '../components/brand/Logo'
-import { DecodeChallenge } from '../components/Decode/DecodeChallenge'
-import { FeatureDemos } from '../components/Demo/FeatureDemos'
-import { CURRICULUM_TOTAL_MINUTES } from '../data/curriculum'
-import { WORDS } from '../data/words'
-import { SITE } from '../config/site'
-
-const title = 'MorseForge — Learn Morse Code as a Game'
-const description = SITE.description
-
-const hours = Math.round((CURRICULUM_TOTAL_MINUTES / 60) * 10) / 10
-
 /**
+ * The landing page (TASK-001 §5; DEC-012).
+ *
  * PROJECT.md §57: do not open with four paragraphs explaining what Morse is.
- * Open with a signal the visitor can try to read. Everything below the fold is
- * for the people who did that and want more.
+ * Open with a key the visitor can press. The hero is a working instrument and
+ * the first interactive element on the page; everything below it is for the
+ * people who sent a letter and want more, and for the search engines and
+ * answer engines that read the page without pressing anything.
+ *
+ * Every word comes from the registry (`getPage('/')`, `LANDING`, `faqFor`);
+ * every number from the data it describes. JavaScript above the fold is the
+ * hero's vanilla script only; the decode puzzle is the one React island, and
+ * it hydrates when scrolled to.
  */
-const tools = [
-  {
-    href: '/learn-morse-code-in-7-days/',
-    label: 'Learn it in 7 days',
-    blurb: `The alphabet in the order the code is built, one layer of the tree per day. About ${hours} hours in total.`,
-  },
-  {
-    href: '/telegraph/',
-    label: 'Send it yourself',
-    blurb: 'Your keyboard becomes a straight key. Tap for a dot, hold for a dash, decoded live.',
-  },
-  {
-    href: '/tree/',
-    label: 'See why',
-    blurb: 'Morse is a binary tree. Every letter sits exactly where its own code spells it out.',
-  },
-  {
-    href: '/morse-code-translator/',
-    label: 'Translate',
-    blurb: 'Text to Morse and back, with real CW audio and a signal lamp at 5–40 WPM.',
-  },
-  {
-    href: '/morse-code-alphabet/',
-    label: 'The alphabet',
-    blurb: 'Every letter, digit and punctuation mark per ITU-R M.1677-1. Click any to hear it.',
-  },
-  {
-    href: '/words/',
-    label: 'Words in Morse',
-    blurb: `${WORDS.length} words and phrases, each playable and each with something worth knowing.`,
-  },
+import BaseLayout from '../layouts/BaseLayout.astro'
+import Faq from '../components/Faq.astro'
+import FactsPanel from '../components/Landing/FactsPanel.astro'
+import HowItWorks from '../components/Landing/HowItWorks.astro'
+import Linked from '../components/Landing/Linked.astro'
+import NetworkTree from '../components/Landing/NetworkTree.astro'
+import SignalHero from '../components/Landing/SignalHero.astro'
+import ToolGrid from '../components/Landing/ToolGrid.astro'
+import { DecodeChallenge } from '../components/Decode/DecodeChallenge'
+import { LANDING } from '../config/landing'
+import { getPage } from '../config/pages'
+import { faqFor } from '../data/faq'
+import { encode, prettify } from '../engine/morseEncoder'
+import { spokenCode } from '../engine/spokenCode'
+import { HERO_TARGETS, codeOf, describeCode } from '../components/Landing/hero'
+import { IDS, webPage } from '../seo/schema'
+import '../styles/pkg-b.css'
+
+const page = getPage('/')
+const faq = faqFor(page.path)
+const schema = [
+  webPage({
+    path: page.path,
+    name: page.h1,
+    description: page.description,
+    mainEntityId: IDS.app,
+  }),
 ]
 
-const promises = [
-  'No account',
-  'No ads',
-  'Works offline',
-  'Progress stays on your device',
-  'Open source',
-]
+const first = HERO_TARGETS[0] ?? ''
+const sos = encode('SOS')
+/** What the band shows, read out: "dot dot dot, dash dash dash, dot dot dot". */
+const sosSpoken = sos.split(' ').map(spokenCode).join(', ')
 ---
 
-<BaseLayout title={title} description={description} path="/">
-  <main class="mx-auto max-w-4xl px-6 py-16">
-    <section class="flex flex-col items-center text-center">
-      <Logo size={52} tagline glow />
+<BaseLayout title={page.title} description={page.description} path={page.path} schema={schema}>
+  <main>
+    <SignalHero />
 
-      <h1 class="sr-only">MorseForge — learn Morse code as a game</h1>
+    <FactsPanel />
 
-      <p class="mt-8 max-w-xl text-lg leading-relaxed text-muted">
-        Turn Morse code into a game. Learn it, send it, hear it, decode it — and watch the signal
-        network come online one character at a time.
-      </p>
-    </section>
-
-    {/* The signal, before any explanation of what a signal is. */}
-    <section class="mt-12">
-      <DecodeChallenge client:load />
-    </section>
-
-    <section class="mt-8 flex flex-wrap items-center justify-center gap-4">
-      <a
-        href="/learn-morse-code-in-7-days/"
-        class="rounded-lg px-6 py-3 font-mono text-xs tracking-[0.16em] text-void"
-        style="background: var(--color-signal)">START LEARNING</a
+    {/* Section 3: the decode puzzle, as a telegram form. */}
+    <section id="decode" class="py-16 md:py-24" aria-labelledby="decode-heading">
+      <div
+        class="mx-auto grid max-w-7xl gap-8 px-5 sm:px-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-14"
       >
-      <a
-        href="/telegraph/"
-        class="rounded-lg border border-line px-6 py-3 font-mono text-xs tracking-[0.16em] text-muted transition-colors hover:border-signal hover:text-signal"
-        >SEND YOUR FIRST SIGNAL</a
-      >
-    </section>
-
-    <ul class="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
-      {
-        promises.map((promise) => (
-          <li class="font-mono text-[10px] tracking-[0.16em] text-signal-dim">{promise}</li>
-        ))
-      }
-    </ul>
-
-    <section class="mt-20">
-      <h2 class="font-display text-2xl font-bold tracking-tight">What it looks like</h2>
-      <p class="mt-2 text-sm text-muted">
-        Silent previews, running on the real timing engine. Pick one to try it properly.
-      </p>
-      <div class="mt-6">
-        <FeatureDemos client:visible />
+        <div class="lg:pt-8">
+          <p class="mf-engraved text-brass">Incoming</p>
+          <h2 id="decode-heading" class="mt-3 font-display text-h2 font-bold text-ink">
+            {LANDING.decode.heading}
+          </h2>
+          <p class="mt-4 max-w-[40ch] text-lead text-muted">{LANDING.decode.lead}</p>
+        </div>
+        <DecodeChallenge client:visible />
       </div>
     </section>
 
-    <section class="mt-20">
-      <h2 class="font-display text-2xl font-bold tracking-tight">Everything here is free</h2>
-      <ul class="mt-6 grid gap-3 sm:grid-cols-2">
-        {
-          tools.map(({ href, label, blurb }) => (
-            <li>
-              <a
-                href={href}
-                class="block h-full rounded-xl border border-line bg-panel p-5 transition-colors hover:border-signal-dim"
-              >
-                <h3 class="font-display text-lg font-semibold text-ink">{label}</h3>
-                <p class="mt-2 text-sm leading-relaxed text-muted">{blurb}</p>
-              </a>
-            </li>
-          ))
-        }
-      </ul>
+    <NetworkTree />
+
+    <HowItWorks />
+
+    <ToolGrid />
+
+    {/* Section 7: the operator's manual. */}
+    <section class="py-16 md:py-24" aria-labelledby="why-heading">
+      <div
+        class="mx-auto grid max-w-7xl gap-12 px-5 sm:px-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-16"
+      >
+        <article>
+          <p class="mf-engraved text-brass">Operator's manual</p>
+          <h2 id="why-heading" class="mt-3 font-display text-h2 font-bold text-ink">
+            {LANDING.why.heading}
+          </h2>
+          <div class="mt-6 max-w-[68ch] space-y-5 leading-relaxed text-muted">
+            {LANDING.why.paragraphs.map((paragraph) => <p>{paragraph}</p>)}
+          </div>
+          <a
+            href={LANDING.why.link.href}
+            class="mt-6 inline-block text-signal underline decoration-signal/40 underline-offset-4 hover:decoration-signal"
+          >
+            {LANDING.why.link.text} →
+          </a>
+        </article>
+
+        <aside class="mf-panel self-start p-6 sm:p-8" aria-labelledby="what-mf-heading">
+          <p class="flex items-center gap-2 mf-engraved">
+            <span class="mf-lamp" aria-hidden="true"></span>
+            The station
+          </p>
+          <h2 id="what-mf-heading" class="mt-3 font-display text-h3 font-bold text-ink">
+            {LANDING.whatMorseForgeIs.heading}
+          </h2>
+          <Linked
+            paragraph={LANDING.whatMorseForgeIs.paragraph}
+            class="mt-3 leading-relaxed text-muted"
+          />
+        </aside>
+      </div>
     </section>
 
-    <section class="mt-20">
-      <h2 class="font-display text-2xl font-bold tracking-tight">Why this one works</h2>
+    {
+      /* The same column as every other landing section (V-06): the FAQ starts at their left edge. */
+    }
+    <div class="mx-auto max-w-7xl px-5 py-16 sm:px-6 md:py-24">
+      <Faq items={faq} heading={LANDING.faq.heading} />
+    </div>
 
-      <div class="mt-6 space-y-6 leading-relaxed text-muted">
-        <p>
-          Most people learn Morse from a chart, memorise twenty-six patterns of dots and dashes, and
-          hit a wall around ten words per minute that no amount of practice moves. The chart caused
-          it: it taught them to translate rather than to hear, and that extra step is a fixed cost
-          the speed eventually outruns.
-        </p>
-        <p>
-          MorseForge teaches each character as a sound from the first minute, in the order the code
-          is actually structured, and makes you send it back as well as read it. It tracks
-          recognising, hearing and sending separately, because they are different abilities — and a
-          character is only mastered when all three hold up.
-        </p>
-      </div>
-
-      <a
-        href="/blog/why-a-morse-code-chart-does-not-work/"
-        class="mt-6 inline-block font-mono text-xs tracking-[0.14em] text-signal underline decoration-signal/40 underline-offset-4"
-        >READ THE LONGER VERSION →</a
+    {/* Section 8: the closing band. Native anchor; the hero script hands over the key. */}
+    <section class="px-5 pt-8 pb-20 sm:px-6 md:pb-28" aria-labelledby="closing-heading">
+      <div
+        class="mf-screen mf-grid mx-auto flex max-w-7xl flex-col items-start gap-6 px-6 py-10 sm:px-10 md:flex-row md:items-center md:justify-between"
       >
+        <div class="relative z-[3]">
+          <p class="closing-code font-mono mf-phosphor text-signal" aria-hidden="true">
+            {prettify(sos)}
+          </p>
+          <h2 id="closing-heading" class="mt-3 font-display text-h3 font-bold text-ink">
+            <span class="sr-only">{sosSpoken} </span>is SOS. Your first letter is {first} — {
+              describeCode(codeOf(first))
+            }.
+          </h2>
+        </div>
+        <a href="#station" class="relative z-[3] mf-btn mf-btn-primary mf-btn-lg" data-focus-key
+          >Send it</a
+        >
+      </div>
     </section>
   </main>
 </BaseLayout>

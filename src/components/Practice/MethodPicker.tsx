@@ -1,10 +1,17 @@
-import { METHODS, METHOD_IDS, type MethodId, activeCharacters } from '../../data/methods'
+import {
+  METHODS,
+  METHOD_IDS,
+  MIN_UNLOCK_ATTEMPTS,
+  type MethodId,
+  activeCharacters,
+} from '../../data/methods'
+import { OptionGroup } from '../ui/OptionGroup'
 
 /**
  * Choose a teaching order.
  *
  * Each option states its reasoning rather than being presented as a neutral
- * preference, because they are not equivalent — one of them is included mainly
+ * preference, because they are not equivalent: one of them is included mainly
  * because people ask for it, and the page says so. A picker that hid that would
  * be pretending all three are equally good advice.
  */
@@ -17,49 +24,45 @@ export function MethodPicker({
   unlocked: number
   onChange: (next: MethodId) => void
 }) {
+  const entry = METHODS[method]
+  const characters = activeCharacters(entry, unlocked)
+
   return (
-    <fieldset>
-      <legend className="font-mono text-[10px] tracking-[0.18em] text-muted">TEACHING ORDER</legend>
+    <div>
+      <h3 id="method-label" className="mf-engraved">
+        Teaching order
+      </h3>
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-3">
-        {METHOD_IDS.map((id) => {
-          const entry = METHODS[id]
-          const selected = method === id
-          return (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => onChange(id)}
-              className="rounded-lg border p-3 text-left transition-colors"
-              style={{
-                borderColor: selected ? 'var(--color-signal)' : 'var(--color-line)',
-                color: selected ? 'var(--color-signal)' : 'var(--color-muted)',
-              }}
-            >
-              <span className="block font-mono text-xs tracking-[0.12em]">
-                {entry.name.toUpperCase()}
-              </span>
-              <span className="mt-1 block text-[11px] leading-snug opacity-80">
-                {entry.summary}
-              </span>
-            </button>
-          )
-        })}
-      </div>
+      <OptionGroup
+        label="Teaching order"
+        labelledBy="method-label"
+        className="mt-3"
+        columns={3}
+        value={method}
+        onChange={onChange}
+        options={METHOD_IDS.map((id) => ({
+          value: id,
+          title: METHODS[id].name,
+          hint: METHODS[id].summary,
+        }))}
+      />
 
-      <p className="mt-3 text-xs leading-relaxed text-muted">{METHODS[method].rationale}</p>
+      <p className="mt-3 text-sm text-muted">{entry.rationale}</p>
 
-      <p className="mt-3 font-mono text-[11px] tracking-[0.12em] text-signal-dim">
-        {activeCharacters(METHODS[method], unlocked).join(' ')}
+      <p className="mt-3 flex flex-wrap items-center gap-1.5" aria-label="Your characters so far">
+        {characters.map((character) => (
+          <span key={character} className="mf-kbd">
+            {character}
+          </span>
+        ))}
       </p>
 
-      {METHODS[method].unlockAccuracy !== null && (
-        <p className="mt-2 text-xs text-muted">
-          A new character unlocks at {Math.round((METHODS[method].unlockAccuracy ?? 0) * 100)}%
-          accuracy over at least 25 answers.
+      {entry.unlockAccuracy !== null && (
+        <p className="mt-2 text-sm text-muted">
+          More join after a session at {Math.round(entry.unlockAccuracy * 100)}% accuracy over at
+          least {MIN_UNLOCK_ATTEMPTS} answers, on the My method pool.
         </p>
       )}
-    </fieldset>
+    </div>
   )
 }

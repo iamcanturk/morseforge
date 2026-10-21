@@ -1,56 +1,157 @@
 ---
-import { prettify } from '../../engine/morseEncoder'
+import '../../styles/pkg-i.css'
+import Pips from './Pips.astro'
+import { characterFacts } from '../../data/characters'
+import { WPM_RANGE } from '../../storage/settings'
 
 /**
- * A playable reference chart, with no framework behind it.
+ * The playable reference chart, engraved as a set of plates, with no
+ * framework behind it.
  *
- * Every row is in the served HTML — this is a page people find in a search and
- * read, and it should be readable before a byte of JavaScript arrives. Pressing
- * a row to hear it is enhancement on top of markup that is already complete.
+ * Every tile is in the served HTML: this is a page people find in a search
+ * and read, and it should be complete before a byte of JavaScript arrives.
+ * Pressing a tile to hear it is enhancement on markup that already says
+ * everything, including the ASCII code (visually hidden on screen, printed on
+ * paper) for anyone copying or quoting the chart.
+ *
+ * One speed control for every plate, in a strip that follows the reader down
+ * the page, rather than a slider per section.
  */
+export interface ChartEntry {
+  character: string
+  code: string
+}
+
+export interface ChartPlate {
+  id: string
+  heading: string
+  /** Engraved into the plate's top rule: "A–Z". */
+  tab: string
+  /** A sentence under the heading, for the groups that need one. */
+  note?: string
+  entries: readonly ChartEntry[]
+  /** Lay the plate out in fixed columns (the digits read 1–5 over 6–0). */
+  cols?: 5
+  /** Show each mark's name under it: punctuation, where "?" alone is a poor label. */
+  named?: boolean
+}
+
 export interface Props {
-  entries: readonly { character: string; code: string }[]
+  plates: readonly ChartPlate[]
+  /** Character page hrefs, keyed by character, only for pages that exist. */
+  links?: ReadonlyMap<string, string>
   initialWpm?: number
 }
 
-const { entries, initialWpm = 12 } = Astro.props
+const { plates, links = new Map(), initialWpm = 12 } = Astro.props
 ---
 
-<div data-alphabet-chart>
-  <label class="mb-5 flex max-w-sm items-center gap-3">
-    <span class="font-mono text-[10px] tracking-[0.16em] text-muted">SPEED</span>
-    <input
-      type="range"
-      data-part="speed"
-      min="5"
-      max="40"
-      value={initialWpm}
-      class="flex-1 accent-[var(--color-signal)]"
-      aria-label="Playback speed in words per minute"
-    />
-    <span data-part="wpm" class="w-16 text-right font-mono text-xs text-signal">
-      {initialWpm} WPM
+<div data-alphabet-chart class="space-y-14">
+  <div
+    class="pi-deck mf-panel flex items-center gap-x-5 gap-y-3 px-4 py-2.5 sm:px-5 sm:py-3"
+    data-print="hide"
+  >
+    <span class="flex items-center gap-2.5">
+      <span class="mf-lamp" data-part="lamp" data-on="false" aria-hidden="true"></span>
+      <span class="mf-engraved max-sm:sr-only">Press a key to hear it</span>
     </span>
-  </label>
+    <label class="flex min-w-0 flex-1 items-center gap-3">
+      <span class="mf-engraved">Speed</span>
+      <input
+        type="range"
+        data-part="speed"
+        min={WPM_RANGE.min}
+        max={WPM_RANGE.max}
+        value={initialWpm}
+        class="mf-range flex-1"
+        aria-label="Playback speed in words per minute"
+      />
+      <output
+        data-part="wpm"
+        class="w-16 text-right font-mono text-control text-signal tabular-nums"
+      >
+        {initialWpm} WPM
+      </output>
+    </label>
+    <button
+      type="button"
+      data-part="print"
+      class="mf-btn mf-btn-ghost mf-btn-sm max-sm:hidden"
+      hidden
+    >
+      Print chart
+    </button>
+  </div>
 
-  <ul class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-    {
-      entries.map(({ character, code }) => (
-        <li>
-          <button
-            type="button"
-            data-code={code}
-            aria-label={`Play ${character}, ${prettify(code)}`}
-            class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors"
-            style="border-color: var(--color-line); background: var(--color-panel)"
-          >
-            <span class="w-5 font-display text-lg font-bold text-signal">{character}</span>
-            <span class="font-mono text-sm tracking-[0.18em] text-cyan">{prettify(code)}</span>
-          </button>
-        </li>
-      ))
-    }
-  </ul>
+  {
+    plates.map((plate) => (
+      <section id={plate.id} aria-labelledby={`${plate.id}-heading`}>
+        <h2 id={`${plate.id}-heading`} class="pi-balance font-display text-h2 font-bold text-ink">
+          {plate.heading}
+        </h2>
+        {plate.note && (
+          <p class="pi-pretty mt-3 max-w-[68ch] leading-relaxed text-muted">{plate.note}</p>
+        )}
+
+        <div class="mf-instrument mt-6 p-2.5 sm:p-3.5">
+          <div class="pi-plate pt-7 sm:pt-8">
+            <span class="pi-plate-tab mf-engraved" aria-hidden="true">
+              {plate.tab}
+            </span>
+            <ul class="pi-keys" data-cols={plate.cols} data-wide={plate.named ? '' : undefined}>
+              {plate.entries.map(({ character, code }) => {
+                const facts = characterFacts(character)
+                const name = plate.named ? facts?.name : undefined
+                const spoken = facts?.spoken ?? ''
+                const spelled = facts?.spelled ?? ''
+                const href = links.get(character)
+                // Label in name (WCAG 2.5.3): the name starts with what the tile
+                // shows, so "A di-dah" can be spoken to press it; then the action
+                // and the code in words.
+                const visible = [character, name, spoken].filter(Boolean).join(' ')
+                return (
+                  <li class="pi-key-cell" id={facts ? `char-${facts.slug}` : undefined}>
+                    <button
+                      type="button"
+                      class="pi-key"
+                      data-code={code}
+                      aria-label={`${visible}: play, ${spelled}`}
+                    >
+                      <span class="pi-key-glyph">{character}</span>
+                      {name && <span class="pi-key-name">{name}</span>}
+                      <Pips code={code} />
+                      <span class="pi-key-spoken" data-kind={facts?.kind}>
+                        {spoken}
+                      </span>
+                      <span class="sr-only" data-print="code">
+                        {code}
+                      </span>
+                    </button>
+                    {href && (
+                      <a
+                        href={href}
+                        class="pi-key-link"
+                        aria-label={`${name ?? character} in Morse code`}
+                      >
+                        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                          <path
+                            d="M5 3h8v8M13 3 3 13"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                          />
+                        </svg>
+                      </a>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        </div>
+      </section>
+    ))
+  }
 </div>
 
 <script>

@@ -1,29 +1,51 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useGameLoop } from './useGameLoop'
-import { GameOver, PoolPicker, useGamePool } from './shared'
 import {
+  GameOver,
+  GameSetup,
+  HudCell,
+  LivesCell,
+  PlateRow,
+  StatusLamp,
+  formatScore,
+  useGamePool,
+} from './shared'
+import { bankRun, clearedPercent, type GameIdentity, type RunReport } from './results'
+import { SignalPiece, SignalReveal } from './signalPiece'
+import {
+  DEFENDER_SKILL,
   STARTING_LIVES,
   accuracy,
   advance,
+  endRun,
+  hitScore,
   isOver,
   newDefenderGame,
   pressure,
+  runXp,
   shoot,
+  shots,
+  streakMultiplier,
   weakest,
   type DefenderState,
 } from '../../game/defender'
 import { createRandom, seedFrom } from '../../game/random'
 import { AudioEngine } from '../../engine/audioEngine'
 import { MORSE_ALPHABET } from '../../data/morseAlphabet'
-import { prettify } from '../../engine/morseEncoder'
+import { joinList, numberWord } from '../../data/format'
 import { createSettingsStore, defaultSettings, type SettingsRecord } from '../../storage/settings'
 import { answer as recordAnswer, createProgressStore } from '../../storage/progress'
+import { createStatsStore } from '../../storage/stats'
+import { achievementSnapshot } from '../../storage/snapshot'
+import type { AchievementSnapshot } from '../../game/achievements'
 import { track } from '../../analytics/track'
 
 /**
  * Signal Defender (PROJECT.md §18).
  *
- * Characters fall, each sounding as it appears; type one to knock it down.
+ * Signals fall as Morse code, each sounding as it appears; type the character
+ * it spells to knock it down. The letter itself is shown only once it is hit
+ * (DEC-027), so every hit is a code read, not a glyph copied.
  * The rules are in `game/defender.ts` and tested there — this holds the state,
  * the clock and the audio.
  *
@@ -31,27 +53,122 @@ import { track } from '../../analytics/track'
  * honestly: practice waits for you, and copying at speed fails not because you
  * cannot decode a character but because you cannot decode it before the next
  * one arrives.
+ *
+ * **Where the side effects live (flow audit B11).** The game state is held in
+ * a ref and mirrored into React state for rendering. Every step — a frame, a
+ * keystroke — reads the ref, computes the next state with the pure rules,
+ * stores it, and only then sounds tones and writes progress, in the handler
+ * itself. Nothing with a side effect runs inside a state updater, which React
+ * may defer or run twice. The run is banked by `finish`, guarded by the run's
+ * number, so it banks exactly once whether it ended on the floor or by "End".
  */
-export function DefenderScreen() {
+
+/** A knocked-down signal's burst, kept on screen for one word-space. */
+interface Burst {
+  id: number
+  character: string
+  x: number
+  y: number
+  points: number
+}
+
+const BURST_MS = 420
+
+/**
+ * Where a signal is drawn. The rules put a fresh signal at 0 and the floor at
+ * 1; drawn as-is, a new signal would be born half above the glass. The top
+ * tenth is headroom, so it appears whole and still lands exactly on the floor.
+ */
+const HEADROOM = 0.1
+const onScreen = (y: number) => HEADROOM + y * (1 - HEADROOM)
+
+/**
+ * The most characters the touch answer pad offers one button each (journeys
+ * idea I-1). Two rows of four on a phone; beyond that the keyboard is quicker
+ * than hunting across a grid.
+ */
+const PAD_MAX = 8
+
+/** Whether this run answers by pad: a touch screen and a pool small enough. */
+const usesPad = (pool: readonly string[]) =>
+  pool.length > 0 &&
+  pool.length <= PAD_MAX &&
+  typeof window !== 'undefined' &&
+  window.matchMedia('(pointer: coarse)').matches
+
+/** Where the attract screen draws its idle signals: fixed, so prerender and hydration agree. */
+const PREVIEW_SPOTS = [
+  { x: 0.2, y: 0.28 },
+  { x: 0.52, y: 0.55 },
+  { x: 0.8, y: 0.18 },
+  { x: 0.36, y: 0.82 },
+] as const
+
+export function DefenderScreen({ identity }: { identity: GameIdentity }) {
   const settingsStore = useMemo(() => createSettingsStore(), [])
   const progressStore = useMemo(() => createProgressStore(), [])
+  const statsStore = useMemo(() => createStatsStore(), [])
   const [settings, setSettings] = useState<SettingsRecord>(defaultSettings)
 
   const pool = useGamePool()
   const [game, setGame] = useState<DefenderState | null>(null)
+  const [report, setReport] = useState<RunReport | null>(null)
   const [typed, setTyped] = useState('')
-  const [flash, setFlash] = useState<'hit' | 'miss' | null>(null)
+  const [bursts, setBursts] = useState<readonly Burst[]>([])
+  const [feedback, setFeedback] = useState<{ kind: 'hit' | 'miss'; text: string } | null>(null)
+  const [misses, setMisses] = useState(0)
+  const [leaks, setLeaks] = useState(0)
 
+  /** The source of truth for the run; `game` is its rendered copy. */
+  const live = useRef<DefenderState | null>(null)
+  /** Increments per run. `finished` holds the last run that was banked. */
+  const run = useRef(0)
+  const finished = useRef(0)
+  const since = useRef<AchievementSnapshot | undefined>(undefined)
   const audio = useRef<AudioEngine | null>(null)
   const random = useRef(createRandom(1))
   const input = useRef<HTMLInputElement>(null)
+  const cabinet = useRef<HTMLElement>(null)
+  const timers = useRef(new Set<ReturnType<typeof setTimeout>>())
 
   useEffect(() => {
     setSettings(settingsStore.read())
     return settingsStore.subscribe(setSettings)
   }, [settingsStore])
 
-  useEffect(() => () => void audio.current?.dispose(), [])
+  useEffect(() => {
+    const pending = timers.current
+    return () => {
+      void audio.current?.dispose()
+      for (const timer of pending) clearTimeout(timer)
+    }
+  }, [])
+
+  const later = useCallback((ms: number, fn: () => void) => {
+    const timer = setTimeout(() => {
+      timers.current.delete(timer)
+      fn()
+    }, ms)
+    timers.current.add(timer)
+  }, [])
+
+  const commit = useCallback((next: DefenderState | null) => {
+    live.current = next
+    setGame(next)
+  }, [])
+
+  const record = useCallback(
+    (character: string, correct: boolean) => {
+      // A game is still evidence: every signal showed its code and was either
+      // read in time or not, so it feeds the same schedule as practice rather
+      // than being a throwaway score. Reading a code is recognition; the sound
+      // helps, but the code is on screen, so it is not proof of listening.
+      progressStore.update((progress) =>
+        recordAnswer(progress, character, DEFENDER_SKILL, correct, Date.now()),
+      )
+    },
+    [progressStore],
+  )
 
   const sound = useCallback(
     (character: string) => {
@@ -67,6 +184,30 @@ export function DefenderScreen() {
     [settings],
   )
 
+  /** Bank the run once. Called from the handler that ended it, never from an updater. */
+  const finish = useCallback(
+    (state: DefenderState) => {
+      if (finished.current === run.current) return
+      finished.current = run.current
+      track('game_finish', 'defender')
+      setReport(
+        bankRun(
+          {
+            game: 'defender',
+            score: state.score,
+            answers: state.hits + state.misses,
+            correct: state.hits,
+            inputs: shots(state),
+            xp: runXp(state),
+            since: since.current,
+          },
+          { stats: statsStore, progress: progressStore },
+        ),
+      )
+    },
+    [progressStore, statsStore],
+  )
+
   const start = useCallback(() => {
     track('game_start', 'defender')
     audio.current ??= new AudioEngine({
@@ -74,212 +215,309 @@ export function DefenderScreen() {
       volume: settings.audio.volume,
     })
     void audio.current.resume()
+    run.current += 1
+    since.current = achievementSnapshot(progressStore.read(), statsStore.read(), Date.now())
     random.current = createRandom(seedFrom(`defender-${pool.id}-${performance.now()}`))
-    setGame(newDefenderGame())
+    setReport(null)
     setTyped('')
-    setFlash(null)
-    setTimeout(() => input.current?.focus(), 50)
-  }, [settings, pool.id])
+    setBursts([])
+    setFeedback(null)
+    commit(newDefenderGame())
+    later(50, () => {
+      cabinet.current?.scrollIntoView({ block: 'start' })
+      // With the pad, the soft keyboard would only cover it and the field.
+      if (!usesPad(pool.characters)) input.current?.focus({ preventScroll: true })
+    })
+  }, [settings, pool.id, pool.characters, progressStore, statsStore, commit, later])
 
   const running = game !== null && !isOver(game)
 
   useGameLoop(running, (dtMs) => {
-    setGame((current) => {
-      if (!current || isOver(current)) return current
-      const { state, spawned } = advance(current, dtMs, pool.characters, random.current)
-      if (spawned) sound(spawned.character)
-      return state
-    })
+    const current = live.current
+    if (!current || isOver(current)) return
+    const { state, spawned, landed } = advance(current, dtMs, pool.characters, random.current)
+    commit(state)
+    if (spawned) sound(spawned.character)
+    if (landed.length > 0) {
+      // A signal blamed by an earlier wrong key already counted as missed.
+      for (const signal of landed) if (!signal.wrong) record(signal.character, false)
+      setLeaks((count) => count + 1)
+      // A landed signal is the one moment its letter is worth telling: it is
+      // how the code gets learned next time.
+      const letters = [...new Set(landed.map((signal) => signal.character))]
+      setFeedback({ kind: 'miss', text: `${joinList(letters)} got through` })
+    }
+    if (isOver(state)) finish(state)
   })
 
   const submit = useCallback(
     (character: string) => {
-      setGame((current) => {
-        if (!current || isOver(current)) return current
-        const { state, hit } = shoot(current, character)
-        setFlash(hit ? 'hit' : 'miss')
-        setTimeout(() => setFlash(null), 160)
-
-        // A game is still evidence: every character shot at was heard and
-        // either recognised or not, so it feeds the same listening schedule as
-        // practice rather than being a throwaway score.
-        if (hit) {
-          progressStore.update((progress) =>
-            recordAnswer(progress, hit.character, 'listening', true, Date.now()),
-          )
-        }
-        return state
-      })
       setTyped('')
+      const current = live.current
+      if (!current || isOver(current)) return
+      const { state, hit, blamed } = shoot(current, character)
+      commit(state)
+
+      if (hit) {
+        record(hit.character, true)
+        const burst: Burst = {
+          id: hit.id,
+          character: hit.character,
+          x: hit.x,
+          y: hit.y,
+          points: hitScore(hit, current.streak),
+        }
+        setBursts((list) => [...list, burst])
+        later(BURST_MS * 2, () => setBursts((list) => list.filter((entry) => entry !== burst)))
+        setFeedback({ kind: 'hit', text: `${hit.character} down, +${burst.points}` })
+      } else {
+        if (blamed) record(blamed.character, false)
+        setMisses((count) => count + 1)
+        setFeedback({ kind: 'miss', text: `${character.toUpperCase()} matched nothing` })
+      }
     },
-    [progressStore],
+    [commit, record, later],
   )
 
-  // Report the run once, when it ends.
-  const finished = game !== null && isOver(game)
-  useEffect(() => {
-    if (finished) track('game_finish', 'defender')
-  }, [finished])
+  const quit = useCallback(() => {
+    const current = live.current
+    if (!current || isOver(current)) return
+    const ended = endRun(current)
+    commit(ended)
+    finish(ended)
+  }, [commit, finish])
+
+  const setup = useCallback(() => {
+    commit(null)
+    setReport(null)
+  }, [commit])
 
   if (game === null) {
+    const sample = pool.characters.length > 0 ? pool.characters : ['E']
     return (
-      <div className="rounded-2xl border border-line bg-panel p-6 sm:p-8">
-        <h2 className="font-display text-2xl font-bold tracking-tight">Signal Defender</h2>
-        <p className="mt-3 leading-relaxed text-muted">
-          Characters fall, one sounding as each appears. Type a character to knock down the lowest
-          one matching it. Let three reach the floor and the run is over.
-        </p>
-        <p className="mt-3 text-sm leading-relaxed text-muted">
-          Practice waits for you. This does not, which is the whole point — copying at speed fails
-          not because you cannot decode a character but because you cannot decode it before the next
-          one arrives.
-        </p>
-
-        <div className="mt-6">
-          <PoolPicker />
-        </div>
-
-        <button
-          type="button"
-          onClick={start}
-          className="mt-8 w-full rounded-lg px-6 py-3.5 font-mono text-sm tracking-[0.16em] text-void"
-          style={{ background: 'var(--color-signal)' }}
-        >
-          START
-        </button>
-
-        {!settings.audio.enabled && (
-          <p className="mt-4 text-xs text-amber">
-            Sound is off in settings. The characters still fall and are still readable on screen, so
-            the game works — it is just the reading game rather than the listening one.
-          </p>
-        )}
-      </div>
-    )
-  }
-
-  if (isOver(game)) {
-    return (
-      <GameOver
-        title="Overrun"
-        stats={[
-          { label: 'SCORE', value: game.score.toLocaleString('en') },
-          { label: 'ACCURACY', value: `${Math.round(accuracy(game) * 100)}%` },
-          { label: 'BEST STREAK', value: String(game.bestStreak) },
-          { label: 'LASTED', value: `${Math.round(game.elapsedMs / 1000)}s` },
+      <GameSetup
+        identity={identity}
+        console="Receiving console"
+        startLabel="Start"
+        onStart={start}
+        rules={[
+          'Signals fall as Morse code, each one sounding as it appears.',
+          'Type the character a code spells to knock down the lowest one that matches.',
+          'The letter shows only once it is hit.',
+          `Let ${numberWord(STARTING_LIVES)} reach the floor and the run is over.`,
         ]}
-        weakest={weakest(game)}
-        onAgain={start}
-        onQuit={() => setGame(null)}
+        preview={
+          <>
+            {PREVIEW_SPOTS.map((spot, index) => {
+              const character = sample[index % sample.length]!
+              return (
+                <SignalPiece
+                  key={index}
+                  character={character}
+                  x={spot.x}
+                  y={onScreen(spot.y)}
+                  danger={spot.y > 0.8}
+                />
+              )
+            })}
+            <span className="gm-floor" />
+          </>
+        }
+        note={
+          !settings.audio.enabled && (
+            <p className="text-sm text-amber">
+              Sound is off in settings. The signals still fall and still show their code, so the
+              game works: you read each code instead of hearing it.
+            </p>
+          )
+        }
       />
     )
   }
 
+  if (isOver(game)) {
+    if (!report) return null
+    const percent = clearedPercent(accuracy(game))
+    return (
+      <GameOver
+        identity={identity}
+        overLabel="Overrun"
+        quit={game.quit}
+        score={game.score}
+        cleared={accuracy(game)}
+        caption={`${percent}% cleared · ${game.hits} down, ${game.leaked.length} landed`}
+        plates={[
+          { label: 'Best streak', value: String(game.bestStreak) },
+          { label: 'Lasted', value: `${Math.round(game.elapsedMs / 1000)}s` },
+          { label: 'XP', value: `+${formatScore(report.xp)}`, tone: 'amber' },
+        ]}
+        outcomes={game.outcomes}
+        stripCaption="Each lamp is one signal or one key, in order. A ring is a miss."
+        report={report}
+        weakest={weakest(game)}
+        weakestLabel="What got past you"
+        onAgain={start}
+        onSetup={setup}
+      />
+    )
+  }
+
+  const danger = game.lives <= 1
+  const load = pressure(game.elapsedMs)
+
   return (
-    <div className="rounded-2xl border border-line bg-panel p-4 sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-        <span className="font-mono text-[10px] tracking-[0.18em] text-muted">
-          SCORE {game.score.toLocaleString('en')}
-        </span>
-        <span className="font-mono text-[10px] tracking-[0.18em] text-muted">
-          STREAK {game.streak}
-        </span>
-        <span
-          className="font-mono text-[10px] tracking-[0.18em]"
-          style={{ color: game.lives === 1 ? 'var(--color-danger)' : 'var(--color-muted)' }}
-        >
-          {/* Lives as a count as well as pips: three hearts and two hearts are
-              hard to tell apart at a glance under time pressure. */}
-          {game.lives} / {STARTING_LIVES} LIVES
-          <span aria-hidden="true"> {'●'.repeat(Math.max(0, game.lives))}</span>
-        </span>
-        <button
-          type="button"
-          onClick={() => setGame(null)}
-          className="font-mono text-[10px] tracking-[0.14em] text-muted hover:text-danger"
-        >
-          GIVE UP
+    <section
+      ref={cabinet}
+      className="mf-instrument gm-cabinet p-4 sm:p-6"
+      aria-label={`${identity.name}, playing`}
+    >
+      <PlateRow
+        title={`${identity.name} · Receiving`}
+        status={
+          <StatusLamp on tone={danger ? 'danger' : 'signal'}>
+            On air
+          </StatusLamp>
+        }
+      >
+        <button type="button" onClick={quit} className="mf-btn mf-btn-danger mf-btn-sm">
+          End run
         </button>
-      </div>
+      </PlateRow>
 
-      {/* The field. Signals are positioned rather than drawn, so they stay real
-          text — selectable, readable by a screen reader, and legible at any
-          zoom. A canvas would be none of those. */}
-      <div
-        className="relative mt-4 overflow-hidden rounded-xl border"
-        style={{
-          height: 'min(58vh, 420px)',
-          borderColor:
-            flash === 'hit'
-              ? 'var(--color-signal)'
-              : flash === 'miss'
-                ? 'var(--color-danger)'
-                : 'var(--color-line)',
-          background: 'var(--color-void)',
-        }}
-      >
-        {game.signals.map((signal) => (
-          <span
-            key={signal.id}
-            className="absolute font-display text-3xl font-bold"
-            style={{
-              left: `${signal.x * 100}%`,
-              top: `${signal.y * 100}%`,
-              transform: 'translate(-50%, -50%)',
-              // Reddens as it nears the floor: a non-colour cue is not needed
-              // here because the position itself is the information.
-              color: signal.y > 0.8 ? 'var(--color-danger)' : 'var(--color-signal)',
-            }}
+      <div className="gm-console mt-4">
+        <div className="gm-hud">
+          <HudCell label="Score">{formatScore(game.score)}</HudCell>
+          <HudCell
+            label="Streak"
+            tone={game.streak >= 5 ? 'amber' : undefined}
+            sub={`×${streakMultiplier(game.streak).toFixed(1)}`}
           >
-            {signal.character}
-            <span className="mt-1 block text-center font-mono text-[10px] tracking-[0.12em] text-muted">
-              {prettify(MORSE_ALPHABET[signal.character] ?? '')}
+            {game.streak}
+          </HudCell>
+          <LivesCell lives={game.lives} of={STARTING_LIVES} />
+          {/* Desk only: the column has room, and a reminder of what can fall
+              is worth more there than empty panel. */}
+          <div className="gm-hud-cell hidden lg:grid">
+            <span className="mf-engraved">On the wire</span>
+            <span className="font-mono text-sm tracking-code break-words text-ink">
+              {pool.characters.join(' ')}
             </span>
-          </span>
-        ))}
+          </div>
+        </div>
 
-        {/* The floor. */}
-        <span
-          aria-hidden="true"
-          className="absolute right-0 bottom-0 left-0 h-px"
-          style={{ background: 'var(--color-danger)', opacity: 0.5 }}
-        />
+        {/* The field. Signals are positioned rather than drawn, so they stay
+            real text — readable by a screen reader and legible at any zoom.
+            Each moves by transform alone (see pkg-h.css). */}
+        <div className="gm-field-wrap">
+          <div className="mf-screen mf-grid gm-field gm-field-defender">
+            {leaks > 0 && <span key={leaks} className="mf-flash gm-flash-danger" />}
 
-        <span className="absolute right-3 bottom-2 font-mono text-[10px] tracking-[0.14em] text-muted">
-          {Math.round(pressure(game.elapsedMs) * 100)}% PRESSURE
-        </span>
-      </div>
+            {game.signals.map((signal) => (
+              <SignalPiece
+                key={signal.id}
+                character={signal.character}
+                x={signal.x}
+                y={onScreen(signal.y)}
+                danger={signal.y > 0.8}
+              />
+            ))}
 
-      <form
-        className="mt-4"
-        onSubmit={(event) => {
-          event.preventDefault()
-          if (typed.trim()) submit(typed)
-        }}
-      >
-        <label htmlFor="defender-answer" className="sr-only">
-          Type the character you heard
-        </label>
-        <input
-          id="defender-answer"
-          ref={input}
-          value={typed}
-          // Submitted on the keystroke rather than on Enter: pressing Enter
-          // after every character halves how fast anyone can play.
-          onChange={(event) => {
-            const next = event.target.value.slice(-1)
-            if (next.trim()) submit(next)
-            else setTyped('')
+            {bursts.map((burst) => (
+              <SignalReveal
+                key={burst.id}
+                character={burst.character}
+                x={burst.x}
+                y={onScreen(burst.y)}
+                points={burst.points}
+              />
+            ))}
+
+            <span className="gm-floor" aria-hidden="true" />
+            <span className="mf-engraved gm-floor-label" aria-hidden="true">
+              Floor
+            </span>
+            <span className="gm-corner right-3 bottom-2" aria-hidden="true">
+              <span className="mf-engraved">Pressure</span>
+              <span className="gm-gauge" style={{ '--fill': load } as CSSProperties}>
+                <span />
+              </span>
+            </span>
+          </div>
+        </div>
+
+        <form
+          className="gm-entry"
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (typed.trim()) submit(typed)
           }}
-          autoCapitalize="characters"
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-          maxLength={1}
-          placeholder="type what you hear"
-          className="w-full rounded-lg border border-line bg-elevated px-4 py-4 text-center font-display text-2xl uppercase outline-none placeholder:text-sm placeholder:normal-case focus:border-signal"
-        />
-      </form>
-    </div>
+        >
+          <div className="mf-screen mf-screen-flush grid gap-2 p-3">
+            <label htmlFor="defender-answer" className="mf-engraved">
+              Type what each code spells
+            </label>
+            {/* Two shake classes, alternated, so each wrong key restarts the
+                shake without remounting (and so unfocusing) the field. */}
+            <div className={misses === 0 ? undefined : misses % 2 ? 'mf-shake' : 'gm-shake-alt'}>
+              <input
+                id="defender-answer"
+                ref={input}
+                value={typed}
+                // Submitted on the keystroke rather than on Enter: pressing
+                // Enter after every character halves how fast anyone can play.
+                onChange={(event) => {
+                  const next = event.target.value.slice(-1)
+                  if (next.trim()) submit(next)
+                  else setTyped('')
+                }}
+                autoCapitalize="characters"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                maxLength={1}
+                enterKeyHint="send"
+                className="mf-input-answer relative z-[3]"
+              />
+            </div>
+            {/* On a touch screen with a small pool, one big button per
+                character: a two-letter drill should not need the soft
+                keyboard for every answer (I-1). The field still works. */}
+            {pool.characters.length <= PAD_MAX && (
+              <div
+                className="relative z-[3] hidden gap-2 pointer-coarse:grid"
+                // Up to four across, so two letters share the row rather than
+                // leaving half of it empty.
+                style={{
+                  gridTemplateColumns: `repeat(${Math.min(pool.characters.length, 4)}, minmax(0, 1fr))`,
+                }}
+                role="group"
+                aria-label="Answer pad"
+              >
+                {pool.characters.map((character) => (
+                  <button
+                    key={character}
+                    type="button"
+                    className="mf-btn mf-btn-secondary min-h-14 px-2 font-display text-h3 normal-case"
+                    onClick={() => submit(character)}
+                  >
+                    {character}
+                  </button>
+                ))}
+              </div>
+            )}
+            <p role="status" className="min-h-5 font-mono text-sm" data-kind={feedback?.kind}>
+              {feedback ? (
+                <span className={feedback.kind === 'hit' ? 'text-signal' : 'text-danger'}>
+                  <span aria-hidden="true">{feedback.kind === 'hit' ? '● ' : '✕ '}</span>
+                  {feedback.text}
+                </span>
+              ) : (
+                <span className="text-muted">Waiting for the first signal</span>
+              )}
+            </p>
+          </div>
+        </form>
+      </div>
+    </section>
   )
 }

@@ -1,0 +1,204 @@
+/* ---------------------------------------------------------------------------
+   Package G: the Signal Tree board and the progress hub.
+
+   Only what global.css has no class for. Colours are tokens; only opacity
+   and transform ever transition (DEC: Signal Office motion rules).
+--------------------------------------------------------------------------- */
+
+/* ---- The board ---------------------------------------------------------- */
+
+.mf-tree-board {
+  position: relative;
+}
+
+/* The board scrolls inside its own glass, never the page. */
+.mf-tree-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+  padding-block: 0.25rem;
+}
+
+.mf-tree-scroll:focus-visible {
+  outline: 2px solid var(--color-amber);
+  outline-offset: -4px;
+}
+
+/* Edge fades: shown only on a side with more board to see. Under the
+   scanlines (z 2) so the glass still reads as one surface. */
+.mf-tree-fade {
+  position: absolute;
+  inset-block: 0;
+  z-index: 1;
+  inline-size: 1rem;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--duration-dah) var(--ease-signal);
+}
+
+.mf-tree-fade-left {
+  inset-inline-start: 0;
+  background: linear-gradient(
+    to left,
+    transparent,
+    color-mix(in srgb, var(--color-screen) 85%, transparent)
+  );
+}
+
+.mf-tree-fade-right {
+  inset-inline-end: 0;
+  background: linear-gradient(
+    to right,
+    transparent,
+    color-mix(in srgb, var(--color-screen) 85%, transparent)
+  );
+}
+
+.mf-tree-board[data-more-left='true'] .mf-tree-fade-left,
+.mf-tree-board[data-more-right='true'] .mf-tree-fade-right {
+  opacity: 1;
+}
+
+/* ---- Pads ---------------------------------------------------------------- */
+
+.mf-tree-label {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.mf-tree-branch-label {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  letter-spacing: 0.12em;
+  fill: var(--color-muted);
+}
+
+.mf-tree-node {
+  cursor: pointer;
+  outline: none; /* replaced by the amber focus ring below */
+}
+
+/* The focus ring is a drawn circle: `outline` on an SVG group is unreliable
+   across browsers, and a ring the shape of the pad reads better anyway. */
+.mf-tree-focus {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mf-tree-node:focus-visible .mf-tree-focus {
+  opacity: 1;
+}
+
+/* Hover: the pad lifts a hair. Transform only, from its own centre. */
+.mf-tree-pad {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform var(--duration-dit) var(--ease-signal);
+}
+
+@media (hover: hover) {
+  .mf-tree-node:hover .mf-tree-pad {
+    transform: scale(1.08);
+  }
+}
+
+.mf-tree-node:active .mf-tree-pad {
+  transform: scale(0.96);
+}
+
+/* The halo's resting state is invisible, so with motion off (where
+   global.css removes the animation) it simply never shows. */
+.mf-tree-halo {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mf-tree-power-fill {
+  transition: transform var(--duration-word) var(--ease-signal);
+}
+
+/* ---- Progress hub ------------------------------------------------------- */
+
+.mf-meter {
+  display: block;
+  block-size: 0.5rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-line-strong) 45%, var(--color-void));
+  box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.45);
+}
+
+.mf-meter-sm {
+  block-size: 0.25rem;
+}
+
+.mf-meter > span {
+  display: block;
+  block-size: 100%;
+  inline-size: 100%;
+  border-radius: inherit;
+  transform-origin: left center;
+  background: var(--meter, var(--color-signal));
+  transition: transform var(--duration-word) var(--ease-signal);
+}
+
+.mf-meter[data-tone='amber'] {
+  --meter: var(--color-amber);
+}
+
+.mf-meter[data-tone='dim'] {
+  --meter: var(--color-signal-dim);
+}
+
+/* Badge plates. Earned: brass edge and a lit lamp. Locked: an engraved
+   outline, text at full strength (never faded), and a lock. */
+.mf-badge {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.875rem;
+  align-items: start;
+  padding: 1rem;
+  border-radius: var(--radius-panel);
+  border: 1px dashed var(--color-line-strong);
+  background: transparent;
+}
+
+.mf-badge[data-earned='true'] {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--color-brass) 60%, var(--color-line));
+  background: linear-gradient(180deg, var(--color-elevated), var(--color-panel));
+  box-shadow: var(--shadow-bezel);
+}
+
+.mf-badge-icon {
+  display: grid;
+  place-items: center;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  border-radius: 999px;
+  font-size: 1.25rem;
+  line-height: 1;
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-void);
+}
+
+/* The locked icon is shown as a lock, not as a faded emoji. */
+.mf-badge[data-earned='true'] .mf-badge-icon {
+  border-color: var(--color-brass);
+  background: radial-gradient(
+    circle at 35% 30%,
+    color-mix(in srgb, var(--color-brass) 30%, var(--color-elevated)),
+    var(--color-panel) 75%
+  );
+}
+
+/* Streak plate's day strip: one cell per day, lit if active. */
+.mf-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.375rem;
+}

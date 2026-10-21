@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AudioEngine } from '../../engine/audioEngine'
-import { KeyEngine, bindKeyboard, type KeyBindings } from '../../engine/keyEngine'
+import {
+  DEFAULT_KEY_BINDINGS,
+  KeyEngine,
+  bindKeyboard,
+  type KeyBindings,
+} from '../../engine/keyEngine'
 import { LiveDecoder } from '../../engine/morseDecoder'
 
 /**
@@ -34,7 +39,23 @@ export interface UseMorseKeyOptions {
   volume?: number
   /** Stop listening to the keyboard, e.g. while a dialog is open. */
   disabled?: boolean
+  /**
+   * Whether the keying key works from anywhere on the page (a `window`
+   * listener). False leaves the page's own Space alone, e.g. while the
+   * instrument is scrolled out of view; the on-screen key still answers
+   * pointers, and Space while it has focus. Default true.
+   */
+  windowKeys?: boolean
   onElement?: (element: '.' | '-', heldMs: number) => void
+  /**
+   * Commit the character the moment this returns true for the elements keyed
+   * so far, instead of waiting for the character gap.
+   *
+   * For screens that know the target, e.g. the lesson's send step: once the
+   * pending code spells it, the pause is only latency. Optional and off by
+   * default, so every other caller keeps the gap as its only commit rule.
+   */
+  commitWhen?: (pending: string) => boolean
   /** A character resolved. Never fires with an empty buffer. */
   onCharacter?: (character: string) => void
   onWord?: () => void
@@ -60,6 +81,17 @@ export interface MorseKeyState {
   commitProgress: number
 }
 
+/**
+ * Whether the pending elements should commit now rather than at the gap.
+ * Pure, so the rule is tested without a DOM. Nothing pending never commits.
+ */
+export function shouldCommitEarly(
+  pending: string,
+  commitWhen?: (pending: string) => boolean,
+): boolean {
+  return pending !== '' && commitWhen !== undefined && commitWhen(pending)
+}
+
 /** How many elements the visualiser keeps. Older ones are off screen anyway. */
 const RECENT_LIMIT = 40
 
@@ -83,6 +115,7 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
     frequency = 600,
     volume = 0.15,
     disabled = false,
+    windowKeys = true,
   } = options
 
   const [state, setState] = useState<MorseKeyState>(EMPTY_STATE)
@@ -99,6 +132,9 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
   // would never commit while the parent re-rendered on each element.
   const callbacks = useRef(options)
   callbacks.current = options
+
+  /** Set to `commitCharacter` below; the engine's callbacks are built first. */
+  const commitEarly = useRef<(() => void) | null>(null)
 
   const stopCountdown = useCallback(() => {
     if (frame.current !== null) cancelAnimationFrame(frame.current)
@@ -155,6 +191,13 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
           sync({ isDown: false })
           startCountdown()
         },
+        // A hold the browser never ended: the window lost focus, or the
+        // binding went away, mid-hold. Nothing was keyed, but the tone and
+        // the pressed look must stop rather than wait for the next press.
+        onCancel: () => {
+          audio.current?.keyUp()
+          sync({ isDown: false })
+        },
         onElement: (element, heldMs) => {
           decoder.current.pushElement(element)
           elementId.current += 1
@@ -166,6 +209,18 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
             recent: [...previous.recent, keyed].slice(-RECENT_LIMIT),
           }))
           callbacks.current.onElement?.(element, heldMs)
+
+          if (shouldCommitEarly(decoder.current.pending, callbacks.current.commitWhen)) {
+            // Deferred to a microtask: the engine emits the element *before*
+            // it arms the gap timers, so committing synchronously here would
+            // leave a word-gap timer armed behind an empty buffer. By the
+            // microtask the release has finished and `commitEarly` can cancel
+            // both timers. The pending check skips it if anything moved on.
+            const expected = decoder.current.pending
+            queueMicrotask(() => {
+              if (decoder.current.pending === expected) commitEarly.current?.()
+            })
+          }
         },
         onCharacterGap: () => {
           stopCountdown()
@@ -208,6 +263,8 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
     return character
   }, [stopCountdown, sync])
 
+  commitEarly.current = commitCharacter
+
   const commitWord = useCallback(() => {
     stopCountdown()
     decoder.current.commitWord()
@@ -216,10 +273,28 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
     callbacks.current.onWord?.()
   }, [stopCountdown, sync])
 
+  /** Abandon the character in progress, keeping what is already decoded. */
+  const cancelPending = useCallback(() => {
+    stopCountdown()
+    engine.current?.reset()
+    decoder.current.clearPending()
+    audio.current?.keyUp()
+    sync({ isDown: false, commitProgress: 0 })
+  }, [stopCountdown, sync])
+
   useEffect(() => {
-    if (disabled || !engine.current) return
-    return bindKeyboard(engine.current, bindings, window, commitCharacter)
-  }, [disabled, bindings, commitCharacter])
+    const keyEngine = engine.current
+    if (disabled || !windowKeys || !keyEngine) return
+    // Esc (the cancel binding) abandons the pending character, exactly as the
+    // station's "Undo character" button does.
+    const unbind = bindKeyboard(keyEngine, bindings, window, commitCharacter, cancelPending)
+    return () => {
+      unbind()
+      // Unbound mid-hold, the keyup will never arrive here. Only a hold is
+      // dropped: a settings change between characters keeps its gap timers.
+      if (keyEngine.isPressed) keyEngine.reset()
+    }
+  }, [disabled, windowKeys, bindings, commitCharacter, cancelPending])
 
   useEffect(() => {
     return () => {
@@ -230,23 +305,21 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
     }
   }, [stopCountdown])
 
-  const press = useCallback(() => {
-    if (disabled) return
-    engine.current?.press()
-  }, [disabled])
+  /** `timeStamp`: the input event's, so the hold is timed from the input (see KeyEngine). */
+  const press = useCallback(
+    (timeStamp?: number) => {
+      if (disabled) return
+      engine.current?.press(timeStamp)
+    },
+    [disabled],
+  )
 
-  const release = useCallback(() => {
-    engine.current?.release()
+  const release = useCallback((timeStamp?: number) => {
+    engine.current?.release(timeStamp)
   }, [])
 
-  /** Abandon the character in progress, keeping what is already decoded. */
-  const cancelPending = useCallback(() => {
-    stopCountdown()
-    engine.current?.reset()
-    decoder.current.clearPending()
-    audio.current?.keyUp()
-    sync({ isDown: false, commitProgress: 0 })
-  }, [stopCountdown, sync])
+  /** For handlers React calls with the event: release at the event's own time. */
+  const releaseAtEvent = (event?: { timeStamp: number }) => release(event?.timeStamp)
 
   /** Wipe everything and start over. */
   const reset = useCallback(() => {
@@ -274,23 +347,31 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
   const pointerHandlers = {
     onPointerDown: (event: React.PointerEvent) => {
       event.preventDefault()
-      press()
+      press(event.timeStamp)
     },
-    onPointerUp: release,
-    onPointerLeave: release,
-    onPointerCancel: release,
+    onPointerUp: releaseAtEvent,
+    onPointerLeave: releaseAtEvent,
+    onPointerCancel: releaseAtEvent,
     onKeyDown: (event: React.KeyboardEvent) => {
+      // The window binding leaves events aimed at a button alone, so with the
+      // key focused, Esc has to be answered here or it would cancel nothing.
+      if (event.key === (bindings?.cancel ?? DEFAULT_KEY_BINDINGS.cancel)) {
+        if (event.repeat) return
+        event.preventDefault()
+        cancelPending()
+        return
+      }
       if (event.key !== ' ' && event.key !== 'Enter') return
       // Auto-repeat would otherwise read as a burst of dots, exactly as it
       // would through the window binding.
       if (event.repeat) return
       event.preventDefault()
-      press()
+      press(event.timeStamp)
     },
     onKeyUp: (event: React.KeyboardEvent) => {
       if (event.key !== ' ' && event.key !== 'Enter') return
       event.preventDefault()
-      release()
+      release(event.timeStamp)
     },
     // Losing focus mid-hold never fires keyup, which would leave the tone
     // sounding and the timers unarmed.

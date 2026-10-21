@@ -1,122 +1,129 @@
 ---
+import '../../styles/pkg-i.css'
 import type { GetStaticPaths } from 'astro'
 import { getCollection, render } from 'astro:content'
 import BaseLayout from '../../layouts/BaseLayout.astro'
-import { AUTHOR, SITE } from '../../config/site'
+import PageShell from '../../components/PageShell.astro'
+import { blogPage, breadcrumbTrail } from '../../config/pages'
+import { FACTS } from '../../config/facts'
+import { AUTHOR, CITATIONS } from '../../config/site'
+import { numberWord } from '../../data/format'
+import { article, breadcrumbs } from '../../seo/schema'
 
+/**
+ * A note, laid out as a page of the operator's manual: a numbered clause
+ * heading each section, the answer in a boxed summary up front, and the body
+ * set to a reading measure.
+ */
 export const getStaticPaths = (async () => {
-  const posts = await getCollection('blog', ({ data }) => !data.draft)
-  return posts.map((post) => ({ params: { slug: post.id }, props: { post } }))
+  const posts = (await getCollection('blog', ({ data }) => !data.draft)).sort(
+    (a, b) => a.data.published.getTime() - b.data.published.getTime(),
+  )
+  return posts.map((post, index) => ({
+    params: { slug: post.id },
+    props: { post, number: index + 1, total: posts.length },
+  }))
 }) satisfies GetStaticPaths
 
-const { post } = Astro.props
+const { post, number } = Astro.props
 const { Content } = await render(post)
 
-const path = `/blog/${post.id}/`
+const meta = blogPage({ slug: post.id, ...post.data })
 const markdown = `/blog/${post.id}.md`
-const title = `${post.data.title} | MorseForge`
+const trail = breadcrumbTrail(meta.path, { name: post.data.title, parent: meta.parent })
+const body = post.body ?? ''
+const wordCount = body.split(/\s+/).filter(Boolean).length
+// Cite a source only when the post actually links to it.
+const cites = (['itu', 'arrl'] as const).filter((key) => body.includes(CITATIONS[key].url))
+const updated =
+  post.data.updated && post.data.updated.getTime() !== post.data.published.getTime()
+    ? post.data.updated
+    : undefined
 
 const formatDate = (date: Date) =>
   date.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })
 
 const schema = [
-  {
-    '@context': 'https://schema.org',
-    '@type': 'BlogPosting',
+  article({
+    type: 'BlogPosting',
+    path: meta.path,
     headline: post.data.title,
-    description: post.data.description,
-    datePublished: post.data.published.toISOString(),
-    dateModified: (post.data.updated ?? post.data.published).toISOString(),
-    url: new URL(path, SITE.url).href,
-    mainEntityOfPage: new URL(path, SITE.url).href,
-    author: { '@id': `${SITE.url}/#author` },
-    publisher: { '@id': `${SITE.url}/#author` },
-    isPartOf: { '@id': `${SITE.url}/#website` },
-    inLanguage: 'en',
-    keywords: post.data.tags.join(', '),
-    // The answer, restated where a machine can find it without parsing prose.
-    abstract: post.data.answer,
-  },
-  {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Home', item: SITE.url },
-      { '@type': 'ListItem', position: 2, name: 'Notes', item: `${SITE.url}/blog/` },
-      { '@type': 'ListItem', position: 3, name: post.data.title },
-    ],
-  },
+    description: meta.description,
+    datePublished: post.data.published,
+    ...(updated ? { dateModified: updated } : {}),
+    wordCount,
+    cites,
+    markdownPath: markdown,
+  }),
+  breadcrumbs(trail),
 ]
 ---
 
 <BaseLayout
-  title={title}
-  description={post.data.description}
-  path={path}
+  title={meta.title}
+  description={meta.description}
+  path={meta.path}
   schema={schema}
   markdown={markdown}
+  article={{ published: post.data.published, modified: updated }}
+  ogType="article"
 >
-  <main class="mx-auto max-w-2xl px-6 py-14">
-    <nav aria-label="Breadcrumb" class="font-mono text-[10px] tracking-[0.16em] text-muted">
-      <a href="/blog/" class="hover:text-signal">NOTES</a>
-    </nav>
-
-    <article class="mt-5">
-      <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">
-        {post.data.title}
-      </h1>
-
-      <div
-        class="mt-4 flex flex-wrap items-center gap-3 font-mono text-[10px] tracking-[0.16em] text-muted"
-      >
-        <time datetime={post.data.published.toISOString()}>
-          {formatDate(post.data.published).toUpperCase()}
-        </time>
+  {
+    /* Answer first: the post's whole answer is the paragraph under the H1,
+      because it is the one a search snippet lifts and an assistant quotes. */
+  }
+  <PageShell
+    width="prose"
+    trail={trail}
+    eyebrow={`Manual · Note ${String(number).padStart(2, '0')}`}
+    h1={meta.h1}
+    intro={post.data.answer}
+  >
+    <article>
+      <p class="mf-engraved flex flex-wrap items-center gap-x-3 gap-y-1">
+        <time datetime={post.data.published.toISOString()}>{formatDate(post.data.published)}</time>
+        {
+          updated && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>
+                Updated <time datetime={updated.toISOString()}>{formatDate(updated)}</time>
+              </span>
+            </>
+          )
+        }
         <span aria-hidden="true">·</span>
-        <a href={AUTHOR.url} rel="me author" class="hover:text-signal">
-          {AUTHOR.name.toUpperCase()}
-        </a>
-      </div>
-
-      {
-        /* Answer-first: the whole answer before the argument for it, because
-          this is the paragraph a search snippet lifts and an assistant quotes. */
-      }
-      <p
-        class="mt-8 rounded-xl border-l-2 bg-panel py-4 pr-5 pl-5 text-lg leading-relaxed"
-        style="border-color: var(--color-signal)"
-      >
-        {post.data.answer}
+        <a href={AUTHOR.url} rel="author" class="hover:text-signal">{AUTHOR.name}</a>
       </p>
 
-      <div class="mf-prose mt-10">
+      <div class="mf-prose pi-manual mt-10">
         <Content />
       </div>
 
-      <footer class="mt-14 border-t border-line pt-8">
-        <ul class="flex flex-wrap gap-2">
-          {
-            post.data.tags.map((tag) => (
-              <li class="rounded-lg border border-line px-3 py-1 font-mono text-[10px] tracking-[0.14em] text-muted">
-                {tag.toUpperCase()}
-              </li>
-            ))
-          }
+      <footer class="mt-16 border-t border-line pt-8">
+        <ul class="flex flex-wrap gap-2" aria-label="Topics">
+          {post.data.tags.map((tag) => <li class="mf-kbd px-2.5 py-1">{tag}</li>)}
         </ul>
+        <p class="mt-6 text-sm text-muted">
+          Also available as <a href={markdown} class="pi-link">plain Markdown</a>.
+        </p>
 
-        <div class="mt-8 rounded-xl border border-line bg-panel p-6">
-          <h2 class="font-display text-lg font-semibold">Try it rather than read about it</h2>
-          <p class="mt-2 leading-relaxed text-muted">
-            The seven-day plan teaches the alphabet in the order the code is built, with audio from
-            the first character. About two hours in total, free, no account.
+        <div class="mf-instrument mt-10 p-6 sm:p-8">
+          <p class="mf-engraved text-brass">Try it rather than read about it</p>
+          <h2 class="pi-balance mt-3 font-display text-h2 font-bold text-ink">
+            Learn Morse code in {FACTS.planDays} days
+          </h2>
+          <p class="pi-pretty mt-4 leading-relaxed text-muted">
+            The plan teaches the alphabet in the order the code is built, with audio from the first
+            character. About {FACTS.planTime} in total over {numberWord(FACTS.planDays)} days, free, no
+            account.
           </p>
-          <a
-            href="/learn-morse-code-in-7-days/"
-            class="mt-5 inline-block rounded-lg px-5 py-2.5 font-mono text-xs tracking-[0.14em] text-void"
-            style="background: var(--color-signal)">START THE PLAN</a
-          >
+          <div class="mt-6 flex flex-wrap gap-3">
+            <a href="/learn-morse-code-in-7-days/" class="mf-btn mf-btn-primary">Start the plan</a>
+            <a href="/blog/" class="mf-btn mf-btn-ghost">All notes</a>
+          </div>
         </div>
       </footer>
     </article>
-  </main>
+  </PageShell>
 </BaseLayout>

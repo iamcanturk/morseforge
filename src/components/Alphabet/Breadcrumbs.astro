@@ -1,0 +1,48 @@
+---
+/**
+ * The visible breadcrumb, from the same trail the BreadcrumbList is built
+ * from (`breadcrumbTrail()` → `breadcrumbs()`), so the two cannot disagree.
+ * The last crumb is the page itself and is not a link.
+ *
+ * Under a finger each link is a 44px target (A-12); the text stays where it
+ * was, left-aligned, so "Home" still lines up with the H1 below it.
+ */
+import type { Crumb } from '../../config/pages'
+
+export interface Props {
+  trail: readonly Crumb[]
+  class?: string
+}
+
+const { trail, class: className } = Astro.props
+---
+
+{
+  trail.length > 0 && (
+    <nav aria-label="Breadcrumb" class={className}>
+      <ol class="mf-engraved flex flex-wrap items-center gap-x-2 gap-y-1">
+        {trail.map((crumb, index) => (
+          <li class="flex items-center gap-2">
+            {index > 0 && (
+              <span aria-hidden="true" class="text-line-strong">
+                /
+              </span>
+            )}
+            {index === trail.length - 1 ? (
+              <span aria-current="page" class="text-ink">
+                {crumb.name}
+              </span>
+            ) : (
+              <a
+                href={crumb.path}
+                class="hover:text-signal pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:items-center"
+              >
+                {crumb.name}
+              </a>
+            )}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  )
+}

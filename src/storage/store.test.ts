@@ -5,8 +5,10 @@ import {
   bool,
   count,
   createMemoryDriver,
+  defaultDriver,
   num,
   oneOf,
+  sharedStore,
   str,
 } from './store'
 
@@ -141,19 +143,25 @@ describe('Store', () => {
     })
   })
 
-  it('caches reads and re-reads after invalidate', () => {
+  it('parses once, and again only when the stored string changes', () => {
     const driver = createMemoryDriver()
-    const spy = vi.spyOn(driver, 'getItem')
+    driver.setItem('test_doc', JSON.stringify({ version: 2, data: { name: 'can', score: 1 } }))
+    const parse = vi.spyOn(JSON, 'parse')
     const store = new Store<Doc>(options, driver)
 
-    store.read()
-    store.read()
-    store.read()
-    expect(spy).toHaveBeenCalledTimes(1)
+    const first = store.read()
+    expect(store.read()).toBe(first)
+    expect(store.read()).toBe(first)
+    expect(parse).toHaveBeenCalledTimes(1)
+
+    driver.setItem('test_doc', JSON.stringify({ version: 2, data: { name: 'other', score: 2 } }))
+    expect(store.read()).toEqual({ name: 'other', score: 2 })
+    expect(parse).toHaveBeenCalledTimes(2)
 
     store.invalidate()
     store.read()
-    expect(spy).toHaveBeenCalledTimes(2)
+    expect(parse).toHaveBeenCalledTimes(3)
+    parse.mockRestore()
   })
 
   it('clears back to the default', () => {
@@ -230,5 +238,148 @@ describe('validateOrDefault', () => {
     const { store, driver } = make()
     store.validateOrDefault({ name: 'can', score: 1 })
     expect(driver.getItem('test_doc')).toBeNull()
+  })
+})
+
+describe('sharedStore', () => {
+  it('returns one instance per key per driver', () => {
+    const driver = createMemoryDriver()
+    const a = sharedStore(options, driver)
+    expect(sharedStore(options, driver)).toBe(a)
+    expect(sharedStore({ ...options, key: 'other_doc' }, driver)).not.toBe(a)
+    expect(sharedStore(options, createMemoryDriver())).not.toBe(a)
+  })
+
+  it('shares the default driver too, so callers without one still agree', () => {
+    expect(defaultDriver()).toBe(defaultDriver())
+    const a = sharedStore({ ...options, key: 'shared_default_doc' })
+    expect(sharedStore({ ...options, key: 'shared_default_doc' })).toBe(a)
+  })
+
+  it('notifies a subscriber of writes made by another caller', () => {
+    const driver = createMemoryDriver()
+    const seen: string[] = []
+    sharedStore(options, driver).subscribe((doc) => seen.push(doc.name))
+    sharedStore(options, driver).write({ name: 'from elsewhere', score: 1 })
+    expect(seen).toEqual(['from elsewhere'])
+  })
+})
+
+describe('writing over a newer record', () => {
+  it('is refused, and a clear lifts the refusal', () => {
+    const driver = createMemoryDriver()
+    const future = JSON.stringify({ version: 3, data: { name: 'can', extra: true } })
+    driver.setItem('test_doc', future)
+    const store = new Store<Doc>(options, driver)
+
+    expect(store.write({ name: 'old build', score: 1 })).toBe(false)
+    expect(driver.getItem('test_doc')).toBe(future)
+    // The session still runs from the cache.
+    expect(store.read().name).toBe('old build')
+
+    store.clear()
+    expect(store.write({ name: 'fresh', score: 2 })).toBe(true)
+    expect(driver.getItem('test_doc')).toContain('fresh')
+  })
+})
+
+describe('count ceiling', () => {
+  it('caps at the largest exact integer by default, or a given maximum', () => {
+    expect(count(1e40)).toBe(Number.MAX_SAFE_INTEGER)
+    expect(count(500, 0, 100)).toBe(100)
+  })
+})
+
+describe('two tabs over one storage', () => {
+  /** Two drivers over one map: each tab's own handle on the same localStorage. */
+  function tabs() {
+    const backing = new Map<string, string>()
+    const changes = new EventTarget()
+    const a = new Store<Doc>(options, createMemoryDriver(backing), changes)
+    const b = new Store<Doc>(options, createMemoryDriver(backing))
+    /** What the browser does in tab A after tab B writes. */
+    const announce = (key: string | null = options.key) =>
+      changes.dispatchEvent(Object.assign(new Event('storage'), { key }))
+    return { a, b, announce }
+  }
+
+  it("applies an update to the other tab's newer record, not to a stale cache", () => {
+    const { a, b } = tabs()
+    a.write({ name: 'can', score: 0 })
+    expect(a.read().score).toBe(0) // tab A has it cached
+
+    b.update((doc) => ({ ...doc, score: doc.score + 500 }))
+    a.update((doc) => ({ ...doc, score: doc.score + 100 }))
+
+    expect(a.read().score).toBe(600)
+    expect(b.read().score).toBe(600)
+  })
+
+  it("reads the other tab's write without being told", () => {
+    const { a, b } = tabs()
+    a.read()
+    b.write({ name: 'from b', score: 7 })
+    expect(a.read()).toEqual({ name: 'from b', score: 7 })
+  })
+
+  it('refreshes and notifies subscribers on a storage event for its key', () => {
+    const { a, b, announce } = tabs()
+    a.read()
+    const seen: Doc[] = []
+    a.subscribe((doc) => seen.push(doc))
+
+    b.write({ name: 'from b', score: 3 })
+    announce()
+    expect(seen).toEqual([{ name: 'from b', score: 3 }])
+
+    // Another key, or an event with nothing new behind it, is not news.
+    announce('some_other_key')
+    announce()
+    expect(seen).toHaveLength(1)
+
+    // A null key means the other tab cleared everything.
+    b.clear()
+    announce(null)
+    expect(seen.at(-1)).toEqual({ name: 'default', score: 0 })
+  })
+
+  it('keeps an unsaved session when its own write failed and nothing else changed', () => {
+    const backing = new Map<string, string>()
+    const failing: StorageDriver = {
+      ...createMemoryDriver(backing),
+      setItem: () => {
+        throw new DOMException('QuotaExceededError')
+      },
+    }
+    const store = new Store<Doc>(options, failing)
+    store.update((doc) => ({ ...doc, score: 1 }))
+    store.update((doc) => ({ ...doc, score: doc.score + 1 }))
+    expect(store.read().score).toBe(2)
+  })
+
+  it('refuses to write over a newer build that wrote from another tab after this one read', () => {
+    const backing = new Map<string, string>()
+    const tab = new Store<Doc>(options, createMemoryDriver(backing))
+    tab.write({ name: 'old build', score: 1 })
+    const future = JSON.stringify({ version: 3, data: { name: 'new build', extra: true } })
+    backing.set(options.key, future)
+
+    expect(tab.write({ name: 'old build', score: 2 })).toBe(false)
+    expect(backing.get(options.key)).toBe(future)
+  })
+
+  it('reload drops what only the cache held, and says so', () => {
+    const backing = new Map<string, string>()
+    const store = new Store<Doc>(options, {
+      ...createMemoryDriver(backing),
+      setItem: () => {
+        throw new DOMException('QuotaExceededError')
+      },
+    })
+    const seen: Doc[] = []
+    store.subscribe((doc) => seen.push(doc))
+    store.write({ name: 'unsaved', score: 9 })
+    expect(store.reload()).toEqual({ name: 'default', score: 0 })
+    expect(seen.at(-1)).toEqual({ name: 'default', score: 0 })
   })
 })

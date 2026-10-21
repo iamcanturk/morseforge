@@ -1,9 +1,13 @@
 /**
  * Signal Defender (PROJECT.md §18).
  *
- * Characters fall from the top of the screen, each one sounding as it spawns.
- * Type a character to knock down the lowest one matching it. Let three reach
- * the floor and the run is over.
+ * Signals fall from the top of the screen as Morse code, each one sounding as it
+ * spawns. Type the character a code spells to knock down the lowest one
+ * matching it. Let three reach the floor and the run is over.
+ *
+ * A falling signal shows its code and never its letter (DEC-027): the letter
+ * is the answer. So a hit is a code read in time, which is the recognition
+ * skill, and that is what every hit and every leak is recorded against.
  *
  * The point of a game here is time pressure that a practice screen cannot
  * create honestly. Practice waits for you; this does not, and that is the
@@ -14,6 +18,8 @@
  * without a canvas, a browser or a wall clock.
  */
 
+import type { Skill } from './mastery'
+import { xpForAnswer } from './progression'
 import { pick, type Random } from './random'
 
 export interface Signal {
@@ -24,6 +30,12 @@ export interface Signal {
   y: number
   /** Fraction of the width. Set at spawn and never changes. */
   x: number
+  /**
+   * Already counted as a wrong answer, by a shot that could only have been
+   * aimed at it. Landing afterwards does not count it a second time: one
+   * signal heard is one answer, however it ends.
+   */
+  wrong?: boolean
 }
 
 export interface DefenderState {
@@ -37,6 +49,15 @@ export interface DefenderState {
   misses: number
   /** Characters that reached the floor, for "practise these next". */
   leaked: readonly string[]
+  /** Characters knocked down, in order. What the run's XP is paid on. */
+  caught: readonly string[]
+  /**
+   * Hit or miss for each resolved signal and each wrong shot, in order, the
+   * most recent `OUTCOME_LOG` of them. The game-over strip draws one lamp each.
+   */
+  outcomes: readonly boolean[]
+  /** Ended by the player rather than by the floor. */
+  quit: boolean
   elapsedMs: number
   nextId: number
   /** Milliseconds until the next spawn. */
@@ -44,6 +65,18 @@ export interface DefenderState {
 }
 
 export const STARTING_LIVES = 3
+
+/**
+ * The skill a run is evidence of. The code is on screen, so a hit proves the
+ * player can read it; it does not prove they heard it, even with sound on.
+ */
+export const DEFENDER_SKILL: Skill = 'recognition'
+
+/** How many outcomes the strip keeps. A long run shows its most recent stretch. */
+export const OUTCOME_LOG = 120
+
+const logged = (log: readonly boolean[], ...next: boolean[]): readonly boolean[] =>
+  next.length === 0 ? log : [...log, ...next].slice(-OUTCOME_LOG)
 
 /** How long a signal takes to fall, at the start and at the hardest. */
 export const FALL_MS = { start: 7000, floor: 2600 } as const
@@ -64,6 +97,9 @@ export function newDefenderGame(): DefenderState {
     hits: 0,
     misses: 0,
     leaked: [],
+    caught: [],
+    outcomes: [],
+    quit: false,
     elapsedMs: 0,
     nextId: 1,
     // The first one arrives after a beat, so the player can read the screen
@@ -87,6 +123,11 @@ export function spawnDelay(elapsedMs: number): number {
   return lerp(SPAWN_MS.start, SPAWN_MS.floor, pressure(elapsedMs))
 }
 
+/** The score multiplier a streak earns: a tenth per hit in a row, capped at three. */
+export function streakMultiplier(streak: number): number {
+  return Math.min(1 + Math.max(0, streak) * 0.1, 3)
+}
+
 /**
  * Points for a hit.
  *
@@ -97,7 +138,7 @@ export function spawnDelay(elapsedMs: number): number {
  */
 export function hitScore(signal: Signal, streak: number): number {
   const earliness = 1 - signal.y
-  const multiplier = Math.min(1 + streak * 0.1, 3)
+  const multiplier = streakMultiplier(streak)
   return Math.round((10 + earliness * 20) * multiplier)
 }
 
@@ -105,6 +146,8 @@ export interface Spawned {
   state: DefenderState
   /** The signal that appeared, so the caller can sound it. Null if none did. */
   spawned: Signal | null
+  /** Signals that reached the floor this step, so the caller can record them. */
+  landed: readonly Signal[]
 }
 
 /**
@@ -119,7 +162,7 @@ export function advance(
   alphabet: readonly string[],
   random: Random,
 ): Spawned {
-  if (isOver(state) || dtMs <= 0) return { state, spawned: null }
+  if (isOver(state) || dtMs <= 0) return { state, spawned: null, landed: [] }
 
   const elapsedMs = state.elapsedMs + dtMs
   const fall = fallDuration(elapsedMs)
@@ -157,10 +200,12 @@ export function advance(
       streak: landed.length > 0 ? 0 : state.streak,
       misses: state.misses + landed.length,
       leaked: [...state.leaked, ...landed.map((signal) => signal.character)],
+      outcomes: logged(state.outcomes, ...landed.map(() => false)),
       nextId,
       spawnIn,
     },
     spawned,
+    landed,
   }
 }
 
@@ -168,6 +213,15 @@ export interface Shot {
   state: DefenderState
   /** What was knocked down, or null for a miss. */
   hit: Signal | null
+  /**
+   * For a miss: the signal it was unambiguously a wrong answer to, or null.
+   *
+   * Only when everything on screen is the same character is a wrong key
+   * evidence about a particular signal — with two different ones falling there
+   * is no telling which the player was answering, and charging a guess to a
+   * character would corrupt its review schedule. Each signal is blamed once.
+   */
+  blamed: Signal | null
 }
 
 /**
@@ -181,7 +235,7 @@ export interface Shot {
  * would make the game about the keyboard rather than about the code.
  */
 export function shoot(state: DefenderState, answer: string): Shot {
-  if (isOver(state)) return { state, hit: null }
+  if (isOver(state)) return { state, hit: null, blamed: null }
 
   const character = answer.trim().toUpperCase()
   const target = state.signals
@@ -192,9 +246,25 @@ export function shoot(state: DefenderState, answer: string): Shot {
     )
 
   if (!target) {
+    const only = state.signals[0]
+    const blamed =
+      only && !only.wrong && state.signals.every((signal) => signal.character === only.character)
+        ? only
+        : null
     return {
-      state: { ...state, streak: 0, misses: state.misses + 1 },
+      state: {
+        ...state,
+        signals: blamed
+          ? state.signals.map((signal) =>
+              signal.id === blamed.id ? { ...signal, wrong: true } : signal,
+            )
+          : state.signals,
+        streak: 0,
+        misses: state.misses + 1,
+        outcomes: logged(state.outcomes, false),
+      },
       hit: null,
+      blamed,
     }
   }
 
@@ -207,13 +277,37 @@ export function shoot(state: DefenderState, answer: string): Shot {
       streak,
       bestStreak: Math.max(state.bestStreak, streak),
       hits: state.hits + 1,
+      caught: [...state.caught, target.character],
+      outcomes: logged(state.outcomes, true),
     },
     hit: target,
+    blamed: null,
   }
 }
 
+/**
+ * End the run now, keeping everything it scored.
+ *
+ * Giving up is still a run that happened: the hits were heard and recorded,
+ * and dropping them because the player stopped first would make walking away
+ * cost more than losing.
+ */
+export function endRun(state: DefenderState): DefenderState {
+  return isOver(state) ? state : { ...state, quit: true }
+}
+
 export function isOver(state: DefenderState): boolean {
-  return state.lives <= 0
+  return state.lives <= 0 || state.quit
+}
+
+/** Characters the player actually typed: hits and wrong shots, not leaks. */
+export function shots(state: DefenderState): number {
+  return state.hits + state.misses - state.leaked.length
+}
+
+/** XP for the run: the same per-character award as a correct practice answer. */
+export function runXp(state: DefenderState): number {
+  return state.caught.reduce((sum, character) => sum + xpForAnswer(character), 0)
 }
 
 /** 0..1. Zero attempts reads as 0 rather than as perfect. */

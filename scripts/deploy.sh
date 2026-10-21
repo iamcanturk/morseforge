@@ -2,7 +2,7 @@
 #
 # Deploy MorseForge to CloudPanel (morse.iamcanturk.dev).
 #
-# Requires the `morsecp` SSH alias — see docs/DEPLOYMENT.md for how it is set up.
+# Requires the `morsecp` SSH alias — see deploy/README.md for how it is set up.
 # Nothing here is destructive to the server config: rsync only touches the
 # document root, and --delete removes stale build artefacts from previous
 # deploys, never anything outside dist/.

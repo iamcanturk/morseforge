@@ -1,0 +1,110 @@
+---
+/**
+ * Section 4, "The network" (TASK-001 §5.2). Zero JavaScript beyond a ten-line
+ * observer that starts the lighting when the figure scrolls into view.
+ *
+ * Drawn straight from `layoutTree(MORSE_TREE)` (via `networkLayout`), not by
+ * reusing the Signal Tree island, so the landing ships no React here and the
+ * two packages stay independent. Dot branches are drawn dotted and dash
+ * branches dashed: the code's own notation is the legend.
+ */
+import { LANDING } from '../../config/landing'
+import { getPage } from '../../config/pages'
+import { NETWORK_COPY, NETWORK_STAGES, NETWORK_VIEWBOX, networkLayout } from './network'
+
+const { nodes, edges } = networkLayout()
+const { width, height } = NETWORK_VIEWBOX
+const RADIUS = 21
+const tree = getPage('/tree/')
+---
+
+<section class="network py-16 md:py-24" data-network aria-labelledby="network-heading">
+  <div
+    class="mx-auto grid max-w-7xl gap-10 px-5 sm:px-6 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:items-center lg:gap-14"
+  >
+    <div>
+      <p class="mf-engraved text-brass">Signal network</p>
+      <h2 id="network-heading" class="mt-3 font-display text-h2 font-bold text-pretty text-ink">
+        {LANDING.network.heading}
+      </h2>
+      <p class="mt-4 max-w-[40ch] text-lead text-muted">{LANDING.network.lead}</p>
+      <a href={tree.path} class="mf-btn mf-btn-secondary mt-7">{tree.navLabel} →</a>
+    </div>
+
+    <figure class="network-figure mf-instrument p-3 sm:p-5">
+      <div class="mf-screen mf-grid px-2 py-3 sm:px-4 sm:py-5">
+        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby="network-desc">
+          <title id="network-desc">{NETWORK_COPY.description}</title>
+          <g>
+            {
+              edges.map((edge) => (
+                <line
+                  class="nt-edge nt-lit"
+                  data-element={edge.element}
+                  style={`--stage:${edge.to.stage}`}
+                  x1={edge.from.x}
+                  y1={edge.from.y}
+                  x2={edge.to.x}
+                  y2={edge.to.y}
+                />
+              ))
+            }
+          </g>
+          {
+            nodes.map((node) =>
+              node.code === '' ? (
+                <g class="nt-root nt-lit" style="--stage:0">
+                  <circle cx={node.x} cy={node.y} r="7" />
+                  <circle class="nt-root-ring" cx={node.x} cy={node.y} r="13" />
+                </g>
+              ) : (
+                <g class="nt-node nt-lit" style={`--stage:${node.stage}`}>
+                  <circle cx={node.x} cy={node.y} r={RADIUS} />
+                  <text x={node.x} y={node.y} font-size="22">
+                    {node.character}
+                  </text>
+                </g>
+              ),
+            )
+          }
+        </svg>
+        <p
+          class="relative z-[3] mt-1 flex justify-center gap-6 font-mono text-label text-muted"
+          aria-hidden="true"
+        >
+          <span>{NETWORK_COPY.dot}</span>
+          <span>{NETWORK_COPY.dash}</span>
+        </p>
+      </div>
+      <figcaption class="nt-power mt-4 grid gap-x-6 gap-y-2 px-2 sm:grid-cols-2">
+        {
+          NETWORK_STAGES.map((stage) => (
+            <span class="flex items-center gap-2 mf-engraved" style={`--stage:${stage.order}`}>
+              <span class="mf-lamp" aria-hidden="true" />
+              {stage.label}
+              <span class="font-mono text-ink">{stage.characters}</span>
+            </span>
+          ))
+        }
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<script is:inline>
+  {
+    const network = document.querySelector('[data-network]')
+    if (network && 'IntersectionObserver' in window) {
+      network.setAttribute('data-armed', '')
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (!entries.some((entry) => entry.isIntersecting)) return
+          network.setAttribute('data-inview', '')
+          observer.disconnect()
+        },
+        { threshold: 0.35 },
+      )
+      observer.observe(network.querySelector('figure') ?? network)
+    }
+  }
+</script>

@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   WORDS,
+  MORE_WORDS_MIN,
   WORD_CATEGORIES,
   breakdown,
   findWord,
+  moreWords,
   morseFor,
+  wordLabel,
   wordsByCategory,
   type WordCategory,
 } from './words'
@@ -89,6 +92,45 @@ describe('WORDS', () => {
   })
 })
 
+describe('labels', () => {
+  it('only change the case, never the words', () => {
+    for (const word of WORDS) {
+      if (word.label === undefined) continue
+      expect(word.label.toUpperCase(), word.slug).toBe(word.text)
+    }
+  })
+
+  it('leave the entries that are codes in capitals', () => {
+    for (const slug of ['sos', 'cq', '73', '88', 'qth', 'ok']) {
+      const word = findWord(slug)!
+      expect(word.label, slug).toBeUndefined()
+      expect(wordLabel(word), slug).toBe(word.text)
+    }
+  })
+
+  it('sentence-case everything else, so titles do not shout', () => {
+    expect(wordLabel(findWord('i-love-you')!)).toBe('I love you')
+    expect(wordLabel(findWord('good-morning')!)).toBe('Good morning')
+    for (const word of WORDS) {
+      if (word.label === undefined) continue
+      expect(word.label, word.slug).not.toBe(word.text)
+      expect(word.label.charAt(0), word.slug).toBe(word.label.charAt(0).toUpperCase())
+    }
+  })
+})
+
+describe('superlatives and etymologies stay hedged', () => {
+  it('never calls anything the most-searched phrase outright', () => {
+    for (const word of WORDS) {
+      expect(word.note, word.slug).not.toMatch(/(?<!one of )the most-searched/i)
+    }
+  })
+
+  it('presents the CQ etymology as what is usually said, not as settled', () => {
+    expect(findWord('cq')!.note).toContain('usually said to come from')
+  })
+})
+
 describe('findWord', () => {
   it('finds by slug and returns undefined otherwise', () => {
     expect(findWord('sos')?.text).toBe('SOS')
@@ -120,5 +162,36 @@ describe('breakdown', () => {
         .map((row) => row.code)
         .join(' '),
     ).toBe(morseFor(word))
+  })
+})
+
+describe('moreWords', () => {
+  it("never files another category under the page's own", () => {
+    for (const word of WORDS) {
+      const { sameCategory, otherCategories } = moreWords(word)
+      expect(sameCategory.every((other) => other.category === word.category)).toBe(true)
+      expect(otherCategories.every((other) => other.category !== word.category)).toBe(true)
+      expect(sameCategory.some((other) => other.slug === word.slug)).toBe(false)
+    }
+  })
+
+  it('tops a small category up to the minimum from elsewhere', () => {
+    const sos = moreWords(findWord('sos')!)
+    expect(sos.sameCategory.map((word) => word.slug)).toEqual(['help', 'mayday'])
+    expect(sos.sameCategory.length + sos.otherCategories.length).toBe(MORE_WORDS_MIN)
+  })
+
+  it('needs no top-up when the category is big enough', () => {
+    const radio = moreWords(findWord('cq')!)
+    expect(radio.sameCategory.length).toBeGreaterThanOrEqual(MORE_WORDS_MIN)
+    expect(radio.otherCategories).toEqual([])
+  })
+})
+
+describe('the SOS note', () => {
+  it('does not claim the page plays it without letter gaps', () => {
+    // The page plays and times the spelled-out letters; the run-together
+    // prosign is described by prosignNote, which quotes its own duration.
+    expect(findWord('sos')!.note).not.toMatch(/no gaps|continuous character/)
   })
 })

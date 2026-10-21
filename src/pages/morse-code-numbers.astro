@@ -1,0 +1,257 @@
+---
+/**
+ * /morse-code-numbers/: the ten digits, the one rule that spells them, how
+ * long each takes and which mirror which. Copy from the registry and
+ * `faq.ts`; every code, count and duration from the data and the engine.
+ */
+import BaseLayout from '../layouts/BaseLayout.astro'
+import MorsePlayer from '../components/MorsePlayer/MorsePlayer.astro'
+import Faq from '../components/Faq.astro'
+import PageShell from '../components/PageShell.astro'
+import CharacterStrip from '../components/Reference/CharacterStrip.astro'
+import SectionHead from '../components/Reference/SectionHead.astro'
+import { characterHref, digitsInRuleOrder, digitsPlanDay } from '../components/Reference/reference'
+import { FACTS } from '../config/facts'
+import { CITATIONS } from '../config/site'
+import { breadcrumbTrail, getPage } from '../config/pages'
+import { faqFor } from '../data/faq'
+import { describeElements, numberWord } from '../data/format'
+import { encode, prettify } from '../engine/morseEncoder'
+import { breadcrumbs, webPage } from '../seo/schema'
+import '../styles/pkg-n.css'
+
+const page = getPage('/morse-code-numbers/')
+const trail = breadcrumbTrail(page.path)
+const faq = faqFor(page.path)
+const digits = digitsInRuleOrder()
+const half = digits.length / 2
+const rising = digits.slice(0, half)
+const falling = digits.slice(half)
+const first = digits[0]!
+const middle = digits[half - 1]!
+const last = digits.at(-1)!
+const planDay = digitsPlanDay()
+const allDigits = digits.map((facts) => facts.character).join('')
+const byTime = [...digits].sort((a, b) => a.durationMs.wpm20 - b.durationMs.wpm20)
+const quickest = byTime[0]!
+const slowest = byTime.at(-1)!
+
+const schema = [
+  webPage({ path: page.path, name: page.h1, description: page.description }),
+  breadcrumbs(trail),
+]
+---
+
+<BaseLayout title={page.title} description={page.description} path={page.path} schema={schema}>
+  <PageShell
+    width="tool"
+    trail={trail}
+    eyebrow="Reference plate · Numbers"
+    h1={page.h1}
+    intro={page.intro}
+  >
+    <div class="grid grid-cols-1 items-start gap-5 lg:grid-cols-2 lg:gap-8">
+      <div class="mf-instrument p-5 sm:p-6">
+        <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <span class="mf-engraved whitespace-nowrap">The rule</span>
+          <span class="mf-engraved whitespace-nowrap">
+            {`${FACTS.digitCount} digits · ${FACTS.digitElements} elements each`}
+          </span>
+        </div>
+        <div class="mf-screen mf-grid mt-4 p-5 sm:p-7">
+          <ol class="pkg-n-digits" aria-label="The digits in rule order">
+            {
+              digits.map((facts) => (
+                <li>
+                  <a href={characterHref(facts.character)!} class="pkg-n-digit-row">
+                    <span class="pkg-n-digit">{facts.character}</span>{' '}
+                    <span class="pkg-n-elements" aria-hidden="true">
+                      {[...facts.code].map((element) => (
+                        <span class:list={['pkg-n-el', element === '-' && 'is-dash']} />
+                      ))}
+                    </span>
+                    <span class="sr-only">{`in Morse code, ${facts.spelled}`}</span>
+                  </a>
+                </li>
+              ))
+            }
+          </ol>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-5">
+        <dl class="pkg-n-readouts grid gap-3">
+          <div class="mf-readout">
+            <dt class="mf-readout-label mf-engraved">Digits</dt>
+            <dd class="mf-readout-value">{FACTS.digitCount}</dd>
+          </div>
+          <div class="mf-readout" data-tone="signal">
+            <dt class="mf-readout-label mf-engraved">Elements</dt>
+            <dd class="mf-readout-value">{FACTS.digitElements}</dd>
+          </div>
+          {
+            planDay !== null && (
+              <div class="mf-readout">
+                <dt class="mf-readout-label mf-engraved">Plan day</dt>
+                <dd class="mf-readout-value">{planDay}</dd>
+              </div>
+            )
+          }
+        </dl>
+        <MorsePlayer morse={encode(allDigits)} label={`${allDigits} · in rule order`} />
+      </div>
+    </div>
+
+    <section slot="more" aria-labelledby="chart">
+      <SectionHead id="chart" index={1} label="Chart">
+        {
+          `Morse code numbers ${digits[digits.length - 1]!.character} to ${digits[digits.length - 2]!.character}`
+        }
+      </SectionHead>
+      <div class="pkg-n-table-wrap mt-8">
+        <table class="pkg-n-table">
+          <caption class="mf-engraved">
+            Each digit with its code, sound and send time at {FACTS.exampleWpm} WPM, per{' '}
+            <a href={CITATIONS.itu.url} rel="noopener" class="pkg-n-link">{CITATIONS.itu.short}</a>
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Digit</th>
+              <th scope="col">Morse</th>
+              <th scope="col">Spoken</th>
+              <th scope="col">Elements</th>
+              <th scope="col">{`At ${FACTS.exampleWpm} WPM`}</th>
+              <th scope="col">Mirror</th>
+            </tr>
+          </thead>
+          <tbody>
+            {
+              [last, ...digits.slice(0, -1)].map((facts) => (
+                <tr>
+                  <th scope="row">
+                    <a href={characterHref(facts.character)!}>{facts.character}</a>
+                  </th>
+                  <td class="is-code">{facts.code}</td>
+                  <td>{facts.spoken}</td>
+                  <td>{describeElements(facts.code)}</td>
+                  <td>{facts.durationMs.wpm20} ms</td>
+                  <td>{facts.mirror ?? ''}</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section slot="more" aria-labelledby="rule">
+      <SectionHead id="rule" index={2} label="The rule"
+        >The one rule that spells every digit</SectionHead
+      >
+      <div class="mt-8 grid gap-5 md:grid-cols-2">
+        <div class="mf-panel p-6 sm:p-8">
+          <p class="mf-engraved">{`${first.character} to ${middle.character}: dots move in`}</p>
+          <p class="mt-4 leading-relaxed text-muted">
+            {first.character} is {describeElements(first.code)}. Each digit after it swaps the next
+            dash for a dot, so {middle.character} is {describeElements(middle.code)}: the digit is
+            the number of dots it starts with.
+          </p>
+          <ul class="mt-6 space-y-2">
+            {
+              rising.map((facts) => (
+                <li class="flex items-center gap-4">
+                  <span class="w-5 font-display font-bold text-ink">{facts.character}</span>
+                  <span class="font-mono tracking-code text-cyan">{prettify(facts.code)}</span>
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+        <div class="mf-panel p-6 sm:p-8">
+          <p class="mf-engraved">
+            {`${falling[0]!.character} to ${last.character}: dashes come back`}
+          </p>
+          <p class="mt-4 leading-relaxed text-muted">
+            {falling[0]!.character} is {describeElements(falling[0]!.code)}, and the dashes return
+            in the same order until {last.character} is {describeElements(last.code)}. Count the
+            dashes it starts with and add {numberWord(half)}, and {last.character} closes the cycle after{
+              ' '
+            }
+            {falling.at(-2)!.character}.
+          </p>
+          <ul class="mt-6 space-y-2">
+            {
+              falling.map((facts) => (
+                <li class="flex items-center gap-4">
+                  <span class="w-5 font-display font-bold text-ink">{facts.character}</span>
+                  <span class="font-mono tracking-code text-cyan">{prettify(facts.code)}</span>
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section slot="more" aria-labelledby="timing">
+      <SectionHead id="timing" index={3} label="Timing">How long each number takes</SectionHead>
+      <p class="mt-4 max-w-[60ch] leading-relaxed text-muted">
+        {
+          `Every digit has the same number of elements, but not the same length. At ${FACTS.exampleWpm} words per minute ${quickest.character} is the quickest at ${quickest.durationMs.wpm20} milliseconds and ${slowest.character} the slowest at ${slowest.durationMs.wpm20}, because a dash lasts ${numberWord(FACTS.units.DASH)} units and a dot ${numberWord(FACTS.units.DOT)}.`
+        }
+      </p>
+      <ul class="mt-8 space-y-3">
+        {
+          byTime.map((facts) => (
+            <li class="grid grid-cols-[2rem_minmax(0,1fr)_5.5rem] items-center gap-4">
+              <span class="font-display text-h3 font-bold text-ink">{facts.character}</span>
+              <span class="pkg-n-meter" aria-hidden="true">
+                <span
+                  style={`--pkg-n-span: ${(facts.durationMs.wpm20 / slowest.durationMs.wpm20) * 100}%;`}
+                />
+              </span>
+              <span class="text-right font-mono text-muted">{facts.durationMs.wpm20} ms</span>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <section slot="more" aria-labelledby="practise">
+      <SectionHead id="practise" index={4} label="Practise"
+        >How to practise Morse code numbers</SectionHead
+      >
+      <div class="pkg-n-prose mt-6 max-w-[64ch] space-y-4 leading-relaxed text-muted">
+        <p>
+          Learn them by sound and in order: hear {first.character} to {middle.character} as a run of dots
+          growing longer, and {falling[0]!.character} to {last.character} as the dashes coming back.
+          {
+            planDay !== null && (
+              <>
+                {' '}
+                The <a href="/learn-morse-code-in-7-days/">{FACTS.planDays}-day plan</a> teaches all{' '}
+                {FACTS.digitCount} on{' '}
+                <a href={`/learn-morse-code-in-7-days/#day-${planDay}`}>day {planDay}</a>, after the
+                letters.
+              </>
+            )
+          }
+        </p>
+        <p>
+          Callsigns mix letters and digits, so <a href="/copy/">copy practice</a> is where numbers get
+          fast: whole lines, graded character by character.
+        </p>
+      </div>
+      <div class="mt-8 flex flex-wrap gap-3">
+        <a href="/practice/" class="mf-btn mf-btn-primary">Practise numbers</a>
+        <a href="/morse-code-alphabet/" class="mf-btn mf-btn-secondary">The whole alphabet</a>
+      </div>
+    </section>
+
+    <Faq slot="more" items={faq} heading="Questions about Morse code numbers" />
+
+    <div slot="more" class="mf-panel p-6 sm:p-8">
+      <CharacterStrip />
+    </div>
+  </PageShell>
+</BaseLayout>

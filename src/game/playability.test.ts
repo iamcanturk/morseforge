@@ -65,7 +65,10 @@ class SerialPlayer {
 /** A frame, in milliseconds. Games are driven at 60fps. */
 const FRAME = 16
 
-/** Human reaction time for a character you know cold. Deliberately unkind. */
+/**
+ * Human reaction time for a character you know cold, read from its code.
+ * Deliberately unkind.
+ */
 const REACTION_MS = 700
 
 describe('Signal Defender is playable', () => {
@@ -123,6 +126,16 @@ describe('Signal Defender is playable', () => {
     const { state } = play(300, 400)
     expect(state.hits).toBeGreaterThan(150)
   })
+
+  it('gives a learner who has to read each code, not a letter, a real run', () => {
+    // A falling signal shows only its code (DEC-027), so a beginner spends
+    // time decoding the dots and dashes before typing. At a second and a half
+    // a code they must still get over a minute and dozens of hits, or the game
+    // only works for people who no longer need it.
+    const { state, seconds } = play(150, 1500)
+    expect(seconds).toBeGreaterThan(60)
+    expect(state.hits).toBeGreaterThan(30)
+  })
 })
 
 describe('Morse Runner is playable', () => {
@@ -159,6 +172,31 @@ describe('Morse Runner is playable', () => {
     const { state, seconds } = play(120, Infinity)
     expect(runnerOver(state)).toBe(true)
     expect(seconds).toBeLessThan(60)
+  })
+
+  it('carries a beginner who needs the hint for every gate', () => {
+    // A gate shows only its letter (DEC-032). Someone who does not know the
+    // codes yet keys a wrong guess, sees the code, then keys it from the
+    // hint: two characters per gate. The hint has to arrive soon enough for
+    // that to get through, or the game shuts out exactly the people it is for.
+    const random = createRandom(5)
+    let state = newRunnerGame()
+    let clock = 0
+    let busyUntil = 0
+    while (clock < 150_000 && !runnerOver(state)) {
+      state = advanceRunner(state, FRAME, ALL_LETTERS, random).state
+      clock += FRAME
+      if (clock < busyUntil) continue
+      const nearest = [...state.gates].sort((a, b) => a.distance - b.distance)[0]
+      if (!nearest) continue
+      // A guess, then the code read off the hint, each taking a beat to key.
+      state = send(state, nearest.hinted ? nearest.character : '?').state
+      busyUntil = clock + 1500
+    }
+    expect(clock / 1000).toBeGreaterThan(120)
+    expect(state.assisted).toBeGreaterThan(20)
+    expect(state.passed).toEqual([])
+    expect(state.score).toBe(0)
   })
 
   it('still leaves time at full speed', () => {

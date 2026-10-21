@@ -91,7 +91,7 @@ export const CURRICULUM: readonly CurriculumDay[] = [
     title: 'The four-element characters, part one',
     characters: ['H', 'V', 'F', 'L', 'P', 'J'],
     summary:
-      'Day five starts the last layer with H, V, F, L, P and J — the six four-element characters that begin with a dot. This is the longest day of the plan, and the first where counting elements stops working and you have to hear the rhythm instead.',
+      'Day five starts the last layer with H, V, F, L, P and J — the six four-element characters that begin with a dot. Together with day six, this is the longest day of the plan, and the first where counting elements stops working and you have to hear the rhythm instead.',
     rationale:
       'At four elements, counting beeps is no longer viable at any real speed. This is the day to switch from counting to recognising a shape, which is why Farnsworth spacing matters more from here on.',
     drill:
@@ -104,9 +104,9 @@ export const CURRICULUM: readonly CurriculumDay[] = [
     title: 'The four-element characters, part two',
     characters: ['B', 'X', 'C', 'Y', 'Z', 'Q'],
     summary:
-      'Day six finishes the alphabet with B, X, C, Y, Z and Q — the six four-element characters that begin with a dash. These are the rarest letters in English, which is exactly why they come last: you will meet them least often in practice.',
+      'Day six finishes the alphabet with B, X, C, Y, Z and Q — the six four-element characters that begin with a dash. Three of them, Q, X and Z, are the rarest letters in English, so finishing on them costs little: you will meet them less often than anything else in practice.',
     rationale:
-      'Letter frequency, not tree position, decides the order within a layer. Q and Z appear in under 0.2% of English text, so they earn the last slot regardless of how their codes look.',
+      'The tree decides the order, not letter frequency: this is the dash-first half of the last layer. It suits the end of the alphabet anyway, because Q, X and Z each appear in under 0.2% of English text.',
     drill:
       'Practise these against the letters they resemble: C against K, Z against G, Q against O.',
     words: ['BOX', 'QUIZ', 'CYCLE', 'ZEBRA', 'BLACK'],

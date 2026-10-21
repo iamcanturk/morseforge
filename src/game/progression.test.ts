@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  MAX_XP,
   STREAK_GRACE_DAYS,
   XP,
   currentStreak,
@@ -189,6 +190,37 @@ describe('xp and levels', () => {
       const { fraction } = levelProgress(xp)
       expect(fraction).toBeGreaterThanOrEqual(0)
       expect(fraction).toBeLessThan(1)
+    }
+  })
+})
+
+describe('the first-signal award', () => {
+  it('is the +10 XP the first-signal screen promises (§57)', () => {
+    expect(XP.firstSignal).toBe(10)
+  })
+})
+
+describe('levelFromXp on untrusted input', () => {
+  // Beyond 2^53, `level + 1 === level`, and the old drift loops never ended:
+  // an export claiming 1e40 XP froze the stats page for good.
+  it('terminates and stays finite for absurd values', () => {
+    for (const xp of [1e40, 1e200, Number.MAX_VALUE, Infinity]) {
+      const level = levelFromXp(xp)
+      expect(Number.isFinite(level), String(xp)).toBe(true)
+      expect(level).toBe(levelFromXp(MAX_XP))
+    }
+  })
+
+  it('reads NaN and negative infinity as no XP', () => {
+    expect(levelFromXp(Number.NaN)).toBe(1)
+    expect(levelFromXp(-Infinity)).toBe(1)
+  })
+
+  it('keeps levelProgress within 0..1 for the same inputs', () => {
+    for (const xp of [1e40, Infinity, Number.NaN, -5]) {
+      const { fraction } = levelProgress(xp)
+      expect(fraction, String(xp)).toBeGreaterThanOrEqual(0)
+      expect(fraction).toBeLessThanOrEqual(1)
     }
   })
 })

@@ -1,7 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="MorseForge">
-  <title>MorseForge</title>
-  <!-- The letter M in Morse is dash-dash. The bars are deliberately unequal and
-       left-aligned: equal bars read as an "=" sign at favicon size. -->
-  <rect x="6" y="16" width="52" height="12" rx="6" fill="#00E88F"/>
-  <rect x="6" y="36" width="38" height="12" rx="6" fill="#00A868"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" role="img" aria-label="MorseForge"><title>MorseForge</title><defs><linearGradient id="ground" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#201a13"/><stop offset="1" stop-color="#0c0a07"/></linearGradient></defs><rect width="16" height="16" rx="3.58" fill="url(#ground)"/><rect x="0.25" y="0.25" width="15.5" height="15.5" rx="3.33" fill="none" stroke="#f3ead7" stroke-opacity=".14" stroke-width="0.5"/><g transform="translate(2 3.43) scale(0.14285699999999998)"><path d="M7 57V7L28 34 M77 57V7L56 34" fill="none" stroke="#5df28f" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/></g></svg>

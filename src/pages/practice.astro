@@ -1,30 +1,127 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro'
+import PageShell from '../components/PageShell.astro'
+import Faq from '../components/Faq.astro'
 import { PracticeScreen } from '../components/Practice/PracticeScreen'
+import { breadcrumbTrail, getPage } from '../config/pages'
+import { faqFor } from '../data/faq'
+import { METHODS, METHOD_IDS, DEFAULT_METHOD } from '../data/methods'
+import { SESSION_MODES, type SessionMode } from '../game/session'
+import { absoluteUrl, breadcrumbs, webPage } from '../seo/schema'
+import { FACTS, MASTERY_RULE } from '../config/facts'
 
-const title = 'Morse Code Practice — Listen, Read and Send | MorseForge'
-const description =
-  'Free Morse code practice in three modes: hear a character and name it, read the dots and dashes, or key it yourself. Spaced repetition picks what you are closest to forgetting.'
+const page = getPage('/practice/')
+const copy = getPage('/copy/')
+const challenge = getPage('/challenge/')
+const faq = faqFor(page.path)
+const trail = breadcrumbTrail(page.path)
+
+const schema = [
+  webPage({ path: page.path, name: page.h1, description: page.description }),
+  breadcrumbs(trail),
+  {
+    '@context': 'https://schema.org',
+    '@type': 'LearningResource',
+    name: page.h1,
+    description: page.description,
+    url: absoluteUrl(page.path),
+    learningResourceType: 'Practice',
+    educationalLevel: 'Beginner',
+    teaches: 'International Morse code',
+    isAccessibleForFree: true,
+  },
+]
+
+/** What each mode trains, in the words of the mode list itself. */
+const MODE_NOTES: Record<SessionMode, string> = {
+  listening:
+    'trains copying by ear: a character plays as real CW tone, and you name it. This is the skill every other one leans on, and the one a chart cannot teach.',
+  recognition:
+    'shows the dots and dashes and asks what they spell. Quick to drill and useful for reading printed code, though it is the one to lean on least.',
+  sending:
+    'asks you to key the character yourself, on the keyboard or the on-screen key, so your hand learns the rhythm as well as your ear.',
+}
+const modes = Object.keys(SESSION_MODES) as SessionMode[]
 ---
 
-<BaseLayout title={title} description={description} path="/practice/">
-  <main class="mx-auto max-w-4xl px-6 py-14">
-    <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Practice</h1>
-    <p class="mt-3 leading-relaxed text-muted">
-      Three modes, because recognising a character, hearing it and sending it are different skills —
-      and mastery needs all three. Prompts are chosen by what you are closest to forgetting.
-    </p>
+<BaseLayout title={page.title} description={page.description} path={page.path} schema={schema}>
+  <PageShell
+    width="tool"
+    trail={trail}
+    h1={page.h1}
+    intro={page.intro}
+    instrumentFirst
+    instrumentClass="max-w-4xl"
+  >
+    <PracticeScreen client:load />
 
-    <div class="mt-10">
-      <PracticeScreen client:load />
-    </div>
+    <section slot="more" aria-labelledby="modes-heading" class="max-w-[68ch]">
+      <h2 id="modes-heading" class="font-display text-h2 font-bold text-ink">
+        Three modes, three skills
+      </h2>
+      <p class="mt-4 leading-relaxed text-muted">
+        Recognising a character, hearing it and sending it are separate skills, and each one is
+        scored on its own. A character only counts as mastered with {MASTERY_RULE}, so a letter you
+        have read but never heard still comes back for practice.
+      </p>
+      <ul class="mt-6 grid gap-4">
+        {
+          modes.map((id) => (
+            <li class="mf-panel p-5">
+              <p class="mf-engraved">{SESSION_MODES[id].label}</p>
+              <p class="mt-2 leading-relaxed text-ink">
+                {SESSION_MODES[id].prompt}: <span class="text-muted">{MODE_NOTES[id]}</span>
+              </p>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
 
-    <p class="mt-10 text-sm leading-relaxed text-muted">
-      Comfortable with single characters? <a
-        href="/copy/"
-        class="text-signal underline underline-offset-4">Copy practice</a
-      > sends whole lines — code groups, words and callsigns — and grades what you wrote character by
-      character.
-    </p>
-  </main>
+    <section slot="more" aria-labelledby="order-heading" class="max-w-[68ch]">
+      <h2 id="order-heading" class="font-display text-h2 font-bold text-ink">
+        Which order to practise in
+      </h2>
+      <p class="mt-4 leading-relaxed text-muted">
+        "My method" practises the characters your teaching order has unlocked so far. The default is
+        the {METHODS[DEFAULT_METHOD].name} order; you can switch under Adjust at any time, and your progress
+        carries over. The reasoning behind each, and why the order matters at all, is in{' '}
+        <a
+          href="/blog/which-order-should-you-learn-morse-in/"
+          class="text-signal underline underline-offset-4">which order to learn Morse code in</a
+        >.
+      </p>
+      <dl class="mt-6 grid gap-6">
+        {
+          METHOD_IDS.map((id) => (
+            <div>
+              <dt class="font-display text-h3 font-bold text-ink">
+                {METHODS[id].name}
+                <span class="mt-1 block font-body text-sm font-normal text-muted">
+                  {METHODS[id].summary}
+                </span>
+              </dt>
+              <dd class="mt-2 leading-relaxed text-muted">{METHODS[id].rationale}</dd>
+            </div>
+          ))
+        }
+      </dl>
+    </section>
+
+    <section slot="more" aria-labelledby="next-heading" class="max-w-[68ch]">
+      <h2 id="next-heading" class="font-display text-h2 font-bold text-ink">
+        When single characters feel easy
+      </h2>
+      <p class="mt-4 leading-relaxed text-muted">
+        <a href={copy.path} class="text-signal underline underline-offset-4">{copy.navLabel}</a> sends
+        whole lines (code groups, words and callsigns) and grades what you wrote character by character.
+        Or take the <a href={challenge.path} class="text-signal underline underline-offset-4"
+          >{FACTS.challengeSeconds}-second test</a
+        >: a fixed run of characters at a fixed speed, with a link at the end that gives a friend
+        the identical run to beat.
+      </p>
+    </section>
+
+    <Faq slot="more" items={faq} />
+  </PageShell>
 </BaseLayout>

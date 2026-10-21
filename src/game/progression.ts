@@ -120,6 +120,12 @@ export const XP = {
   sessionComplete: 20,
   /** For reaching Mastered on a character. */
   characterMastered: 100,
+  /**
+   * The §57 "SIGNAL DETECTED +10 XP" moment, paid once per profile and never
+   * again. It is the reward for trying at all, so it has to be real XP; paying
+   * it twice would make it farmable, and then it would be a fake number.
+   */
+  firstSignal: 10,
 } as const
 
 /** XP for one correct answer, weighted by how hard the character is. */
@@ -139,12 +145,28 @@ export function xpForLevel(level: number): number {
   return 50 * (level - 1) * level
 }
 
+/**
+ * The most XP any record may hold — level 4,472 or so.
+ *
+ * Unreachable by practice (it is a billion points), and there to keep the
+ * level maths exact: beyond 2^53, `level + 1 === level`, and the drift loops
+ * below would never finish on a number someone typed into an export.
+ */
+export const MAX_XP = 1_000_000_000
+
+/** XP as the level maths may use it: finite, non-negative and capped. */
+const usableXp = (xp: number): number =>
+  Number.isFinite(xp) ? Math.min(Math.max(xp, 0), MAX_XP) : xp > 0 ? MAX_XP : 0
+
 export function levelFromXp(xp: number): number {
-  if (xp <= 0) return 1
+  const total = usableXp(xp)
+  if (total <= 0) return 1
   // Closed form of the inverse, then a guard against float drift at the seam.
-  let level = Math.floor((1 + Math.sqrt(1 + (4 * xp) / 50)) / 2)
-  while (xpForLevel(level + 1) <= xp) level += 1
-  while (level > 1 && xpForLevel(level) > xp) level -= 1
+  // Drift is at most one level either way, so two steps per direction bound
+  // the loops whatever the input.
+  let level = Math.floor((1 + Math.sqrt(1 + (4 * total) / 50)) / 2)
+  for (let step = 0; step < 2 && xpForLevel(level + 1) <= total; step++) level += 1
+  for (let step = 0; step < 2 && level > 1 && xpForLevel(level) > total; step++) level -= 1
   return level
 }
 
@@ -159,10 +181,11 @@ export interface LevelProgress {
 }
 
 export function levelProgress(xp: number): LevelProgress {
-  const level = levelFromXp(xp)
+  const total = usableXp(xp)
+  const level = levelFromXp(total)
   const floor = xpForLevel(level)
   const ceiling = xpForLevel(level + 1)
   const span = ceiling - floor
-  const into = xp - floor
+  const into = total - floor
   return { level, into, span, fraction: span === 0 ? 0 : into / span }
 }

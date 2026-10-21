@@ -12,9 +12,13 @@ export const SITE = {
   name: 'MorseForge',
   tagline: 'Learn Morse. Build the Signal.',
   url: 'https://morse.iamcanturk.dev',
-  /** Used verbatim as the default meta description and og:description. */
+  /**
+   * Used verbatim as the default meta description, the og:description and the
+   * schema.org description. Kept to 155 characters, the most a results page
+   * shows before cutting it off; `site.test.ts` enforces that.
+   */
   description:
-    'Learn Morse code for free with a real CW audio engine, a keyboard straight key, and a Signal Tree that lights up as you master each character. No account, no ads, works offline.',
+    'Learn Morse code by sound with a free trainer: real CW audio, a keyboard telegraph key and a Signal Tree that fills in as you go. No account, no ads.',
   locale: 'en',
   repo: 'https://github.com/iamcanturk/morse',
 } as const
@@ -55,3 +59,46 @@ export const AUTHOR_SAME_AS: readonly string[] = [AUTHOR.url, AUTHOR_X_URL, AUTH
  * progress never leaves the device.
  */
 export const CF_ANALYTICS_TOKEN: string | null = '43d4ce9b115249e0b6f2bb3234c3c499'
+
+/**
+ * The entity every page is about, for schema.org `about` and `sameAs`.
+ *
+ * Linking the site to Wikidata is what tells a search engine or an LLM that
+ * "Morse code" here means the encoding and not a person called Morse, and it
+ * costs one constant. `name` is the form copy uses in running text.
+ */
+export const MORSE_CODE_ENTITY = {
+  name: 'Morse code',
+  wikipedia: 'https://en.wikipedia.org/wiki/Morse_code',
+  wikidata: 'https://www.wikidata.org/wiki/Q79897',
+} as const
+
+/** The entity as a schema.org `Thing`, ready to drop into an `about` field. */
+export const MORSE_CODE_ABOUT = {
+  '@type': 'Thing',
+  name: MORSE_CODE_ENTITY.name,
+  sameAs: [MORSE_CODE_ENTITY.wikipedia, MORSE_CODE_ENTITY.wikidata],
+} as const
+
+/**
+ * The two sources the site's claims rest on.
+ *
+ * Pages cite these by importing them, so a link that moves is fixed once. The
+ * ITU URL is the recommendation itself rather than the series index, which is
+ * what an assistant needs in order to attribute a fact to it.
+ */
+export const CITATIONS = {
+  itu: {
+    /** What copy calls it in running text. */
+    short: 'ITU-R M.1677-1',
+    name: 'ITU-R M.1677-1: International Morse code',
+    publisher: 'International Telecommunication Union',
+    url: 'https://www.itu.int/rec/R-REC-M.1677-1-200910-I/en',
+  },
+  arrl: {
+    short: 'ARRL',
+    name: 'A Standard for Morse Timing Using the Farnsworth Technique',
+    publisher: 'American Radio Relay League',
+    url: 'https://www.arrl.org/files/file/Technology/x9004008.pdf',
+  },
+} as const

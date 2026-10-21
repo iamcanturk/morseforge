@@ -1,126 +1,132 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { type CardData, drawCard, toBlob } from './resultCard'
+import { type CardData, cardDescription, drawCard, ensureCardFonts, toBlob } from './resultCard'
 import { SITE } from '../../config/site'
+import { shareData, type ShareMessage } from '../../game/share'
+import { track } from '../../analytics/track'
 
 /**
- * Renders the result card and offers the three ways to get it out.
+ * The result card as an image, and the two ways to get it out.
  *
- * Web Share first, because on a phone that is one tap into whatever app the
- * person actually uses. Download second, for desktop. And the X intent last,
- * with the URL in the text — an image posted without a link is a poster for
- * nothing, and the link is the entire reason the card exists.
+ * An optional extra beside the share text, never instead of it (flow audit
+ * B6). Many share targets drop the text when a file is attached, so the card
+ * prints its own URL, and the link goes with the image as the share's url
+ * for the targets that keep it (once, not also inside the text: DEC-035).
  */
-export function ShareCard({ data }: { data: CardData }) {
+export function ShareCard({ data, message }: { data: CardData; message: ShareMessage }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [canShareFiles, setCanShareFiles] = useState(false)
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** The card as a PNG, built as soon as it is drawn. */
+  const image = useRef<File | null>(null)
 
   useEffect(() => {
-    if (canvas.current) drawCard(canvas.current, data, SITE.url)
+    let live = true
+    image.current = null
+    // The brand faces first, briefly; a card drawn before they load comes out
+    // in the system font.
+    void ensureCardFonts().then(async () => {
+      if (!live || !canvas.current) return
+      drawCard(canvas.current, data, SITE.url)
+      // Encoded now, not on click: a share must start inside the tap's user
+      // activation, and awaiting the PNG first can outlast it (iOS Safari),
+      // which makes the share fail with NotAllowedError.
+      const blob = await toBlob(canvas.current)
+      if (live && blob) {
+        image.current = new File([blob], 'morseforge-result.png', { type: 'image/png' })
+      }
+    })
+    return () => {
+      live = false
+    }
   }, [data])
 
-  // Feature-detected on mount rather than during render: `navigator` does not
-  // exist while this is prerendered, and a button that appears after hydration
-  // is better than one that promises a share the browser cannot do.
+  // Feature-detected after mount: `navigator` does not exist while this is
+  // prerendered, and a button that appears after hydration is better than one
+  // that promises a share the browser cannot do.
   useEffect(() => {
-    const probe = new File([new Blob()], 'probe.png', { type: 'image/png' })
-    setCanShareFiles(
-      typeof navigator !== 'undefined' &&
-        typeof navigator.canShare === 'function' &&
-        navigator.canShare({ files: [probe] }),
-    )
+    try {
+      const probe = new File([new Blob()], 'probe.png', { type: 'image/png' })
+      setCanShareFiles(
+        typeof navigator.canShare === 'function' && navigator.canShare({ files: [probe] }),
+      )
+    } catch {
+      setCanShareFiles(false)
+    }
   }, [])
 
-  const flash = useCallback((message: string) => {
-    setStatus(message)
-    setTimeout(() => setStatus(null), 2400)
+  useEffect(
+    () => () => {
+      if (flashTimer.current !== null) clearTimeout(flashTimer.current)
+    },
+    [],
+  )
+
+  const flash = useCallback((text: string) => {
+    if (flashTimer.current !== null) clearTimeout(flashTimer.current)
+    setStatus(text)
+    flashTimer.current = setTimeout(() => setStatus(null), 2400)
   }, [])
 
   const download = useCallback(async () => {
     if (!canvas.current) return
-    const blob = await toBlob(canvas.current)
-    if (!blob) return
-
+    const blob = image.current ?? (await toBlob(canvas.current))
+    if (!blob) {
+      flash('The image could not be made in this browser.')
+      return
+    }
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
     link.download = 'morseforge-result.png'
     link.click()
-    URL.revokeObjectURL(url)
+    // Revoked later: some browsers start the download after the handler
+    // returns, and a revoked URL downloads nothing.
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
     flash('Saved morseforge-result.png')
   }, [flash])
 
   const share = useCallback(async () => {
-    if (!canvas.current) return
-    const blob = await toBlob(canvas.current)
-    if (!blob) return
-
-    const file = new File([blob], 'morseforge-result.png', { type: 'image/png' })
-    try {
-      await navigator.share({
-        files: [file],
-        title: 'MorseForge',
-        text: `${Math.round(data.accuracy * 100)}% accuracy on MorseForge. Can you beat it?`,
-      })
-    } catch {
-      // The user dismissed the sheet, or the browser refused. Neither is worth
-      // an error message — they can still download.
+    // Nothing awaited before the share itself: see the draw effect.
+    const file = image.current
+    if (!file) {
+      flash('The image is still being made. Try again in a moment.')
+      return
     }
-  }, [data.accuracy])
-
-  const intent = `https://x.com/intent/tweet?text=${encodeURIComponent(
-    data.challenge
-      ? `I decoded ${data.correct} Morse signals in 60 seconds at ${Math.round(data.accuracy * 100)}% accuracy.\n\nCan you beat me?\n\n⚡ ${SITE.url}/challenge/`
-      : `${data.correct} characters at ${Math.round(data.accuracy * 100)}% accuracy on MorseForge.\n\n⚡ ${SITE.url}`,
-  )}`
+    track('share_open', 'card')
+    try {
+      await navigator.share(shareData(message, [file]))
+    } catch (error) {
+      // Dismissed: the person's choice, nothing to say.
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      // Refused: say so, rather than a button that silently does nothing.
+      flash('Sharing the image was refused here. Save it instead, or use the link above.')
+    }
+  }, [message, flash])
 
   return (
     <div>
       <canvas
         ref={canvas}
-        className="w-full rounded-xl border border-line"
-        // The card is a picture of numbers already announced above it, so the
-        // description says what it is rather than reading them out twice.
+        width={1200}
+        height={630}
+        className="block aspect-[1200/630] w-full rounded-control border border-line-strong"
         role="img"
-        aria-label="Your result as a shareable image"
+        aria-label={cardDescription(data)}
       />
-
       <div className="mt-4 flex flex-wrap gap-3">
         {canShareFiles && (
-          <button
-            type="button"
-            onClick={() => void share()}
-            className="rounded-lg px-5 py-2.5 font-mono text-xs tracking-[0.14em] text-void"
-            style={{ background: 'var(--color-signal)' }}
-          >
-            SHARE
+          <button type="button" onClick={() => void share()} className="mf-btn mf-btn-secondary">
+            Share image
           </button>
         )}
-
-        <button
-          type="button"
-          onClick={() => void download()}
-          className="rounded-lg border border-line px-5 py-2.5 font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:border-signal hover:text-signal"
-        >
-          SAVE IMAGE
+        <button type="button" onClick={() => void download()} className="mf-btn mf-btn-secondary">
+          Save image
         </button>
-
-        <a
-          href={intent}
-          target="_blank"
-          rel="noopener"
-          className="rounded-lg border border-line px-5 py-2.5 font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:border-cyan hover:text-cyan"
-        >
-          POST ON X
-        </a>
       </div>
-
       {/* Mounted whether or not there is a message: a live region that appears
           at the same moment as its content is usually not announced. */}
-      <p
-        role="status"
-        className={status ? 'mt-3 font-mono text-[11px] tracking-[0.12em] text-signal' : 'sr-only'}
-      >
+      <p role="status" className={status ? 'mt-3 text-sm text-signal' : 'sr-only'}>
         {status ?? ''}
       </p>
     </div>

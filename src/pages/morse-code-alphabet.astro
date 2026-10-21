@@ -1,158 +1,176 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro'
-import AlphabetChart from '../components/Alphabet/AlphabetChart.astro'
-import { DIGITS, LETTERS, PUNCTUATION } from '../data/morseAlphabet'
-import { prettify } from '../engine/morseEncoder'
-import { SITE } from '../config/site'
+import AlphabetChart, { type ChartPlate } from '../components/Alphabet/AlphabetChart.astro'
+import Faq from '../components/Faq.astro'
+import PageShell from '../components/PageShell.astro'
+import { characterHref, characterPageSlugs } from '../components/Alphabet/characterLinks'
+import { breadcrumbTrail, getPage } from '../config/pages'
+import { FACTS, spanOf } from '../config/facts'
+import { CITATIONS } from '../config/site'
+import { CHARACTERS } from '../data/characters'
+import { faqFor } from '../data/faq'
+import { describeElements, numberWord } from '../data/format'
+import {
+  ALL_DIGITS,
+  ALL_LETTERS,
+  DIGITS,
+  ITU_PUNCTUATION,
+  LETTERS,
+  NON_ITU_PUNCTUATION,
+} from '../data/morseAlphabet'
+import { encode, prettify } from '../engine/morseEncoder'
+import { breadcrumbs, characterTerms, definedTermSet, termSetId, webPage } from '../seo/schema'
 
-const path = '/morse-code-alphabet/'
-const title = 'Morse Code Alphabet — Full A–Z Chart With Sound | MorseForge'
-const description =
-  'The complete Morse code alphabet: all 26 letters, 10 digits and punctuation, per ITU-R M.1677-1. Click any character to hear it at your own speed. Free, no account.'
+const page = getPage('/morse-code-alphabet/')
+const faq = faqFor(page.path)
+const trail = breadcrumbTrail(page.path)
+const ITU = CITATIONS.itu.short
 
-const toEntries = (source: Record<string, string>) =>
+const toEntries = (source: Readonly<Record<string, string>>) =>
   Object.entries(source).map(([character, code]) => ({ character, code }))
 
-const letters = toEntries(LETTERS)
-const digits = toEntries(DIGITS)
-const punctuation = toEntries(PUNCTUATION)
+// Integer-like keys iterate in numeric order, 0 first. The chart puts 0 last
+// so the two rows read 1–5 then 6–0, and the counting pattern lines up.
+const digits = toEntries(DIGITS).sort(
+  (a, b) => (Number(a.character) || 10) - (Number(b.character) || 10),
+)
 
-const FAQ = [
+const plates: ChartPlate[] = [
   {
-    question: 'How many characters are in the Morse code alphabet?',
-    answer: `International Morse code covers 26 letters, 10 digits and around 18 punctuation and procedural characters, defined in ITU-R M.1677-1. Letters run from one element (E and T) to four; digits are all exactly five elements long; punctuation runs from five to seven.`,
+    id: 'letters',
+    heading: `Morse code letters ${spanOf(ALL_LETTERS)}`,
+    tab: `${spanOf(ALL_LETTERS)} · ${FACTS.letterCount}`,
+    entries: toEntries(LETTERS),
   },
   {
-    question: 'Why is E just one dot?',
-    answer:
-      'Because E is the most common letter in English. Morse assigned the shortest codes to the most frequent letters, which is a form of frequency encoding — the same principle behind modern compression. Q and Z are long precisely because they are rare.',
+    id: 'numbers',
+    heading: `Morse code numbers ${spanOf(ALL_DIGITS)}`,
+    tab: `${spanOf(ALL_DIGITS)} · ${FACTS.digitCount}`,
+    entries: digits,
+    cols: 5,
   },
   {
-    question: 'Is there a Morse code for lowercase letters?',
-    answer:
-      'No. Morse has no case at all. It also has no way to indicate a paragraph or a new line beyond the prosign BT. Anything sent in Morse arrives as uppercase by convention, not because it was sent that way.',
+    id: 'punctuation',
+    heading: `Punctuation in ${ITU}`,
+    tab: `${ITU} · ${FACTS.ituPunctuationCount}`,
+    note: `The standard defines ${FACTS.ituPunctuationCount} punctuation marks. It also has a multiplication sign, which is sent exactly like the letter X (${prettify(encode('X'))}), so it is not listed separately here.`,
+    entries: toEntries(ITU_PUNCTUATION),
+    named: true,
   },
   {
-    question: 'What is the difference between American and International Morse?',
-    answer:
-      'American Morse, the original, used variable-length internal gaps inside some characters. Those gaps were readable on a landline sounder but not over radio, where fading and interference blur them. International Morse replaced it worldwide and is what every modern reference means by "Morse code".',
+    id: 'common-punctuation',
+    heading: `Common but not in ${ITU}`,
+    tab: `Not in the standard · ${FACTS.nonItuPunctuationCount}`,
+    note: `These ${numberWord(FACTS.nonItuPunctuationCount)} marks are widely used and every MorseForge tool accepts them, but ${ITU} does not define them, so a receiver may not know them.`,
+    entries: toEntries(NON_ITU_PUNCTUATION),
+    named: true,
   },
 ]
+
+// Shown characters, in chart order: the same set the term set describes.
+const shown = plates.flatMap((plate) => plate.entries.map((entry) => entry.character))
+
+// Character pages are a separate route that may not exist yet, or may cover
+// only some characters. Link only to the pages the build actually produces.
+const slugs = await characterPageSlugs()
+const links = new Map(
+  shown.flatMap((character) => {
+    const href = characterHref(character, slugs)
+    return href ? [[character, href] as const] : []
+  }),
+)
+
+const terms = shown.flatMap((character) => {
+  const facts = CHARACTERS[character]
+  return facts ? characterTerms([facts], { linked: links.has(character) }) : []
+})
 
 const schema = [
-  {
-    '@context': 'https://schema.org',
-    '@type': 'Article',
-    headline: 'The Morse code alphabet',
-    description,
-    url: new URL(path, SITE.url).href,
-    author: { '@id': `${SITE.url}/#author` },
-    isPartOf: { '@id': `${SITE.url}/#website` },
-    inLanguage: 'en',
-    citation: {
-      '@type': 'CreativeWork',
-      name: 'ITU-R M.1677-1: International Morse code',
-      url: 'https://www.itu.int/rec/R-REC-M.1677/en',
-    },
-  },
-  {
-    '@context': 'https://schema.org',
-    '@type': 'FAQPage',
-    mainEntity: FAQ.map((entry) => ({
-      '@type': 'Question',
-      name: entry.question,
-      acceptedAnswer: { '@type': 'Answer', text: entry.answer },
-    })),
-  },
+  webPage({
+    path: page.path,
+    name: page.h1,
+    description: page.description,
+    type: 'CollectionPage',
+    mainEntityId: termSetId(page.path),
+  }),
+  breadcrumbs(trail),
+  definedTermSet({
+    path: page.path,
+    name: 'International Morse code',
+    description: page.description,
+    terms,
+  }),
 ]
 
-const sections = [
-  { id: 'letters', heading: 'Letters', entries: letters },
-  { id: 'numbers', heading: 'Numbers', entries: digits },
-  { id: 'punctuation', heading: 'Punctuation', entries: punctuation },
-]
+const digitSentence = (digit: keyof typeof DIGITS) =>
+  `${digit} is ${describeElements(DIGITS[digit])}`
 ---
 
-<BaseLayout title={title} description={description} path={path} schema={schema}>
-  <main class="mx-auto max-w-4xl px-6 py-14">
-    <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">
-      The Morse code alphabet
-    </h1>
+<BaseLayout title={page.title} description={page.description} path={page.path} schema={schema}>
+  <PageShell
+    width="tool"
+    trail={trail}
+    eyebrow={`Reference · ${ITU}`}
+    h1={page.h1}
+    intro={page.intro}
+  >
+    <dl class="grid max-w-[22rem] grid-cols-3 gap-3" data-print="hide">
+      <div class="mf-readout">
+        <dt class="mf-readout-label mf-engraved">Letters</dt>
+        <dd class="mf-readout-value">{FACTS.letterCount}</dd>
+      </div>
+      <div class="mf-readout">
+        <dt class="mf-readout-label mf-engraved">Digits</dt>
+        <dd class="mf-readout-value">{FACTS.digitCount}</dd>
+      </div>
+      <div class="mf-readout">
+        <dt class="mf-readout-label mf-engraved">Marks</dt>
+        <dd class="mf-readout-value">{FACTS.ituPunctuationCount}</dd>
+      </div>
+    </dl>
 
-    <p class="mt-5 max-w-2xl text-lg leading-relaxed">
-      All {letters.length} letters, {digits.length} digits and {punctuation.length} punctuation marks,
-      following
-      <a
-        href="https://www.itu.int/rec/R-REC-M.1677/en"
-        rel="noopener"
-        class="underline decoration-signal/40 underline-offset-4 hover:decoration-signal"
-        >ITU-R M.1677-1</a
-      >, the international standard. Click any character to hear it.
-    </p>
-
-    {
-      /* Rendered by Astro so the full chart is in the HTML with JavaScript off;
-        the interactive version below replaces it once React hydrates. */
-    }
-    <div class="mt-10 space-y-14">
-      {
-        sections.map((section) => (
-          <section id={section.id}>
-            <h2 class="font-display text-xl font-bold tracking-tight">{section.heading}</h2>
-
-            <noscript>
-              <ul class="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                {section.entries.map(({ character, code }) => (
-                  <li class="flex items-center gap-3 rounded-lg border border-line bg-panel px-3 py-2.5">
-                    <span class="w-5 font-display text-lg font-bold text-signal">{character}</span>
-                    <span class="font-mono text-sm tracking-[0.18em] text-cyan">
-                      {prettify(code)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </noscript>
-
-            <div class="mt-5">
-              <AlphabetChart entries={section.entries} />
-            </div>
-          </section>
-        ))
-      }
+    <div class="mt-10">
+      <AlphabetChart plates={plates} links={links} />
     </div>
 
-    <section class="mt-16">
-      <h2 class="font-display text-2xl font-bold tracking-tight">
-        Why the codes are what they are
-      </h2>
-      <p class="mt-3 leading-relaxed text-muted">
-        The alphabet is not arbitrary. Morse is a prefix tree: from a starting point, a dot branches
-        one way and a dash the other, and every character sits where its own sequence lands. E is
-        one dot because E is the most common letter in English, and the shortest codes went to the
-        letters that would be sent most often.
-      </p>
-      <p class="mt-4 leading-relaxed text-muted">
-        The digits give this away most clearly. 1 is one dot then four dashes, 2 is two dots then
-        three dashes, and so on until 5 is five dots — then the pattern reverses back out to 0,
-        which is five dashes. It is a rule you can derive rather than a table you have to memorise.
-      </p>
-      <a
-        href="/tree/"
-        class="mt-6 inline-block rounded-lg border border-line px-5 py-2.5 font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:border-signal hover:text-signal"
-        >SEE THE TREE</a
-      >
+    <section slot="more" class="grid gap-10 lg:grid-cols-[minmax(0,1fr)_20rem]" data-print="hide">
+      <div class="max-w-[68ch]">
+        <h2 class="pi-balance font-display text-h2 font-bold text-ink">
+          Why the codes are what they are
+        </h2>
+        <p class="pi-pretty mt-4 leading-relaxed text-muted">
+          The alphabet is not arbitrary. Morse is a prefix tree: from a starting point, a dot
+          branches one way and a dash the other, and every character sits where its own sequence
+          lands. E is one dot because E is the most common letter in English, and the shortest codes
+          went to the letters that would be sent most often.
+        </p>
+        <p class="pi-pretty mt-4 leading-relaxed text-muted">
+          The digits give this away most clearly. {digitSentence('1')}, {digitSentence('2')}, and so
+          on until {digitSentence('5')}. Then the pattern turns around: {digitSentence('6')}, and so
+          on until {digitSentence('0')}. It is a rule you can derive rather than a table you have to
+          memorise.
+        </p>
+      </div>
+
+      <nav aria-label="Related" class="mf-panel self-start p-5 sm:p-6">
+        <p class="mf-engraved">Keep going</p>
+        <ul class="mt-4 space-y-3">
+          <li><a href="/tree/" class="pi-link">See the Morse code tree</a></li>
+          <li>
+            <a href="/learn-morse-code-in-7-days/" class="pi-link"
+              >Learn Morse code in {FACTS.planDays} days</a
+            >
+          </li>
+          <li><a href="/morse-code-translator/" class="pi-link">Translate your own text</a></li>
+          <li>
+            <a href="/words/" class="pi-link">{FACTS.wordCount} words in Morse code</a>
+          </li>
+        </ul>
+      </nav>
     </section>
 
-    <section class="mt-16">
-      <h2 class="font-display text-2xl font-bold tracking-tight">Common questions</h2>
-      {
-        FAQ.map((entry) => (
-          <div class="mt-7">
-            <h3 class="font-display text-base font-semibold">{entry.question}</h3>
-            <p class="mt-2 leading-relaxed text-muted">{entry.answer}</p>
-          </div>
-        ))
-      }
-    </section>
-  </main>
+    <div slot="more" data-print="hide">
+      <Faq items={faq} />
+    </div>
+  </PageShell>
 </BaseLayout>

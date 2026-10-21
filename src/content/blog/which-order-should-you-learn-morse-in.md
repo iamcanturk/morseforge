@@ -1,7 +1,8 @@
 ---
 title: Which order should you learn Morse code in?
-description: Alphabetical is the worst option and the most common. Koch and shortest-first both work, and the choice between them matters far less than not starting with A B C.
+description: Alphabetical is the worst order to learn Morse code in. Koch and shortest-first both work, and choosing between them matters far less than avoiding A B C.
 published: 2026-08-23
+updated: 2026-10-21
 answer: Not alphabetically. A B C D groups characters that sound alike and follows an order the code itself does not use. The two that work are Koch, which starts with two characters at full target speed and adds one each time you clear 90% accuracy, and shortest-first, which follows the code outwards from E and T. Either is fine — the gap between them is far smaller than the gap to the alphabet.
 tags: [learning, technique, beginners]
 ---

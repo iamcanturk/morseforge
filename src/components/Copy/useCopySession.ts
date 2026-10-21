@@ -2,12 +2,12 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import { generateText, type TextKind } from '../../data/practiceText'
 import { gradeCopy, type CopyGrade } from '../../game/copy'
 import { summarize, type Attempt, type SessionSummary } from '../../game/session'
-import { xpForAnswer } from '../../game/progression'
 import { answer as recordAnswer, createProgressStore } from '../../storage/progress'
 import { applySession, createStatsStore } from '../../storage/stats'
 import { achievementSnapshot } from '../../storage/snapshot'
 import { newlyEarned, type Achievement } from '../../game/achievements'
 import { track } from '../../analytics/track'
+import { attemptsForLine, isComplete, lineNumber, sessionXp } from './copySession'
 
 /**
  * Runs a copy session (PROJECT.md §13).
@@ -19,7 +19,14 @@ import { track } from '../../analytics/track'
  *
  * The scoring, XP and stats all go through the same functions single-character
  * practice uses — a line just contributes as many attempts as it had
- * characters. That keeps one lifetime accuracy figure meaning one thing.
+ * characters. That keeps one lifetime accuracy figure meaning one thing, and
+ * it means copy practice and the daily bank identically: `applySession`, which
+ * marks the local day once however many sessions land on it.
+ *
+ * Every write happens in an event handler, never inside a state updater. React
+ * may run an updater twice, and an updater that banks a session banks it
+ * twice; the old `stop` did exactly that. A ref holds the lines as the source
+ * of truth and a second ref makes finishing a once-per-session event.
  */
 
 export type CopyStatus = 'idle' | 'running' | 'reviewing' | 'finished'
@@ -33,7 +40,7 @@ export interface CopyConfig {
   /**
    * A fixed list to send instead of generating.
    *
-   * The daily challenge hands the same eight lines to everyone, so it cannot
+   * The daily challenge hands the same lines to everyone, so it cannot
    * generate per session — but it is otherwise the identical exercise, and
    * running it through a second loop would be two chances to score copying
    * differently.
@@ -55,16 +62,20 @@ export interface UseCopySessionResult {
   results: readonly CopyResult[]
   /** The line just graded, held while the answer key is on screen. */
   lastGrade: CopyGrade | null
+  /** Over the answered lines only. The daily rescores against the whole day. */
   summary: SessionSummary | null
   /** Achievements this session earned. Empty unless it just crossed one. */
   earned: readonly Achievement[]
   /** Lines copied without a single error. */
   perfectLines: number
+  /** True once finished with every line answered; false if it was stopped early. */
+  completed: boolean
   start: () => void
   /** Grade an answer and stop on it. Returns the grade so the UI can react. */
   submit: (given: string) => CopyGrade | null
   /** Move past the answer key to the next line, or finish. */
   next: () => void
+  /** End now, with the lines answered so far. */
   stop: () => void
   reset: () => void
 }
@@ -75,7 +86,7 @@ export function useCopySession(config: CopyConfig): UseCopySessionResult {
 
   const [status, setStatus] = useState<CopyStatus>('idle')
   const [current, setCurrent] = useState<string | null>(null)
-  const [results, setResults] = useState<CopyResult[]>([])
+  const [results, setResults] = useState<readonly CopyResult[]>([])
   const [lastGrade, setLastGrade] = useState<CopyGrade | null>(null)
   const [summary, setSummary] = useState<SessionSummary | null>(null)
   const [earned, setEarned] = useState<readonly Achievement[]>([])
@@ -86,11 +97,24 @@ export function useCopySession(config: CopyConfig): UseCopySessionResult {
   const startedAt = useRef<number>(0)
   const promptedAt = useRef<number>(0)
   const attempts = useRef<Attempt[]>([])
+  const collected = useRef<CopyResult[]>([])
+  const phase = useRef<CopyStatus>('idle')
+  const currentRef = useRef<string | null>(null)
 
   // The config object can be new on every render; a session must not restart
   // because its parent re-rendered.
   const configRef = useRef(config)
   configRef.current = config
+
+  const move = useCallback((next: CopyStatus) => {
+    phase.current = next
+    setStatus(next)
+  }, [])
+
+  const show = useCallback((line: string | null) => {
+    currentRef.current = line
+    setCurrent(line)
+  }, [])
 
   const generate = useCallback((index: number) => {
     const { kind, characters, prompts } = configRef.current
@@ -106,32 +130,32 @@ export function useCopySession(config: CopyConfig): UseCopySessionResult {
     )
   }, [])
 
-  const finish = useCallback(
-    (collected: readonly CopyResult[]) => {
-      const elapsed = performance.now() - startedAt.current
-      const result = summarize(attempts.current, elapsed)
+  const finish = useCallback(() => {
+    // Once per session, whichever of "last line", END and GIVE UP gets here.
+    if (phase.current === 'finished' || phase.current === 'idle') return
+    move('finished')
 
-      const xpEarned = attempts.current
-        .filter((attempt) => attempt.correct)
-        .reduce((sum, attempt) => sum + xpForAnswer(attempt.character), 0)
+    const elapsed = performance.now() - startedAt.current
+    const result = summarize(attempts.current, elapsed)
 
-      statsStore.update((stats) => applySession(stats, result, xpEarned, Date.now()))
-      track('copy_finish', configRef.current.kind)
+    // Zero answers bank nothing: applySession returns the record untouched.
+    statsStore.update((stats) =>
+      applySession(stats, result, sessionXp(attempts.current), Date.now()),
+    )
+    track('copy_finish', configRef.current.kind)
 
-      const after = achievementSnapshot(progressStore.read(), statsStore.read())
-      setEarned(newlyEarned(before.current ?? after, after))
+    const after = achievementSnapshot(progressStore.read(), statsStore.read())
+    setEarned(newlyEarned(before.current ?? after, after))
 
-      setResults([...collected])
-      setSummary(result)
-      setStatus('finished')
-      setCurrent(null)
-      setLastGrade(null)
-    },
-    [statsStore, progressStore],
-  )
+    setResults([...collected.current])
+    setSummary(result)
+    show(null)
+    setLastGrade(null)
+  }, [move, show, statsStore, progressStore])
 
   const start = useCallback(() => {
     attempts.current = []
+    collected.current = []
     setEarned([])
     before.current = achievementSnapshot(progressStore.read(), statsStore.read())
     startedAt.current = performance.now()
@@ -139,95 +163,78 @@ export function useCopySession(config: CopyConfig): UseCopySessionResult {
     setResults([])
     setSummary(null)
     setLastGrade(null)
-    setCurrent(generate(0))
-    setStatus('running')
-  }, [generate, progressStore, statsStore])
+    show(generate(0))
+    move('running')
+  }, [generate, move, show, progressStore, statsStore])
 
   const submit = useCallback(
     (given: string): CopyGrade | null => {
-      if (status !== 'running' || current === null) return null
+      const line = currentRef.current
+      if (phase.current !== 'running' || line === null) return null
 
-      const grade = gradeCopy(current, given)
-      const elapsed = performance.now() - promptedAt.current
-      const sent = grade.slots.filter((slot) => slot.expected !== null)
+      const grade = gradeCopy(line, given)
+      const lineAttempts = attemptsForLine(grade, performance.now() - promptedAt.current)
 
       // Every character in the line was heard, so every one of them is evidence
       // about listening — a hit and a miss both move that character's schedule.
       progressStore.update((progress) => {
         const now = Date.now()
-        return sent.reduce(
-          (record, slot) =>
-            recordAnswer(record, slot.expected!, 'listening', slot.mark === 'hit', now),
+        return lineAttempts.reduce(
+          (record, attempt) =>
+            recordAnswer(record, attempt.character, 'listening', attempt.correct, now),
           progress,
         )
       })
 
-      attempts.current = [
-        ...attempts.current,
-        ...sent.map((slot) => ({
-          character: slot.expected!,
-          answer: slot.given ?? '',
-          correct: slot.mark === 'hit',
-          // Split evenly: a line is heard as a whole, so there is no honest
-          // per-character time to report.
-          elapsedMs: sent.length === 0 ? elapsed : elapsed / sent.length,
-        })),
-      ]
-
-      setResults((collected) => [...collected, { text: current, grade }])
+      attempts.current = [...attempts.current, ...lineAttempts]
+      collected.current = [...collected.current, { text: line, grade }]
+      setResults(collected.current)
       setLastGrade(grade)
-      setStatus('reviewing')
+      move('reviewing')
       return grade
     },
-    [status, current, progressStore],
+    [move, progressStore],
   )
 
   const next = useCallback(() => {
-    if (status !== 'reviewing') return
+    if (phase.current !== 'reviewing') return
+    const answered = collected.current.length
+    const line = answered >= configRef.current.lines ? null : generate(answered)
+    if (line === null) {
+      finish()
+      return
+    }
+    setLastGrade(null)
+    show(line)
+    promptedAt.current = performance.now()
+    move('running')
+  }, [finish, generate, move, show])
 
-    setResults((collected) => {
-      const next = collected.length >= configRef.current.lines ? null : generate(collected.length)
-      if (next === null) {
-        finish(collected)
-        return collected
-      }
-      setLastGrade(null)
-      setCurrent(next)
-      promptedAt.current = performance.now()
-      setStatus('running')
-      return collected
-    })
-  }, [status, finish, generate])
-
-  const stop = useCallback(() => {
-    setResults((collected) => {
-      finish(collected)
-      return collected
-    })
-  }, [finish])
+  const stop = useCallback(() => finish(), [finish])
 
   const reset = useCallback(() => {
-    setStatus('idle')
-    setCurrent(null)
+    move('idle')
+    show(null)
     setResults([])
     setLastGrade(null)
     setSummary(null)
     setEarned([])
     attempts.current = []
-  }, [])
+    collected.current = []
+  }, [move, show])
 
   const perfectLines = results.filter((result) => result.grade.perfect).length
-  const lineNumber = Math.min(results.length + (status === 'reviewing' ? 0 : 1), config.lines)
 
   return {
     status,
     current,
-    lineNumber,
+    lineNumber: lineNumber(results.length, status === 'reviewing', config.lines),
     results,
     lastGrade,
     summary,
     earned,
     perfectLines,
+    completed: status === 'finished' && isComplete(results.length, config.lines),
     start,
     submit,
     next,

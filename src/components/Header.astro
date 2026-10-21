@@ -1,152 +1,344 @@
 ---
-import { Logo } from './brand/Logo'
-import ThemeToggle from './ThemeToggle.astro'
-import { AUTHOR, AUTHOR_GITHUB_URL, AUTHOR_X_URL, SITE } from '../config/site'
+import { Logo, LogoMark } from './brand/Logo'
+import ThemeMenu from './ThemeMenu.astro'
+import { MENU_TILES, NAV_GROUPS, PHONE_GROUPS, PRIMARY_NAV, isCurrent } from './ui/siteNav'
+import { SITE } from '../config/site'
+import { SKILLS } from '../game/mastery'
+import { LESSON_STAGES } from '../game/nextAction'
+import { STREAK_GRACE_DAYS } from '../game/progression'
+import { PROGRESS_KEY } from '../storage/progress'
+import { STATS_KEY } from '../storage/stats'
 
 /**
- * Site header.
+ * Site header: one 56px row at every width (DEC-040).
  *
- * Three destinations in the bar and everything else behind one disclosure.
- * The previous version put all nine links in the bar under tiny group labels,
- * which turned the header into a wall of 9px type — a list to be scanned rather
- * than a route to be chosen.
+ * Logo, then the nav left-aligned after it (centring it between two clusters
+ * of changing width made it drift), then one cluster on the right with one
+ * rhythm: 40 px hit areas 4 px apart (44 px under a finger), the chip 8 px
+ * before them. Only what a learner uses from every page is in the bar: the
+ * progress chip, when it has something to say; one theme button with a menu;
+ * Settings, at every width (DEC-043). GitHub is in the footer and at the
+ * bottom of the phone menu. On a phone the bar is logo · chip · theme ·
+ * settings · menu; below 380 px, while the chip shows, the logo drops to the
+ * mark so all five fit (a 320 px window included).
  *
- * The disclosure is a native `<details>`, so it opens without JavaScript, is
+ * Four destinations in the bar — Learn, Practice, Telegraph, Daily — and the
+ * rest behind "All tools". Telegraph and Daily used to be buried in the menu
+ * although they are the most fun and the most shareable things here. On a
+ * phone the menu trigger sits in the same row, rather than as a second row
+ * that doubled the sticky header's height and took it from the key.
+ *
+ * Both menus are native `<details>`, so they open without JavaScript, are
  * keyboard operable for free, and every link inside stays in the HTML for a
- * crawler. That last part matters: the nav is also the internal linking, and a
- * menu built from JavaScript would hide two thirds of the site from a bot.
+ * crawler. That matters: the nav is also the internal linking, and a menu
+ * built from JavaScript would hide two thirds of the site from a bot. `name`
+ * makes the two mutually exclusive.
  *
  * `Logo` is a React component with no client directive, so Astro renders it to
  * static HTML and ships zero JavaScript for it.
  */
-const primary = [
-  { href: '/learn/', label: 'Learn' },
-  { href: '/practice/', label: 'Practice' },
-  { href: '/morse-code-translator/', label: 'Translator' },
-  { href: '/stats/', label: 'Progress' },
-]
-
-const more = [
-  {
-    title: 'Learn',
-    links: [
-      { href: '/learn/', label: 'Guided lessons', hint: 'See it, hear it, send it' },
-      {
-        href: '/learn-morse-code-in-7-days/',
-        label: '7-day plan',
-        hint: 'The whole course, written out',
-      },
-      { href: '/tree/', label: 'The Morse tree', hint: 'Why each letter has its code' },
-    ],
-  },
-  {
-    title: 'Practise',
-    links: [
-      { href: '/practice/', label: 'Practice', hint: 'Listen, read or send' },
-      { href: '/copy/', label: 'Copy practice', hint: 'Whole lines, graded per character' },
-      { href: '/daily/', label: 'Daily challenge', hint: 'The same one for everyone' },
-      { href: '/challenge/', label: '60-second challenge', hint: 'How many can you decode?' },
-      { href: '/telegraph/', label: 'Telegraph key', hint: 'Send freely and read it back' },
-      {
-        href: '/games/signal-defender/',
-        label: 'Signal Defender',
-        hint: 'Copy them before they land',
-      },
-      { href: '/games/morse-runner/', label: 'Morse Runner', hint: 'Send before you arrive' },
-    ],
-  },
-  {
-    title: 'Look up',
-    links: [
-      { href: '/morse-code-translator/', label: 'Translator', hint: 'Text to Morse and back' },
-      { href: '/morse-code-alphabet/', label: 'Alphabet', hint: 'Every character, playable' },
-      { href: '/words/', label: 'Words in Morse', hint: 'SOS, CQ, I love you…' },
-      { href: '/blog/', label: 'Notes', hint: 'How to learn it properly' },
-      { href: '/privacy/', label: 'Privacy', hint: 'No cookies, and why' },
-      { href: '/stats/', label: 'Your progress', hint: 'Level, streak, achievements' },
-    ],
-  },
-]
-
-const current = Astro.url.pathname
-const isCurrent = (href: string) => current === href
+const pathname = Astro.url.pathname
+const current = (href: string) => (isCurrent(href, pathname) ? 'page' : undefined)
 ---
 
-<header
-  class="sticky top-0 z-40 border-b border-line backdrop-blur"
-  style="background: color-mix(in srgb, var(--color-void) 88%, transparent)"
->
-  <div class="mx-auto max-w-6xl px-6">
-    <div class="flex items-center justify-between gap-4 py-3">
-      <div class="flex items-center gap-7">
-        <a href="/" class="shrink-0" aria-label="MorseForge home">
-          <Logo size={24} />
-        </a>
+<header class="mf-header">
+  <div class="mx-auto flex h-14 max-w-7xl items-center gap-2 px-4 sm:px-6">
+    {
+      /* A 44 px hit area round an 18–20 px lockup: the padding is the target,
+        the negative margin keeps the lockup where it was. */
+    }
+    <a
+      href="/"
+      class="-ml-2 flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-control px-2"
+      aria-label={`${SITE.name} home`}
+    >
+      {
+        /* The header's optical size of the lockup: 18 px of mark on a phone,
+          so the full lockup fits beside the controls at 360 px; 20 above. */
+      }
+      <Logo size={18} compact decorative className="mf-logo-full sm:hidden" />
+      <LogoMark size={18} decorative className="mf-logo-mark" />
+      <Logo size={20} compact decorative className="hidden sm:block" />
+    </a>
 
-        <nav aria-label="Main" class="hidden items-center gap-6 lg:flex">
-          {
-            primary.map(({ href, label }) => (
-              <a
-                href={href}
-                aria-current={isCurrent(href) ? 'page' : undefined}
-                class="text-sm transition-colors hover:text-signal"
-                style={isCurrent(href) ? 'color: var(--color-signal)' : 'color: var(--color-ink)'}
-              >
-                {label}
-              </a>
-            ))
+    <nav aria-label="Main" class="ml-10 hidden items-center gap-7 lg:flex">
+      {
+        PRIMARY_NAV.map(({ href, label }) => (
+          <a href={href} aria-current={current(href)} class="mf-nav-link">
+            {label}
+          </a>
+        ))
+      }
+
+      <details name="mf-menu" class="group" data-menu>
+        <summary class="mf-summary mf-nav-link gap-1.5 text-muted hover:text-ink">
+          All tools
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            aria-hidden="true"
+            class="transition-transform duration-150 group-open:rotate-180"
+          >
+            <path d="m6 9 6 6 6-6"></path>
+          </svg>
+        </summary>
+
+        <div class="mf-menu-panel px-6 pt-2">
+          <div class="mf-panel mx-auto grid max-w-5xl grid-cols-4 gap-8 p-7 shadow-2xl">
+            {
+              NAV_GROUPS.map((group) => (
+                <div>
+                  <p class="mf-engraved text-brass">{group.title}</p>
+                  <ul class="mt-3 space-y-1">
+                    {group.links.map(({ href, label, hint }) => (
+                      <li>
+                        <a href={href} aria-current={current(href)} class="mf-menu-link">
+                          <span class="mf-menu-link-label">{label}</span>{' '}
+                          <span class="mf-menu-link-hint">{hint}</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      </details>
+    </nav>
+
+    <div class="ml-auto flex shrink-0 items-center gap-1">
+      {
+        /* Progress chip (DEC-008, Q3a). Rendered hidden and filled by the few
+          lines below from the stats and progress records. With no record, or
+          one it cannot read, it stays hidden: a fresh visitor sees nothing,
+          and a malformed record never becomes a wrong number in the header.
+
+          It never shows empty. With a streak it is the amber lamp, lit once
+          you have practised today, and the streak as "5d"; the label and the
+          arrow join from sm up. Without a streak it is the label, at every
+          width. Its accessible name starts with exactly what it shows, so a
+          voice user can say what they see (A-17). */
+      }
+      <a href="/learn/" class="mf-chip ml-2 mr-1 sm:mr-2" hidden data-progress-chip>
+        <span class="mf-lamp" data-tone="amber" data-chip-lamp aria-hidden="true"></span>
+        <span data-chip-streak class="mf-chip-streak"></span>
+        <span data-chip-label class="mf-chip-label">Continue</span>
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          aria-hidden="true"
+          class="hidden text-signal sm:block"
+        >
+          <path d="M5 12h14M13 6l6 6-6 6"></path>
+        </svg>
+      </a>
+      <script
+        is:inline
+        define:vars={{
+          statsKey: STATS_KEY,
+          progressKey: PROGRESS_KEY,
+          graceDays: STREAK_GRACE_DAYS,
+          stages: LESSON_STAGES,
+          skills: SKILLS,
+        }}
+      >
+        // Envelope `{ version, data }`, as src/storage/store.ts writes it.
+        // Field by field and type by type, so an older or newer record shape
+        // reads as "nothing to show" rather than as an error or a NaN.
+        const read = (key) => {
+          const record = JSON.parse(localStorage.getItem(key) ?? 'null')
+          const data = typeof record?.version === 'number' ? record.data : null
+          return data && typeof data === 'object' ? data : null
+        }
+        const day = (key) => {
+          const [y, m, d] = key.split('-').map(Number)
+          return Date.UTC(y, m - 1, d)
+        }
+
+        // Run now, and again whenever the records may have changed under the
+        // page: back from the cache, back to the tab, or written by another
+        // tab. Same-tab practice is caught on the next page load.
+        const wide = window.matchMedia('(min-width: 40rem)')
+        const render = () => {
+          const chip = document.querySelector('[data-progress-chip]')
+          if (!chip) return
+          try {
+            const now = new Date()
+            const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
+
+            // The displayed streak, as game/progression.ts currentStreak computes it.
+            const streak = read(statsKey)?.streak
+            let days = 0
+            let lit = false
+            if (
+              Number.isInteger(streak?.current) &&
+              streak.current > 0 &&
+              /^\d{4}-\d{2}-\d{2}$/.test(streak?.lastActiveDay ?? '')
+            ) {
+              const gap = Math.round((today - day(streak.lastActiveDay)) / 86400000)
+              if (gap <= graceDays + 1) days = streak.current
+              lit = days > 0 && gap <= 0
+            }
+
+            const characters = read(progressKey)?.characters ?? {}
+            const seen = stages.flat().some((c) => characters[c]?.seen === true)
+            // game/nextAction.ts lessonStagesDone: stages count as a run from the
+            // first, and a stage is done once each of its characters has a
+            // correct answer in some skill (mastery level 2; a test pins that).
+            const passed = (c) => skills.some((s) => characters[c]?.skills?.[s]?.correct > 0)
+            const unfinished = stages.findIndex((stage) => !stage.every(passed))
+
+            if (days === 0 && !seen) {
+              chip.hidden = true
+              return
+            }
+
+            // The course first, digits included, then practice once every stage is done.
+            let href = unfinished === -1 ? '/practice/' : '/learn/'
+            let label = 'Continue'
+            if (href === location.pathname) {
+              href = '/stats/'
+              label = 'Progress'
+            }
+            const lamp = chip.querySelector('[data-chip-lamp]')
+            const count = chip.querySelector('[data-chip-streak]')
+            const labelEl = chip.querySelector('[data-chip-label]')
+            chip.href = href
+            labelEl.textContent = label
+            // With no number to show, the label is the content: never hide it.
+            chip.dataset.streak = days > 0 ? 'true' : 'false'
+            count.textContent = days > 0 ? `${days}d` : ''
+            count.hidden = days === 0
+            lamp.hidden = days === 0
+            lamp.dataset.on = String(lit)
+            // The name starts with what a sighted user reads, word for word
+            // ("5d" on a phone, "5d Continue" from sm up), then says it in full.
+            const shown = wide.matches || days === 0
+            const streakText = `${days}-day streak${lit ? ', practised today' : ''}`
+            const parts =
+              days > 0 ? [shown ? `${days}d ${label}` : `${days}d`, streakText] : [label]
+            if (days > 0 && !shown) parts.splice(1, 0, label)
+            chip.setAttribute('aria-label', parts.join(', '))
+            chip.title = days > 0 ? streakText : ''
+            chip.hidden = false
+          } catch {
+            // No storage, or something unreadable in it. The chip stays as it was.
           }
+        }
+        render()
+        window.addEventListener('pageshow', render)
+        window.addEventListener('storage', render)
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') render()
+        })
+        // The visible text changes at sm, and the name follows it.
+        wide.addEventListener('change', render)
+      </script>
 
-          <details class="group relative" data-menu>
-            <summary
-              class="flex cursor-pointer list-none items-center gap-1 text-sm text-muted transition-colors hover:text-signal [&::-webkit-details-marker]:hidden"
-            >
-              Everything
-              <svg
-                width="11"
-                height="11"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="3"
-                aria-hidden="true"
-                class="transition-transform group-open:rotate-180"
-              >
-                <path d="m6 9 6 6 6-6"></path>
-              </svg>
-            </summary>
+      <ThemeMenu />
 
-            <div
-              class="absolute top-full left-0 z-50 mt-3 grid w-[34rem] grid-cols-3 gap-5 rounded-xl border border-line p-5 shadow-2xl"
-              style="background: var(--color-panel)"
-            >
+      <a
+        href="/settings/"
+        aria-label="Settings"
+        aria-current={current('/settings/')}
+        title="Settings"
+        class="mf-icon-btn"
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="12" r="3"></circle>
+          <path
+            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
+          ></path>
+        </svg>
+      </a>
+
+      {
+        /* The phone menu: the trigger in the top row, the panel hanging from
+          the header's bottom edge and capped to the screen. A sticky element
+          taller than the viewport stops sticking, so the panel scrolls inside
+          itself instead of making the header that tall.
+
+          The six tiles are the destinations a phone needs most, with their
+          hints. The lists under them are everything else, once: no page the
+          tiles already link appears again (V-13), so the panel is a little
+          over one screen rather than two. Settings is the gear in the bar. */
+      }
+      <details name="mf-menu" class="group lg:hidden" data-menu>
+        <summary class="mf-summary mf-icon-btn text-ink">
+          <span class="sr-only">Menu</span>
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            aria-hidden="true"
+            class="group-open:hidden"
+          >
+            <path d="M4 7h16M4 12h10M4 17h16"></path>
+          </svg>
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            aria-hidden="true"
+            class="hidden group-open:block"
+          >
+            <path d="M6 6l12 12M18 6 6 18"></path>
+          </svg>
+        </summary>
+
+        <nav
+          aria-label="Main"
+          class="mf-menu-panel max-h-[calc(100svh-3.5rem)] overflow-y-auto overscroll-contain border-b border-line-strong bg-panel shadow-2xl"
+        >
+          <div class="mx-auto max-w-3xl px-4 pt-4 pb-6 sm:px-6">
+            <ul class="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {
-                more.map((group) => (
+                MENU_TILES.map(({ href, label, hint }) => (
+                  <li>
+                    <a href={href} aria-current={current(href)} class="mf-menu-tile">
+                      <span class="mf-menu-link-label">{label}</span>{' '}
+                      <span class="mf-menu-link-hint">{hint}</span>
+                    </a>
+                  </li>
+                ))
+              }
+            </ul>
+
+            <div class="mt-6 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
+              {
+                PHONE_GROUPS.map((group) => (
                   <div>
-                    <span class="block font-mono text-[9px] tracking-[0.18em] text-signal-dim">
-                      {group.title.toUpperCase()}
-                    </span>
-                    <ul class="mt-2.5 space-y-2.5">
-                      {group.links.map(({ href, label, hint }) => (
+                    <p class="mf-engraved text-brass">{group.title}</p>
+                    <ul class="mt-1.5">
+                      {group.links.map(({ href, label }) => (
                         <li>
-                          <a
-                            href={href}
-                            aria-current={isCurrent(href) ? 'page' : undefined}
-                            class="block group/link"
-                          >
-                            <span
-                              class="block text-[13px] transition-colors group-hover/link:text-signal"
-                              style={
-                                isCurrent(href)
-                                  ? 'color: var(--color-signal)'
-                                  : 'color: var(--color-ink)'
-                              }
-                            >
-                              {label}
-                            </span>
-                            <span class="mt-0.5 block text-[11px] leading-snug text-muted">
-                              {hint}
-                            </span>
+                          <a href={href} aria-current={current(href)} class="mf-menu-row">
+                            {label}
                           </a>
                         </li>
                       ))}
@@ -155,173 +347,47 @@ const isCurrent = (href: string) => current === href
                 ))
               }
             </div>
-          </details>
-        </nav>
-      </div>
 
-      {
-        /* Author credit lives in the header as well as the footer: on a long
-          content page the footer is a scroll away and is never seen. */
-      }
-      <div class="flex shrink-0 items-center gap-3">
-        <a
-          href={AUTHOR.url}
-          rel="me"
-          class="hidden text-xs whitespace-nowrap text-muted transition-colors hover:text-signal md:block"
-          >by {AUTHOR.name}</a
-        >
-
-        <span class="hidden h-4 w-px bg-line md:block" aria-hidden="true"></span>
-
-        <a
-          href={SITE.repo}
-          rel="noopener"
-          aria-label="Source code on GitHub"
-          title="Source on GitHub"
-          class="text-muted transition-colors hover:text-signal"
-        >
-          <svg width="17" height="17" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-            <path
-              d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"
-            ></path>
-          </svg>
-        </a>
-
-        <a
-          href={AUTHOR_X_URL}
-          rel="me noopener"
-          aria-label={`${AUTHOR.name} on X`}
-          title={`@${AUTHOR.x} on X`}
-          class="text-muted transition-colors hover:text-signal"
-        >
-          <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-            <path
-              d="M9.52 6.77 15.48 0h-1.41L8.89 5.88 4.75 0H0l6.25 8.9L0 16h1.41l5.46-6.21L11.25 16H16L9.52 6.77ZM7.59 8.98l-.63-.89L1.92 1.04h2.17l4.07 5.7.63.89 5.29 7.4h-2.17L7.59 8.98Z"
-            ></path>
-          </svg>
-        </a>
-
-        <a href={AUTHOR_GITHUB_URL} rel="me noopener" class="sr-only">{AUTHOR.name} on GitHub</a>
-
-        <ThemeToggle />
-
-        <a
-          href="/settings/"
-          aria-label="Settings"
-          title="Settings"
-          class="hidden text-muted transition-colors hover:text-signal lg:block"
-        >
-          <svg
-            width="17"
-            height="17"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            aria-hidden="true"
-          >
-            <circle cx="12" cy="12" r="3"></circle>
-            <path
-              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
-            ></path>
-          </svg>
-        </a>
-      </div>
-    </div>
-
-    {
-      /* The mobile menu.
-        
-        This was a sideways-scrolling strip, which measured badly: sixteen
-        links, thirteen of them off-screen behind 1,462px of horizontal scroll
-        with nothing to indicate there was anything to scroll to. Most of the
-        site was unreachable on a phone unless you happened to swipe a row of
-        text that did not look swipeable.
-        
-        A disclosure shows all of it, grouped the same way the desktop menu is.
-        Native <details>, so it opens with no JavaScript and is keyboard
-        operable for free, and every link stays in the HTML for a crawler. */
-    }
-    <details class="pb-3 lg:hidden" data-menu data-mobile-menu>
-      <summary
-        class="flex cursor-pointer list-none items-center justify-between rounded-lg border border-line px-4 py-2.5 text-sm text-ink [&::-webkit-details-marker]:hidden"
-      >
-        <span class="font-mono text-xs tracking-[0.16em]">MENU</span>
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.5"
-          aria-hidden="true"
-          class="text-muted transition-transform [details[open]_&]:rotate-180"
-        >
-          <path d="m6 9 6 6 6-6"></path>
-        </svg>
-      </summary>
-
-      {
-        /* Capped and scrollable. The header is sticky, and a sticky element
-          taller than the viewport stops sticking — it scrolls away with the
-          page and comes back in the wrong place. Open, this panel measured
-          1,162px on an 812px screen. */
-      }
-      <nav aria-label="Main" class="mt-3 max-h-[62vh] space-y-5 overflow-y-auto overscroll-contain">
-        {
-          more.map((group) => (
-            <div>
-              <p class="font-mono text-[10px] tracking-[0.18em] text-signal-dim">
-                {group.title.toUpperCase()}
-              </p>
-              <ul class="mt-1.5">
-                {group.links.map(({ href, label, hint }) => (
-                  <li>
-                    <a
-                      href={href}
-                      aria-current={isCurrent(href) ? 'page' : undefined}
-                      class="-mx-2 block rounded-lg px-2 py-2.5"
-                      style={
-                        isCurrent(href) ? 'color: var(--color-signal)' : 'color: var(--color-ink)'
-                      }
-                    >
-                      <span class="block text-sm">{label}</span>
-                      <span class="mt-0.5 block text-xs leading-snug text-muted">{hint}</span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
+            <div class="mt-5 border-t border-line pt-3">
+              <a
+                href={SITE.repo}
+                rel="noopener"
+                class="mf-btn mf-btn-ghost mf-btn-sm -ml-3 min-h-11">Source on GitHub</a
+              >
             </div>
-          ))
-        }
-
-        <a
-          href="/settings/"
-          aria-current={isCurrent('/settings/') ? 'page' : undefined}
-          class="-mx-2 block rounded-lg px-2 py-3 text-sm"
-          style={isCurrent('/settings/')
-            ? 'color: var(--color-signal)'
-            : 'color: var(--color-muted)'}>Settings</a
-        >
-      </nav>
-    </details>
+          </div>
+        </nav>
+      </details>
+    </div>
   </div>
 
   <script is:inline>
-    // A native <details> stays open after you follow a link back, and two open
-    // at once would overlap. Neither is worth a framework — this is the whole
-    // behaviour the element is missing.
-    document.addEventListener('click', (event) => {
-      for (const menu of document.querySelectorAll('[data-menu][open]')) {
-        if (!menu.contains(event.target)) menu.removeAttribute('open')
+    // A native <details> stays open after you follow a link back, and does
+    // not close on an outside click, on Escape, or when focus leaves it. This
+    // is the whole behaviour the element is missing; it is not worth a
+    // framework. In a block, so its names stay out of the page's globals.
+    {
+      const closeOutside = (target) => {
+        for (const menu of document.querySelectorAll('[data-menu][open]')) {
+          if (!menu.contains(target)) menu.removeAttribute('open')
+        }
       }
-    })
-    document.addEventListener('keydown', (event) => {
-      if (event.key !== 'Escape') return
-      for (const menu of document.querySelectorAll('[data-menu][open]')) {
-        menu.removeAttribute('open')
-        menu.querySelector('summary')?.focus()
-      }
-    })
+      document.addEventListener('click', (event) => closeOutside(event.target))
+      // Tabbing out of a menu closes it (A-05): an open panel would otherwise
+      // cover the control that now has focus. Focus is not moved.
+      document.addEventListener('focusin', (event) => closeOutside(event.target))
+      document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return
+        for (const menu of document.querySelectorAll('[data-menu][open]')) {
+          menu.removeAttribute('open')
+          menu.querySelector('summary')?.focus()
+        }
+      })
+      window.addEventListener('pageshow', () => {
+        for (const menu of document.querySelectorAll('[data-menu][open]')) {
+          menu.removeAttribute('open')
+        }
+      })
+    }
   </script>
 </header>

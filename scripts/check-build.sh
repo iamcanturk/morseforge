@@ -41,13 +41,22 @@ fi
 echo "Prerendered content:"
 MIN_TEXT=500
 
-for page in \
-  index.html \
-  learn-morse-code-in-7-days/index.html \
-  morse-code-translator/index.html \
-  morse-code-alphabet/index.html \
+# Every page here must exist and carry real text without JavaScript. These
+# are the pages people land on from search and from shared links; a build that
+# silently drops one of them is a failed build, not a skipped check.
+REQUIRED_PAGES="
+  index.html
+  learn-morse-code-in-7-days/index.html
+  morse-code-translator/index.html
+  morse-code-alphabet/index.html
   words/sos/index.html
-do
+  message/index.html
+  how-to-learn-morse-code/index.html
+  morse-code-numbers/index.html
+  morse-code-speed/index.html
+"
+
+for page in $REQUIRED_PAGES; do
   if [ ! -f "$DIST/$page" ]; then
     fail "$page was not generated"
     continue
@@ -131,6 +140,38 @@ if [ "$linked" -eq "$post_count" ]; then
 else
   fail "only $linked of $post_count posts link their Markdown copy"
 fi
+
+# The reference pages' copies, generated from data rather than written.
+for file in morse-code-alphabet.md learn-morse-code-in-7-days.md; do
+  [ -f "$DIST/$file" ] && pass "$file" || fail "$file missing"
+done
+
+word_pages=$(find "$DIST/words" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
+word_markdown=$(find "$DIST/words" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+if [ "$word_markdown" -gt 0 ] && [ "$word_markdown" -eq "$word_pages" ]; then
+  pass "every word page has a Markdown copy — $word_markdown of $word_pages"
+else
+  fail "$word_markdown Markdown copies for $word_pages word pages"
+fi
+
+# --------------------------------------------------------------------------
+# SEO and GEO
+#
+# One visible H1, title and description lengths, self canonicals, JSON-LD that
+# parses, noindex pages kept out of the sitemap, a dated sitemap, og:image
+# files that exist, Markdown alternates that are Markdown, and the crawler
+# files. Details and the rules are in scripts/check-seo.mjs.
+# --------------------------------------------------------------------------
+echo "SEO:"
+if node "$(dirname "$0")/check-seo.mjs" "$DIST" >/tmp/morseforge-seo.$$ 2>/dev/null; then
+  pass "$(tail -1 /tmp/morseforge-seo.$$)"
+  # Pages whose sources are uncommitted have no lastmod yet: shown, not failed.
+  grep '^WARN' /tmp/morseforge-seo.$$ | sed 's/^/  /' || true
+else
+  fail "$(tail -1 /tmp/morseforge-seo.$$)"
+  grep '^FAIL' /tmp/morseforge-seo.$$ | head -40 >&2
+fi
+rm -f /tmp/morseforge-seo.$$
 
 # --------------------------------------------------------------------------
 # Internal links

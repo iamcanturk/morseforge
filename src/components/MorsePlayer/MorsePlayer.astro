@@ -1,6 +1,9 @@
 ---
+import '../../styles/pkg-i.css'
 import { prettify } from '../../engine/morseEncoder'
+import { spokenCode } from '../../engine/spokenCode'
 import { buildTimeline, timelineDuration } from '../../engine/timingEngine'
+import { WPM_RANGE } from '../../storage/settings'
 
 /**
  * The Morse player, with no framework behind it.
@@ -14,6 +17,11 @@ import { buildTimeline, timelineDuration } from '../../engine/timingEngine'
  * with JavaScript off. The React version rendered nothing at all until it
  * hydrated, which was the wrong default for pages whose whole job is to be
  * found and read.
+ *
+ * Drawn as an instrument: a CRT strip carrying the code and a round signal
+ * lamp behind a brass bezel, with the controls on the panel below. Every
+ * state (lit, pressed, playing) is an attribute or a class that player.ts
+ * flips; no colour is set inline.
  */
 export interface Props {
   morse: string
@@ -28,98 +36,107 @@ export interface Props {
 const { morse, label, initialWpm = 15, flash = true, compact = false } = Astro.props
 
 const seconds = (timelineDuration(buildTimeline(morse, { wpm: initialWpm })) / 1000).toFixed(1)
-const spoken = [...morse]
-  .map((mark) => (mark === '.' ? 'dot' : mark === '-' ? 'dash' : 'break'))
-  .join(' ')
+const spoken = spokenCode(morse)
 ---
 
-<div class="rounded-xl border border-line bg-panel p-5" data-morse-player data-morse={morse}>
-  {label && <div class="mb-1 font-mono text-[10px] tracking-[0.18em] text-muted">{label}</div>}
-
-  {
-    /*
-    The prettified glyphs are for the eye; the spoken form is for a screen
-    reader. An aria-label on the paragraph would have done neither — it is a
-    generic element, so most screen readers ignore the label and read the
-    glyphs instead.
-  */
-  }
-  <p class="font-mono text-lg break-all text-cyan">
-    <span class="sr-only">{spoken}</span>
-    <span aria-hidden="true">{prettify(morse)}</span>
-  </p>
-
-  {
-    /*
-    The lamp is aria-hidden: the code is already in the DOM above, and a
-    screen reader announcing every flash would be unusable.
-  */
-  }
-  <div
-    aria-hidden="true"
-    data-part="lamp-box"
-    hidden={!flash}
-    class="mt-4 h-24 rounded-lg border"
-    style="border-color: var(--color-line); background: var(--color-void)"
-  >
+<div class="mf-panel p-3 sm:p-4" data-morse-player data-morse={morse}>
+  <div class="mf-screen flex items-center gap-5 px-5 py-5 sm:px-6">
+    <div class="relative min-w-0 flex-1">
+      {label && <p class="mf-engraved">{label}</p>}
+      {
+        /*
+        The prettified glyphs are for the eye; the spoken form is for a screen
+        reader. An aria-label on the paragraph would have done neither — it is a
+        generic element, so most screen readers ignore the label and read the
+        glyphs instead.
+      */
+      }
+      <p class="pi-code mt-2 font-mono text-xl text-signal sm:text-2xl">
+        <span class="sr-only">{spoken}</span>
+        <span aria-hidden="true">{prettify(morse)}</span>
+      </p>
+    </div>
+    {
+      /*
+      The lamp is aria-hidden: the code is already in the DOM above, and a
+      screen reader announcing every flash would be unusable.
+    */
+    }
+    <div
+      aria-hidden="true"
+      data-part="lamp-box"
+      data-on="false"
+      hidden={!flash}
+      class="pi-bulb pi-bulb-lg"
+    >
+    </div>
   </div>
 
-  <div class="mt-4 flex flex-wrap items-center gap-3">
-    <button
-      type="button"
-      data-part="play"
-      class="rounded-lg px-5 py-2.5 font-mono text-xs tracking-[0.14em]"
-      style="background: var(--color-signal); color: var(--color-void)">▶ PLAY</button
-    >
+  <div class="mt-4 flex flex-wrap items-center gap-2 px-1 sm:gap-3">
+    <button type="button" data-part="play" class="mf-btn mf-btn-audio min-w-28">
+      <span
+        class="mf-lamp"
+        data-tone="cyan"
+        data-on="false"
+        data-part="play-lamp"
+        aria-hidden="true"></span>
+      <span data-part="play-label">Play</span>
+    </button>
 
     <button
       type="button"
       data-part="sound"
       aria-pressed="true"
-      class="rounded-lg border px-3 py-2.5 font-mono text-xs tracking-[0.14em]"
-      style="border-color: var(--color-signal); color: var(--color-signal)">SOUND</button
+      class="mf-btn mf-btn-secondary mf-btn-sm pi-toggle"
     >
+      <span class="mf-lamp" data-on="true" aria-hidden="true"></span>
+      Sound
+    </button>
 
     <button
       type="button"
       data-part="buzz"
       aria-pressed="false"
       hidden
-      class="rounded-lg border px-3 py-2.5 font-mono text-xs tracking-[0.14em]"
-      style="border-color: var(--color-line); color: var(--color-muted)">BUZZ</button
+      class="mf-btn mf-btn-secondary mf-btn-sm pi-toggle"
     >
+      <span class="mf-lamp" data-tone="amber" data-on="false" aria-hidden="true"></span>
+      Buzz
+    </button>
 
     <button
       type="button"
       data-part="lamp"
       aria-pressed={flash ? 'true' : 'false'}
-      class="rounded-lg border px-3 py-2.5 font-mono text-xs tracking-[0.14em]"
-      style={flash
-        ? 'border-color: var(--color-cyan); color: var(--color-cyan)'
-        : 'border-color: var(--color-line); color: var(--color-muted)'}>LAMP</button
+      class="mf-btn mf-btn-secondary mf-btn-sm pi-toggle"
     >
+      <span class="mf-lamp" data-tone="cyan" data-on={flash ? 'true' : 'false'} aria-hidden="true"
+      ></span>
+      Lamp
+    </button>
 
     {
       !compact && (
-        <span data-part="duration" class="font-mono text-[11px] tracking-[0.12em] text-muted">
-          ~{seconds}s
+        <span class="ml-auto font-mono text-control text-muted tabular-nums">
+          <span class="sr-only">Length </span>
+          <span data-part="duration">~{seconds}s</span>
         </span>
       )
     }
   </div>
 
-  <label class="mt-4 flex items-center gap-3">
-    <span class="font-mono text-[10px] tracking-[0.16em] text-muted">SPEED</span>
+  <label class="mt-4 flex items-center gap-3 px-1">
+    <span class="mf-engraved">Speed</span>
     <input
       type="range"
       data-part="speed"
-      min="5"
-      max="40"
+      min={WPM_RANGE.min}
+      max={WPM_RANGE.max}
       value={initialWpm}
-      class="flex-1 accent-[var(--color-signal)]"
+      class="mf-range flex-1"
       aria-label="Speed in words per minute"
     />
-    <span data-part="wpm" class="w-16 text-right font-mono text-xs text-signal">
+    <span data-part="wpm" class="w-16 text-right font-mono text-control text-signal tabular-nums">
       {initialWpm} WPM
     </span>
   </label>

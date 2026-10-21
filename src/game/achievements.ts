@@ -8,6 +8,21 @@
  * running — say, if the user imports progress from another device.
  */
 
+import { joinList, numberWord } from '../data/format'
+import { LESSON_STAGES } from '../data/lessonStages'
+import { ALL_LETTERS } from '../data/morseAlphabet'
+
+/**
+ * The two speed badges, in correct characters per minute.
+ *
+ * They used to say "words per minute", but the stored best is a session's
+ * correct answers per minute divided by five: typing pace in reading and
+ * listening drills, not a sending or copying speed in WPM. The thresholds are
+ * the old ones times five, so nobody loses a badge they already hold.
+ */
+export const RADIO_OPERATOR_CPM = 50
+export const SPEED_DEMON_CPM = 125
+
 export interface AchievementSnapshot {
   /** Elements ever keyed. */
   elementsSent: number
@@ -15,7 +30,12 @@ export interface AchievementSnapshot {
   mastered: number
   /** Characters introduced at all. */
   seen: number
-  /** Best measured speed, in words per minute. */
+  /** Lesson stages completed in a row from the first (see `stagesTaught`). */
+  stagesTaught: number
+  /**
+   * Best session pace as stored: correct answers per minute divided by five
+   * (`SessionSummary.wpm`). Times five is characters a minute; never show it as WPM.
+   */
   bestWpm: number
   /** Longest run of consecutive active days. */
   longestStreak: number
@@ -39,6 +59,24 @@ export interface Achievement {
 
 const ratio = (value: number, target: number) => Math.min(value / target, 1)
 
+/**
+ * The stored best, in the unit the speed badges state, **unrounded**.
+ *
+ * `charsPerMinute` rounds for display, and a badge judged on the rounded
+ * figure was earned below its own threshold: a best of 49.5 a minute showed
+ * as 50 and paid "50 characters a minute".
+ */
+const bestCpm = (s: AchievementSnapshot) => s.bestWpm * 5
+
+/** The first lesson stage, named in First Ring. */
+const FIRST_STAGE = LESSON_STAGES[0] ?? []
+
+/** Thresholds for the count badges, so their copy cannot drift from the rule. */
+const CIRCUIT_STARTED_SEEN = 5
+const WEEK_ONE_DAYS = 7
+const HALF_WAY_MASTERED = Math.floor(ALL_LETTERS.length / 2)
+const SIGNAL_MASTER_MASTERED = ALL_LETTERS.length
+
 /** The §49 list, in the order it is shown. */
 export const ACHIEVEMENTS: readonly Achievement[] = [
   {
@@ -49,12 +87,23 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     earned: (s) => s.elementsSent >= 1,
   },
   {
+    // The reward for a first sitting. Mastery needs thirty-odd answers per
+    // letter, so without this the earliest honest badge after First Signal is
+    // days away. Stage one is two letters, each answered correctly once: small,
+    // but it is a thing the learner actually did, read from their progress.
+    id: 'first-ring',
+    icon: '📶',
+    title: 'First Ring',
+    description: `Completed the first lesson stage: ${joinList(FIRST_STAGE)}.`,
+    earned: (s) => s.stagesTaught >= 1,
+  },
+  {
     id: 'circuit-started',
     icon: '🔌',
     title: 'Circuit Started',
-    description: 'Met your first five characters.',
-    earned: (s) => s.seen >= 5,
-    progress: (s) => ratio(s.seen, 5),
+    description: `Met your first ${numberWord(CIRCUIT_STARTED_SEEN)} characters.`,
+    earned: (s) => s.seen >= CIRCUIT_STARTED_SEEN,
+    progress: (s) => ratio(s.seen, CIRCUIT_STARTED_SEEN),
   },
   {
     id: 'lightbulb',
@@ -67,25 +116,25 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     id: 'radio-operator',
     icon: '📡',
     title: 'Radio Operator',
-    description: 'Reached 10 words per minute.',
-    earned: (s) => s.bestWpm >= 10,
-    progress: (s) => ratio(s.bestWpm, 10),
+    description: `Answered ${RADIO_OPERATOR_CPM} characters a minute correctly in a session.`,
+    earned: (s) => bestCpm(s) >= RADIO_OPERATOR_CPM,
+    progress: (s) => ratio(bestCpm(s), RADIO_OPERATOR_CPM),
   },
   {
     id: 'speed-demon',
     icon: '⚡',
     title: 'Speed Demon',
-    description: 'Reached 25 words per minute.',
-    earned: (s) => s.bestWpm >= 25,
-    progress: (s) => ratio(s.bestWpm, 25),
+    description: `Answered ${SPEED_DEMON_CPM} characters a minute correctly in a session.`,
+    earned: (s) => bestCpm(s) >= SPEED_DEMON_CPM,
+    progress: (s) => ratio(bestCpm(s), SPEED_DEMON_CPM),
   },
   {
     id: 'week-one',
     icon: '🔥',
     title: 'Week One',
-    description: 'Practised seven days running.',
-    earned: (s) => s.longestStreak >= 7,
-    progress: (s) => ratio(s.longestStreak, 7),
+    description: `Practised ${numberWord(WEEK_ONE_DAYS)} days running.`,
+    earned: (s) => s.longestStreak >= WEEK_ONE_DAYS,
+    progress: (s) => ratio(s.longestStreak, WEEK_ONE_DAYS),
   },
   {
     id: 'cq-cq-cq',
@@ -98,17 +147,17 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     id: 'half-way',
     icon: '🔋',
     title: 'Half The Network',
-    description: 'Mastered thirteen characters.',
-    earned: (s) => s.mastered >= 13,
-    progress: (s) => ratio(s.mastered, 13),
+    description: `Mastered ${numberWord(HALF_WAY_MASTERED)} characters.`,
+    earned: (s) => s.mastered >= HALF_WAY_MASTERED,
+    progress: (s) => ratio(s.mastered, HALF_WAY_MASTERED),
   },
   {
     id: 'signal-master',
     icon: '🏆',
     title: 'Signal Master',
-    description: 'Mastered all twenty-six letters.',
-    earned: (s) => s.mastered >= 26,
-    progress: (s) => ratio(s.mastered, 26),
+    description: `Mastered all ${numberWord(SIGNAL_MASTER_MASTERED)} letters.`,
+    earned: (s) => s.mastered >= SIGNAL_MASTER_MASTERED,
+    progress: (s) => ratio(s.mastered, SIGNAL_MASTER_MASTERED),
   },
 ]
 

@@ -1,0 +1,699 @@
+/* ---------------------------------------------------------------------------
+   Package I: the reference pages (alphabet, translator, words, notes, 404,
+   privacy) and the Morse player.
+
+   Only what the shared classes in global.css do not already cover. Colours
+   are tokens, never hex; the only things that animate are transform and
+   opacity; nothing here is below 12px.
+
+   The layer statement repeats Tailwind's order on purpose. If this file
+   reaches the browser before global.css, declaring `components` first would
+   otherwise put it below `base`, and the preflight would win over every rule
+   in it.
+--------------------------------------------------------------------------- */
+@layer theme, base, components, utilities;
+
+@layer components {
+  /* ---- Reference plate (the alphabet chart) ---------------------------- */
+
+  /* A plate engraved into the instrument face: a second hairline rule inset
+     from the edge, the way a brass chart is cut. */
+  .pi-plate {
+    position: relative;
+    border-radius: var(--radius-panel);
+    border: 1px solid var(--color-line);
+    box-shadow:
+      inset 0 0 0 5px color-mix(in srgb, var(--color-void) 35%, transparent),
+      inset 0 0 0 6px var(--color-line);
+    padding: 0.75rem;
+  }
+
+  @media (min-width: 40rem) {
+    .pi-plate {
+      padding: 1.75rem;
+    }
+  }
+
+  /* Plate number, set into the top rule like a maker's stamp. */
+  .pi-plate-tab {
+    position: absolute;
+    inset-block-start: -0.7rem;
+    inset-inline-start: 1.25rem;
+    padding-inline: 0.5rem;
+    background: var(--color-panel);
+    color: var(--color-brass);
+  }
+
+  .pi-keys {
+    display: grid;
+    gap: 0.625rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (min-width: 40rem) {
+    .pi-keys {
+      grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+    }
+  }
+
+  /* Punctuation codes run to seven elements and carry a name: wider keys. */
+  @media (min-width: 40rem) {
+    .pi-keys[data-wide] {
+      grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+    }
+  }
+
+  /* Digits read in two rows of five, 1–5 over 6–0, so the dots-then-dashes
+     pattern lines up column by column. */
+  @media (min-width: 40rem) {
+    .pi-keys[data-cols='5'] {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+  }
+
+  /* ---- Keycap tile ------------------------------------------------------ */
+
+  .pi-key-cell {
+    position: relative;
+    container-type: inline-size;
+  }
+
+  .pi-key {
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    align-content: start;
+    gap: 0.5rem;
+    inline-size: 100%;
+    min-block-size: 6.5rem;
+    padding: 0.75rem 0.875rem 0.875rem;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--color-line-strong);
+    border-block-end-width: 3px;
+    background: linear-gradient(180deg, var(--color-elevated), var(--color-panel));
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--color-ink) 7%, transparent);
+    color: var(--color-ink);
+    text-align: start;
+    cursor: pointer;
+    transition: transform var(--duration-dit) var(--ease-signal);
+  }
+
+  /* Hover is an overlay fading in, so no colour ever transitions. */
+  .pi-key::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--color-ink);
+    opacity: 0;
+    transition: opacity 120ms var(--ease-signal);
+  }
+
+  .pi-key:hover::after {
+    opacity: 0.05;
+  }
+
+  .pi-key:active {
+    transform: translateY(2px);
+  }
+
+  /* Sounding now. Instant, like the lamp: a key is down or it is not. */
+  .pi-key[data-state='live'] {
+    border-color: var(--color-signal);
+    background: color-mix(in srgb, var(--color-signal) 12%, var(--color-panel));
+  }
+
+  .pi-key[data-state='live'] .pi-pips {
+    color: var(--color-signal);
+  }
+
+  .pi-key-glyph {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .pi-key-name {
+    font-size: 0.8125rem;
+    line-height: 1.2;
+    color: var(--color-muted);
+  }
+
+  .pi-key .pi-pips {
+    margin-block-start: 0.25rem;
+  }
+
+  .pi-key-spoken {
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    line-height: 1.2;
+    letter-spacing: 0.04em;
+    color: var(--color-muted);
+    overflow-wrap: anywhere;
+  }
+
+  /* A letter's spoken form is at most four syllables ("dah-di-dah-dit"). On
+     one line the rows of keys stay even (V-23), on the alphabet plate and on
+     the word pages; a tile too narrow for it, at 400 % zoom, still wraps
+     rather than spilling. Digits and marks run longer and keep wrapping.
+     Never below 12px: only the tracking tightens. */
+  @container (min-inline-size: 8rem) {
+    .pi-key-spoken[data-kind='letter'] {
+      white-space: nowrap;
+      letter-spacing: -0.02em;
+    }
+  }
+
+  /* Dots and dashes drawn as engraved pips, sized in Morse units: a dash is
+     three dots long, the gap inside a character is one. */
+  .pi-pips {
+    --pip: 0.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: calc(var(--pip) * 0.75);
+    min-block-size: var(--pip);
+    color: var(--color-brass);
+  }
+
+  .pi-pips-lg {
+    --pip: 0.75rem;
+  }
+
+  .pi-pip {
+    display: block;
+    block-size: var(--pip);
+    inline-size: var(--pip);
+    border-radius: 999px;
+    background: currentColor;
+    box-shadow: inset 0 -1px 0 rgb(0 0 0 / 0.35);
+  }
+
+  .pi-pip[data-el='dah'] {
+    inline-size: calc(var(--pip) * 3);
+  }
+
+  /* On a phone a key is shorter, and a letter key with no page of its own to
+     link to lies flat, glyph beside its code, so the chart is half as tall.
+     A key with a link stays stacked: the corner link would cover its pips. */
+  @media (max-width: 39.99rem) {
+    .pi-key {
+      min-block-size: 0;
+      gap: 0.375rem;
+    }
+
+    .pi-keys:not([data-cols], [data-wide]) .pi-key-cell:not(:has(.pi-key-link)) > .pi-key {
+      grid-template-columns: 1.75rem 1fr;
+      align-items: center;
+      gap: 0.375rem 0.75rem;
+      padding-block: 0.625rem;
+    }
+
+    .pi-keys:not([data-cols], [data-wide])
+      .pi-key-cell:not(:has(.pi-key-link))
+      > .pi-key
+      .pi-key-glyph {
+      grid-row: 1 / span 2;
+    }
+
+    .pi-keys:not([data-cols], [data-wide]) .pi-key-cell:not(:has(.pi-key-link)) > .pi-key .pi-pips {
+      margin: 0;
+    }
+  }
+
+  /* The character's own page, when Package N has built it. */
+  .pi-key-link {
+    position: absolute;
+    z-index: 1;
+    inset-block-start: 0.375rem;
+    inset-inline-end: 0.375rem;
+    display: grid;
+    place-items: center;
+    inline-size: 2rem;
+    block-size: 2rem;
+    border-radius: var(--radius-chip);
+    color: var(--color-muted);
+  }
+
+  .pi-key-link:hover {
+    color: var(--color-signal);
+  }
+
+  @media (pointer: coarse) {
+    .pi-key-link {
+      inline-size: 2.75rem;
+      block-size: 2.75rem;
+      inset-block-start: 0;
+      inset-inline-end: 0;
+    }
+  }
+
+  /* The control strip that follows the reader down a long chart. Under the
+     header, never over it. Its height is fixed so the page can reserve it:
+     focus and anchor jumps land below the deck as well as the header (A-04),
+     through the one shared variable for sticky layers (FIX2 C-2). The 44px
+     touch range sets the tallest row; 0.5rem more than the deck leaves a 12px
+     gap under it once the shared 1rem is counted. */
+  html:has(.pi-deck) {
+    --pi-deck-h: 4.125rem;
+    --mf-sticky-extra: calc(var(--pi-deck-h) + 0.5rem);
+  }
+
+  .pi-deck {
+    position: sticky;
+    inset-block-start: calc(var(--mf-header-h, 3.5rem) + 0.75rem);
+    z-index: 20;
+    box-sizing: border-box;
+    block-size: var(--pi-deck-h, 4.125rem);
+  }
+
+  /* ---- Tables ----------------------------------------------------------- */
+
+  .pi-table {
+    inline-size: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    text-align: start;
+  }
+
+  .pi-table th,
+  .pi-table td {
+    padding: 0.75rem 1rem;
+    border-block-end: 1px solid var(--color-line);
+    vertical-align: baseline;
+    text-align: start;
+  }
+
+  .pi-table tr:last-child > * {
+    border-block-end: 0;
+  }
+
+  .pi-table thead th {
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    font-weight: 400;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    color: var(--color-muted);
+    background: color-mix(in srgb, var(--color-void) 40%, transparent);
+  }
+
+  /* ---- Translator ------------------------------------------------------- */
+
+  /* The text side is a telegram form: paper stock with ruled lines. */
+  .pi-form {
+    position: relative;
+    border-radius: var(--radius-control);
+    background-color: var(--color-paper);
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0 calc(2rem - 1px),
+      color-mix(in srgb, var(--color-paper-ink) 13%, transparent) calc(2rem - 1px) 2rem
+    );
+    background-position: 0 0.9rem;
+    color: var(--color-paper-ink);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--color-paper-ink) 18%, transparent),
+      0 1px 0 rgb(0 0 0 / 0.35);
+  }
+
+  [data-theme='light'] .pi-form {
+    box-shadow: inset 0 0 0 1px var(--color-line-strong);
+  }
+
+  .pi-field {
+    display: block;
+    inline-size: 100%;
+    min-block-size: 10rem;
+    padding: 0.9rem 1rem 1rem;
+    border: 0;
+    background: transparent;
+    resize: vertical;
+    font-size: 1.25rem;
+    line-height: 2rem;
+  }
+
+  /* The ring is drawn by the surrounding face (`.mf-focus-within`): the field
+     has no edge of its own, and inside the CRT its own outline would be cut
+     off by the glass. One ring, on the thing that looks like the control. */
+  .pi-field:focus-visible {
+    outline: none;
+  }
+
+  .pi-form .pi-field {
+    color: var(--color-paper-ink);
+    font-family: var(--font-display);
+    caret-color: var(--color-paper-ink);
+  }
+
+  .pi-form .pi-field::placeholder {
+    color: var(--color-paper-muted);
+    opacity: 1;
+  }
+
+  .mf-screen .pi-field {
+    position: relative;
+    z-index: 1;
+    color: var(--color-signal);
+    font-family: var(--font-mono);
+    letter-spacing: var(--tracking-code);
+    caret-color: var(--color-signal);
+  }
+
+  .mf-screen .pi-field::placeholder {
+    color: var(--color-muted);
+    opacity: 1;
+  }
+
+  .pi-form-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    line-height: var(--text-label--line-height);
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    color: var(--color-paper-muted);
+  }
+
+  /* ---- Player ----------------------------------------------------------- */
+
+  /* A round indicator lamp behind a brass bezel. On and off are instant: the
+     lit layer's opacity flips, nothing eases, because easing would blur the
+     dot/dash distinction the learner is reading. */
+  .pi-bulb {
+    position: relative;
+    flex: none;
+    inline-size: 4rem;
+    block-size: 4rem;
+    border-radius: 999px;
+    background: radial-gradient(
+      circle at 38% 32%,
+      color-mix(in srgb, var(--color-signal) 14%, var(--color-screen)),
+      var(--color-screen) 70%
+    );
+    box-shadow:
+      0 0 0 3px var(--color-brass-deep),
+      0 0 0 4px rgb(0 0 0 / 0.55),
+      0 0 0 6px color-mix(in srgb, var(--color-brass) 35%, transparent),
+      inset 0 3px 8px rgb(0 0 0 / 0.8);
+  }
+
+  .pi-bulb::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(
+      circle at 40% 35%,
+      color-mix(in srgb, var(--color-signal) 35%, var(--color-ink)),
+      var(--color-signal) 48%,
+      color-mix(in srgb, var(--color-signal) 55%, var(--color-screen)) 100%
+    );
+    box-shadow: 0 0 32px 8px color-mix(in srgb, var(--color-signal) 50%, transparent);
+    opacity: 0;
+  }
+
+  .pi-bulb[data-on='true']::after {
+    opacity: 1;
+  }
+
+  @media (min-width: 40rem) {
+    .pi-bulb-lg {
+      inline-size: 5.5rem;
+      block-size: 5.5rem;
+    }
+  }
+
+  /* A toggle's state is its lamp plus aria-pressed; off reads quieter. */
+  .pi-toggle[aria-pressed='false'] {
+    color: var(--color-muted);
+  }
+
+  .pi-code {
+    font-family: var(--font-mono);
+    letter-spacing: var(--tracking-code);
+    overflow-wrap: anywhere;
+  }
+
+  /* ---- Telegram card (word pages) --------------------------------------- */
+
+  .pi-telegram {
+    position: relative;
+    border-radius: 6px;
+    background-color: var(--color-paper);
+    color: var(--color-paper-ink);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--color-paper-ink) 16%, transparent),
+      0 1px 0 rgb(0 0 0 / 0.35),
+      0 28px 48px -30px rgb(0 0 0 / 0.9);
+  }
+
+  [data-theme='light'] .pi-telegram {
+    box-shadow:
+      inset 0 0 0 1px var(--color-line-strong),
+      0 18px 40px -26px rgb(60 40 10 / 0.35);
+  }
+
+  /* The printed band across the top of a Western Union form. */
+  .pi-telegram-band {
+    border-block-end: 2px solid var(--color-paper-ink);
+    box-shadow:
+      0 2px 0 var(--color-paper),
+      0 3px 0 var(--color-paper-ink);
+  }
+
+  .pi-telegram-rule {
+    border-block-start: 1px dashed color-mix(in srgb, var(--color-paper-ink) 30%, transparent);
+  }
+
+  .pi-telegram .pi-pips {
+    color: var(--color-paper-ink);
+  }
+
+  .pi-telegram a {
+    color: var(--color-paper-ink);
+  }
+
+  a.pi-telegram {
+    transition: transform var(--duration-dah) var(--ease-signal);
+  }
+
+  a.pi-telegram:hover,
+  a.pi-telegram:focus-visible {
+    transform: translateY(-2px) rotate(-0.4deg);
+  }
+
+  /* ---- Operator's manual (notes) ---------------------------------------- */
+
+  /* Body copy a little closer to ink than the global prose: a long read in
+     the muted tone is a strain, even at 7:1. */
+  .pi-manual {
+    counter-reset: pi-section;
+    font-size: 1.0625rem;
+  }
+
+  .pi-manual p,
+  .pi-manual li {
+    color: color-mix(in srgb, var(--color-ink) 80%, var(--color-muted));
+    text-wrap: pretty;
+  }
+
+  .pi-manual h2,
+  .pi-manual h3 {
+    color: var(--color-ink);
+    text-wrap: balance;
+  }
+
+  /* Numbered sections, like a manual's clauses. */
+  .pi-manual h2::before {
+    counter-increment: pi-section;
+    content: counter(pi-section, decimal-leading-zero);
+    display: block;
+    margin-block-end: 0.35rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    font-weight: 400;
+    letter-spacing: var(--tracking-label);
+    color: var(--color-brass);
+  }
+
+  .pi-manual section > * + * {
+    margin-top: 1.25em;
+  }
+
+  .pi-manual blockquote {
+    padding: 0.25rem 0 0.25rem 1.25rem;
+    border-inline-start: 2px solid var(--color-brass);
+    font-style: italic;
+  }
+
+  .pi-manual hr {
+    border: 0;
+    border-block-start: 1px solid var(--color-line);
+  }
+
+  .pi-manual table {
+    inline-size: 100%;
+    border-collapse: collapse;
+    font-size: 0.9375rem;
+    display: block;
+    overflow-x: auto;
+  }
+
+  .pi-manual th,
+  .pi-manual td {
+    padding: 0.6rem 0.9rem;
+    border-block-end: 1px solid var(--color-line);
+    text-align: start;
+    vertical-align: baseline;
+  }
+
+  .pi-manual th {
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    font-weight: 400;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  .pi-manual td {
+    color: color-mix(in srgb, var(--color-ink) 80%, var(--color-muted));
+  }
+
+  .pi-manual :not(pre) > code {
+    padding: 0.05em 0.35em;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--color-cyan) 10%, transparent);
+    letter-spacing: 0.08em;
+  }
+
+  .pi-manual pre {
+    overflow-x: auto;
+    padding: 1rem 1.25rem;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--color-line);
+    background: var(--color-void);
+  }
+
+  /* Table of contents rows on the notes index. */
+  .pi-toc-row {
+    position: relative;
+    display: grid;
+    gap: 0.5rem 1.5rem;
+    padding-block: 1.5rem;
+    border-block-start: 1px solid var(--color-line);
+  }
+
+  @media (min-width: 48rem) {
+    .pi-toc-row {
+      grid-template-columns: 4rem 1fr auto;
+      align-items: baseline;
+    }
+  }
+
+  .pi-toc-row a::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
+  .pi-toc-row:hover .pi-toc-title {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 5px;
+    text-decoration-color: var(--color-signal);
+  }
+
+  /* ---- Shared ----------------------------------------------------------- */
+
+  .pi-link {
+    color: var(--color-signal);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-decoration-color: color-mix(in srgb, var(--color-signal) 45%, transparent);
+    text-underline-offset: 4px;
+  }
+
+  .pi-link:hover {
+    text-decoration-color: var(--color-signal);
+  }
+
+  /* A link that is a list row of its own ("Keep going", "More words") is a
+     44px row under a finger (A-12). Links inside a sentence stay inline. */
+  @media (pointer: coarse) {
+    li > .pi-link:only-child {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: 2.75rem;
+    }
+  }
+
+  .pi-balance {
+    text-wrap: balance;
+  }
+
+  .pi-pretty {
+    text-wrap: pretty;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Print: the alphabet chart is meant to be printable (the "printable Morse
+   code chart" search). Ink on paper, no desk, no controls, and the ASCII code
+   that the screen draws as pips is printed as text too.
+--------------------------------------------------------------------------- */
+@media print {
+  html,
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  body::before,
+  .mf-header,
+  body > footer,
+  [data-print='hide'] {
+    display: none !important;
+  }
+
+  .mf-instrument,
+  .mf-panel,
+  .pi-plate,
+  .pi-key {
+    background: none !important;
+    box-shadow: none !important;
+    border-color: rgb(0 0 0 / 0.35) !important;
+    color: black !important;
+  }
+
+  .pi-key {
+    min-block-size: 0;
+    break-inside: avoid;
+  }
+
+  .pi-plate-tab {
+    background: white;
+    color: black;
+  }
+
+  .pi-pips,
+  .pi-key-name,
+  .pi-key-spoken,
+  .text-muted,
+  .text-ink {
+    color: black !important;
+  }
+
+  [data-print='code'] {
+    position: static !important;
+    inline-size: auto !important;
+    block-size: auto !important;
+    clip-path: none !important;
+    overflow: visible !important;
+    white-space: normal !important;
+    font-family: var(--font-mono);
+    letter-spacing: var(--tracking-code);
+  }
+}

@@ -1,51 +1,51 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro'
+import Faq from '../../components/Faq.astro'
+import PageShell from '../../components/PageShell.astro'
 import { MorseRunnerGame } from '../../components/Games/games'
+import { breadcrumbTrail, getPage, pageUrl } from '../../config/pages'
+import { faqFor } from '../../data/faq'
+import { breadcrumbs, webPage } from '../../seo/schema'
 
-const title = 'Morse Runner — A Morse Code Sending Game | MorseForge'
-const description =
-  'Gates come towards you, each asking for one character. Key it with the straight key before you arrive. A Morse code game about sending under time pressure.'
+// Title, description, H1 and intro all come from the registry (SEO-B); the
+// island gets the registry's name and URL for its share text.
+const page = getPage('/games/morse-runner/')
+const trail = breadcrumbTrail(page.path)
+const faq = faqFor(page.path)
+const schema = [
+  webPage({ path: page.path, name: page.h1, description: page.description }),
+  breadcrumbs(trail),
+]
 ---
 
-<BaseLayout title={title} description={description} path="/games/morse-runner/">
-  <main class="mx-auto max-w-3xl px-6 py-14">
-    <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Morse Runner</h1>
-    <p class="mt-3 leading-relaxed text-muted">
-      Gates come towards you. Key the character before you get there.
-    </p>
+<BaseLayout title={page.title} description={page.description} path={page.path} schema={schema}>
+  <PageShell width="tool" trail={trail} h1={page.h1} intro={page.intro} instrumentFirst>
+    <MorseRunnerGame client:idle name={page.navLabel} url={pageUrl(page.path)} />
 
-    <div class="mt-10">
-      <MorseRunnerGame client:load />
-    </div>
-
-    <section class="mt-16 border-t border-line pt-10">
-      <h2 class="font-display text-xl font-bold tracking-tight">Why sending needs a clock</h2>
-      <p class="mt-3 leading-relaxed text-muted">
+    <section slot="more" class="max-w-3xl">
+      <h2 class="font-display text-h2 font-bold">Why sending needs a clock</h2>
+      <p class="mt-4 leading-relaxed text-muted">
         The <a href="/telegraph/" class="text-signal underline underline-offset-4">telegraph</a> waits
-        for you forever, and so does the sending drill. That is the right way to learn a character — and
+        for you forever, and so does the sending drill. That is the right way to learn a character, and
         it is why neither of them ever teaches you to commit to one. Hesitating costs nothing there. On
         the air it costs the contact.
       </p>
       <p class="mt-4 leading-relaxed text-muted">
         Here the gate arrives whether you are ready or not, which is the only honest way to find out
-        whether you can send a character or merely work one out.
-      </p>
-
-      <h2 class="mt-8 font-display text-xl font-bold tracking-tight">If gates keep landing</h2>
-      <p class="mt-3 leading-relaxed text-muted">
-        How long a pause ends your character is a separate setting from speed, and the default is
-        deliberately patient. If characters are committing before you have finished them — or not
-        committing at all — adjust the keyer in
-        <a href="/settings/" class="text-signal underline underline-offset-4">settings</a> rather than
-        fighting it.
+        whether you can send a character or merely work one out. Each gate shows only its letter:
+        the code has to come from memory. A wrong send shows the code as a hint, and a gate passed
+        on a hint saves the run but counts as a miss in the same sending schedule as practice.
       </p>
 
       <p class="mt-8 text-sm leading-relaxed text-muted">
         The other one is <a
           href="/games/signal-defender/"
           class="text-signal underline underline-offset-4">Signal Defender</a
-        >, which is the same idea for listening.
+        >, which is the same idea for reading: signals fall as dots and dashes, and the letter only
+        shows once you have named it.
       </p>
     </section>
-  </main>
+
+    <Faq slot="more" items={faq} />
+  </PageShell>
 </BaseLayout>

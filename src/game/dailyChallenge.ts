@@ -48,7 +48,11 @@ export interface DailyChallenge {
   passMark: number
 }
 
-const LINES = 8
+/**
+ * Lines in one day's challenge. Exported so the page copy ("eight lines") reads
+ * the number instead of typing it.
+ */
+export const LINES = 8
 
 /**
  * Speeds the challenge rotates through.
@@ -70,6 +74,18 @@ const SPEEDS = [
 const KINDS: readonly TextKind[] = ['groups', 'groups', 'words', 'phrases', 'callsigns']
 
 /**
+ * The characters a day of this kind is drawn from.
+ *
+ * Callsigns and code groups need digits; words and phrases are letters only,
+ * and offering a digit-bearing alphabet there would change nothing except
+ * making the fallback worse. Exported so the daily page says which characters
+ * the wire uses from the same rule that picks them.
+ */
+export function dailyAlphabet(kind: TextKind): string[] {
+  return kind === 'words' || kind === 'phrases' ? [...ALL_LETTERS] : [...ALL_LETTERS, ...ALL_DIGITS]
+}
+
+/**
  * Build the challenge for a date.
  *
  * Pure and total: the same key always produces the same challenge, on any
@@ -81,11 +97,7 @@ export function dailyChallenge(date: string = dailyKey()): DailyChallenge {
   const kind = KINDS[Math.floor(random() * KINDS.length)]!
   const speed = SPEEDS[Math.floor(random() * SPEEDS.length)]!
 
-  // Callsigns and code groups need digits; words and phrases are letters only,
-  // and offering a digit-bearing alphabet there would change nothing except
-  // making the fallback worse.
-  const alphabet =
-    kind === 'words' || kind === 'phrases' ? [...ALL_LETTERS] : [...ALL_LETTERS, ...ALL_DIGITS]
+  const alphabet = dailyAlphabet(kind)
 
   const prompts: string[] = []
   let guard = 0

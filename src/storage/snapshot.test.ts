@@ -70,3 +70,17 @@ describe('achievementSnapshot', () => {
     }
   })
 })
+
+describe('stagesTaught in the snapshot', () => {
+  it('reads the lesson position from progress, so First Ring is earned from data', () => {
+    let record = emptyProgress()
+    for (const character of ['E', 'T']) record = answer(record, character, 'sending', true, T0)
+    const snapshot = achievementSnapshot(record, defaultStats(), T0)
+    expect(snapshot.stagesTaught).toBe(1)
+    expect(
+      newlyEarned(achievementSnapshot(emptyProgress(), defaultStats(), T0), snapshot).map(
+        (a) => a.id,
+      ),
+    ).toContain('first-ring')
+  })
+})

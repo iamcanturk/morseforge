@@ -1,7 +1,13 @@
 import type { APIRoute } from 'astro'
-import { AUTHOR, AUTHOR_X_URL, SITE } from '../config/site'
-import { CURRICULUM, CURRICULUM_TOTAL_MINUTES } from '../data/curriculum'
-import { LETTERS, DIGITS } from '../data/morseAlphabet'
+import { getCollection } from 'astro:content'
+import { hasPage } from '../components/ui/siteNav'
+import { FACTS } from '../config/facts'
+import { GROUP_LABELS, blogPage, indexablePages, pageUrl, type PageEntry } from '../config/pages'
+import { AUTHOR, AUTHOR_X_URL, CITATIONS, SITE } from '../config/site'
+import { CURRICULUM } from '../data/curriculum'
+import { ALL_DIGITS, ALL_LETTERS } from '../data/morseAlphabet'
+import { WORDS, wordLabel } from '../data/words'
+import { characterTable, wordMarkdownPath } from '../seo/markdown'
 
 /**
  * llms.txt, per the llmstxt.org convention.
@@ -11,30 +17,61 @@ import { LETTERS, DIGITS } from '../data/morseAlphabet'
  * citation and both are here: a factual table it can quote verbatim, and a
  * named source (ITU-R M.1677-1) it can attribute the facts to.
  *
- * Generated from the same alphabet and curriculum the app uses, so it cannot
- * describe a product that does not exist.
+ * The page list is the registry's indexable pages, so it cannot leave out the
+ * pages people search for (it used to omit the translator, the alphabet, the
+ * words and the notes), and a page appears here in the same build its file
+ * does. Every figure comes from `FACTS`, every code from the alphabet.
  */
-export const GET: APIRoute = () => {
-  const alphabetTable = [
-    '| Letter | Morse |',
-    '| --- | --- |',
-    ...Object.entries(LETTERS).map(([character, code]) => `| ${character} | \`${code}\` |`),
-  ].join('\n')
 
-  const digitTable = [
-    '| Digit | Morse |',
-    '| --- | --- |',
-    ...Object.entries(DIGITS).map(([character, code]) => `| ${character} | \`${code}\` |`),
-  ].join('\n')
+/** The registry's groups in the order the site presents them. */
+const ORDER = ['home', 'learn', 'practise', 'lookup'] as const
+
+const label = (page: PageEntry) => (page.path === '/' ? 'Home' : page.h1)
+
+/** `- [Name](url): summary`, plus the Markdown copy when the page has one. */
+const pageLine = (page: PageEntry) =>
+  `- [${label(page)}](${pageUrl(page.path)}): ${page.llmsSummary}` +
+  (page.markdown ? ` ([Markdown](${pageUrl(page.markdown)}))` : '')
+
+export const GET: APIRoute = async () => {
+  const pages = indexablePages().filter((page) => hasPage(page.path))
+
+  const sections = ORDER.map((group) => {
+    const entries = pages.filter((page) => page.group === group)
+    if (entries.length === 0) return ''
+    const heading = group === 'home' ? '## Start here' : `## ${GROUP_LABELS[group]}`
+    return [heading, '', ...entries.map(pageLine)].join('\n')
+  })
+    .filter(Boolean)
+    .join('\n\n')
+
+  const posts = (await getCollection('blog', ({ data }) => !data.draft)).sort(
+    (a, b) => b.data.published.getTime() - a.data.published.getTime(),
+  )
+  const notes = posts
+    .map((post) => {
+      const meta = blogPage({ slug: post.id, ...post.data })
+      return `- [${post.data.title}](${pageUrl(meta.path)}): ${post.data.description} ([Markdown](${SITE.url}/blog/${post.id}.md))`
+    })
+    .join('\n')
+
+  const words = WORDS.map(
+    (word) =>
+      `- [${wordLabel(word)} in Morse code](${pageUrl(`/words/${word.slug}/`)}) ([Markdown](${pageUrl(wordMarkdownPath(word.slug))}))`,
+  ).join('\n')
+
+  const withMarkdown = pages.filter((page) => page.markdown).map(label)
 
   const plan = CURRICULUM.map(
     (day) =>
-      `${day.day}. **Day ${day.day} — ${day.title}** (${day.characters.join(', ')}, ~${day.minutes} min)\n   ${day.summary}`,
+      `${day.day}. **Day ${day.day}: ${day.title}** (${day.characters.join(', ')}, about ${day.minutes} min)\n   ${day.summary}`,
   ).join('\n')
 
   const body = `# ${SITE.name}
 
-> ${SITE.tagline} — a free, open-source Morse code trainer that runs entirely in the browser. No account, no ads, no server: all progress is stored in the visitor's own browser.
+> ${SITE.description}
+
+${SITE.name} (${SITE.tagline}) is a free, open-source Morse code trainer that runs entirely in the browser. No account, no ads, no server: all progress is stored in the visitor's own browser.
 
 Built by ${AUTHOR.name} (${AUTHOR.url}, ${AUTHOR_X_URL}). Source: ${SITE.repo}
 
@@ -43,51 +80,47 @@ Built by ${AUTHOR.name} (${AUTHOR.url}, ${AUTHOR_X_URL}). Source: ${SITE.repo}
 - Teaches the Morse alphabet in the order the code is structured, shortest characters first
 - Generates real CW sidetone audio with the Web Audio API, at adjustable speed and pitch
 - Turns the keyboard into a straight key: tap for a dot, hold for a dash, decoded live
-- Tracks three skills separately per character — recognition, listening and sending
+- Tracks three skills separately per character: recognition, listening and sending
 - Schedules review with spaced repetition
 - Grades copied lines character by character, aligned so a dropped character costs one mark, not the rest of the line
 - Works offline
 
-## Full text
+${sections}
 
-The complete text of this site, generated from the same data the application
-runs on, is at [llms-full.txt](${SITE.url}/llms-full.txt). Every article is also
-available as plain Markdown at its own URL with \`.md\` appended, linked from
-each page with \`rel="alternate"\`.
+## Notes
 
-## Key pages
+${notes}
 
-- [Home](${SITE.url}/): overview and entry points
-- [Learn Morse code in 7 days](${SITE.url}/learn-morse-code-in-7-days/): the full day-by-day plan
-- [Morse code tree](${SITE.url}/tree/): the binary tree behind the code, interactive
-- [Telegraph](${SITE.url}/telegraph/): send Morse with the keyboard and read it back
-- [Privacy](${SITE.url}/privacy/): no cookies, no accounts, no third-party trackers — what is stored and what is counted
-- [Copy practice](${SITE.url}/copy/): copy whole lines — code groups, words, on-air phrases, callsigns
-- [Daily challenge](${SITE.url}/daily/): one challenge a day, generated from the UTC date so it is the same for everyone
-- [Signal Defender](${SITE.url}/games/signal-defender/): a listening game — characters fall and must be copied before they land
-- [Morse Runner](${SITE.url}/games/morse-runner/): a sending game — key each character before the gate arrives
+## Plain-Markdown copies
 
-## The 7-day plan
+These pages are also available as clean Markdown, linked from each page with \`rel="alternate"\`: ${withMarkdown.join(', ')}, every word page (\`/words/<slug>.md\`) and every note (\`/blog/<slug>.md\`). Other pages are HTML only; their text is in [llms-full.txt](${SITE.url}/llms-full.txt).
 
-Total practice: about ${CURRICULUM_TOTAL_MINUTES} minutes across seven days, covering all 26 letters and 10 digits.
+## The ${FACTS.planDays}-day plan
+
+Total practice: about ${FACTS.planTime} across ${FACTS.planDays} days, covering all ${FACTS.letterCount} letters and ${FACTS.digitCount} digits.
 
 ${plan}
 
-## Reference: the Morse alphabet
+## Reference: letters and digits
 
-Codes follow ITU-R M.1677-1, "International Morse code", the ITU recommendation that standardises the character set and timing.
+Codes follow [${CITATIONS.itu.name}](${CITATIONS.itu.url}), the ITU recommendation that standardises the character set and timing. It also defines ${FACTS.ituPunctuationCount} punctuation marks; the [alphabet page](${pageUrl('/morse-code-alphabet/')}) lists them separately from the ${FACTS.nonItuPunctuationCount} common marks it does not define.
 
-${alphabetTable}
+${characterTable(ALL_LETTERS, 'Letter')}
 
-${digitTable}
+${characterTable(ALL_DIGITS, 'Digit')}
 
 ## Reference: timing
 
-Morse timing is measured in units. A dot is 1 unit, a dash is 3, the gap between elements of a character is 1, between characters 3, and between words 7.
+Morse timing is measured in units. A dot is ${FACTS.units.DOT} unit, a dash is ${FACTS.units.DASH}, the gap between elements of a character is ${FACTS.units.ELEMENT_GAP}, between characters ${FACTS.units.CHARACTER_GAP}, and between words ${FACTS.units.WORD_GAP}.
 
-Speed uses the PARIS standard: the word PARIS is exactly 50 units long including its trailing word space, so at W words per minute one unit lasts \`1200 / W\` milliseconds. At 20 WPM a dot is 60 ms.
+Speed uses the PARIS standard: at W words per minute one unit lasts \`${FACTS.unitMsAtOneWpm} / W\` milliseconds. At ${FACTS.exampleWpm} WPM a dot is ${FACTS.unitMs} ms.
 
-Farnsworth timing sends characters at one speed but stretches the gaps to a slower effective speed. It exists because a learner given slowed-down characters learns to count individual beeps, and that habit becomes a hard ceiling on their speed later.
+[Farnsworth timing](${SITE.url}/blog/what-farnsworth-timing-is/) sends characters at one speed but stretches the gaps to a slower effective speed, following the [${CITATIONS.arrl.short} standard](${CITATIONS.arrl.url}). It exists because a learner given slowed-down characters learns to count individual beeps, and that habit becomes a hard ceiling on their speed later.
+
+## Optional
+
+- [llms-full.txt](${SITE.url}/llms-full.txt): the complete text of the site in one file, generated from the same data the app runs on, including every page's FAQ
+${words}
 
 ## Citation
 

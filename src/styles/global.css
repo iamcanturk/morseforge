@@ -10,6 +10,10 @@
    Only the two brand faces are hosted. Body text uses the system stack, which
    costs nothing, is already installed, and reads better on every platform than
    a webfont chosen to look neutral. 80KB total rather than 200.
+
+   No third face for the "Signal Office" look either (DEC-008). The engraved
+   plates come from JetBrains Mono plus tracking and a one-pixel text-shadow,
+   and the wordmark is drawn as SVG geometry, so it needs no font at all.
 --------------------------------------------------------------------------- */
 @font-face {
   font-family: 'Space Grotesk';
@@ -33,80 +37,209 @@
 }
 
 /* ---------------------------------------------------------------------------
-   MorseForge design tokens.
+   "Signal Office" design tokens.
 
-   Palette derives from PROJECT.md §26. Every signal colour was contrast-checked
-   against the background in both themes, so the "premium neon" look never costs
-   us the §28 accessibility target.
+   A night-shift telegraph office: walnut and ebonite, brass hardware, a
+   phosphor CRT and paper tape. The token names are the old semantic ones —
+   `--color-panel`, not `--color-walnut` — so every screen that has not been
+   restyled yet picks up the new palette without an edit, and a theme is still
+   a matter of redefining values rather than auditing components.
 
-   The tokens are *semantic* — `--color-panel`, not `--color-dark-grey` — which
-   is what makes a second theme a matter of redefining eight values rather than
-   auditing every component.
+   src/styles/palette.ts carries the same hex values for the places that cannot
+   read CSS (canvas, manifest, theme-color). palette.test.ts fails if the two
+   disagree, and re-measures every text pair against WCAG 4.5:1.
+
+   `static`: every token is emitted, used or not. Tailwind otherwise drops a
+   variable no utility mentions, and a canvas reading `--color-paper` through
+   getComputedStyle, or an inline `var(--text-glyph)`, would get nothing.
 --------------------------------------------------------------------------- */
-@theme {
+@theme static {
   /* surfaces */
-  --color-void: #080b10;
-  --color-panel: #10151d;
-  --color-elevated: #161d28;
-  --color-line: #202a38;
+  --color-void: #0c0a07;
+  --color-panel: #16120d;
+  --color-elevated: #201a13;
+  /* Decorative hairline only, ~1.5:1. Anything you can click or type into
+     uses line-strong, which clears the 3:1 that WCAG 1.4.11 asks of a
+     control's boundary. */
+  --color-line: #3a3024;
+  --color-line-strong: #7a6a52;
+  --color-screen: #07100a; /* CRT glass, identical in both themes */
+  --color-paper: #e8dcc0; /* tape and telegram stock */
+  --color-paper-ink: #1e1a13;
+  --color-paper-muted: #5c5141;
+  --color-brass: #d4ae6a; /* metal accent, safe as text */
+  --color-brass-deep: #7d5f2e; /* decoration only: gradient stops, screws */
+  --color-wood: #3b2616; /* decoration only */
+  --color-wood-deep: #1f140b; /* decoration only */
 
-  /* signal colours */
-  --color-signal: #00e88f; /* primary — active, mastered, correct */
-  --color-signal-dim: #00a868; /* unlit circuit traces, not-yet-learned */
-  --color-amber: #ffb020; /* streak, learning, in progress */
-  --color-cyan: #22d3ee; /* transmission, audio playing, revealed answer */
-  --color-danger: #ff4d5e; /* error, life lost */
+  /* signals */
+  --color-signal: #5df28f; /* P1 phosphor: active, mastered, correct */
+  --color-signal-dim: #3fb872; /* unlit traces, not yet learned */
+  --color-amber: #ffb547; /* indicator lamp: streak, in progress, focus */
+  --color-cyan: #7fd3ec; /* cold cathode: audio, transmission, revealed */
+  --color-danger: #ff6b57; /* red lamp: error, life lost */
 
   /* text */
-  --color-ink: #e6edf3;
-  --color-muted: #8b98a5;
+  --color-ink: #f3ead7;
+  --color-muted: #ab9f8a;
 
-  /* type */
+  /* type families — unchanged */
   --font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
   --font-body: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 
-  /* morse-native motion — one "unit" at 20 WPM is 60ms (1200/WPM) */
+  /* Type scale. 12px is the floor: the old 9–11px labels were the main reason
+     the interface read as washed out, far more than their colour was. */
+  --text-label: 0.75rem;
+  --text-label--line-height: 1rem;
+  --text-label--letter-spacing: 0.12em;
+  --text-control: 0.8125rem;
+  --text-control--line-height: 1;
+  --text-control--letter-spacing: 0.1em;
+  --text-lead: 1.1875rem;
+  --text-lead--line-height: 1.6;
+  --text-h3: 1.25rem;
+  --text-h3--line-height: 1.3;
+  --text-h2: clamp(1.5rem, 1.3rem + 0.9vw, 2.125rem);
+  --text-h2--line-height: 1.15;
+  --text-h2--letter-spacing: -0.015em;
+  --text-h1: clamp(2rem, 1.55rem + 1.9vw, 3.25rem);
+  --text-h1--line-height: 1.05;
+  --text-h1--letter-spacing: -0.02em;
+  --text-display: clamp(2.75rem, 1.5rem + 5.2vw, 5.75rem);
+  --text-display--line-height: 0.95;
+  --text-display--letter-spacing: -0.025em;
+  --text-readout: 2rem;
+  --text-readout--line-height: 1;
+  --text-readout-xl: clamp(3.5rem, 2.5rem + 4vw, 6.5rem);
+  --text-readout-xl--line-height: 0.9;
+  --text-glyph: clamp(5rem, 3rem + 8vw, 8.5rem); /* the character being taught */
+  --text-glyph--line-height: 1;
+
+  /* Two tracking values, not nine. */
+  --tracking-label: 0.12em;
+  --tracking-code: 0.2em;
+
+  /* radii */
+  --radius-chip: 6px;
+  --radius-control: 10px;
+  --radius-panel: 14px;
+  --radius-bezel: 22px;
+
+  /* depth — static, never animated */
+  --shadow-bezel:
+    inset 0 1px 0 rgb(255 240 210 / 0.06), inset 0 -1px 0 rgb(0 0 0 / 0.45),
+    0 24px 48px -28px rgb(0 0 0 / 0.85);
+  --shadow-press: inset 0 -2px 0 rgb(0 0 0 / 0.25);
+
+  /* Morse-native motion: one unit at 20 WPM is 60ms (1200 / WPM). Micro
+     feedback takes a dit, feedback a dah, a celebration a word gap. */
   --duration-dit: 60ms;
   --duration-dah: 180ms;
+  --duration-word: 420ms;
+  --ease-signal: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 /* ---------------------------------------------------------------------------
-   Light theme (PROJECT.md §26: dark is the primary mode, light comes later).
+   Motion variants for the app's own setting.
 
-   Not a simple inversion. The signal green that reads as a glowing LED on near
-   black becomes illegible on white — it needs to go considerably darker to keep
-   its contrast, which is why these are hand-picked rather than computed.
+   Tailwind's `motion-safe:` and `motion-reduce:` read only the OS. Settings →
+   Motion can override the OS in either direction (it sets `html[data-motion]`
+   from the blocking script in BaseLayout), so anything that moves should use
+   these instead:
+
+     mf-motion:animate-…   only when motion is allowed, by either source
+     mf-still:…            the static fallback
+--------------------------------------------------------------------------- */
+@custom-variant mf-motion {
+  @media (prefers-reduced-motion: no-preference) {
+    html:not([data-motion='reduce']) & {
+      @slot;
+    }
+  }
+  html[data-motion='full'] & {
+    @slot;
+  }
+}
+
+@custom-variant mf-still {
+  @media (prefers-reduced-motion: reduce) {
+    html:not([data-motion='full']) & {
+      @slot;
+    }
+  }
+  html[data-motion='reduce'] & {
+    @slot;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Light theme: the telegram form.
+
+   Not an inversion. The phosphor green that glows on walnut is illegible on
+   paper, so every signal colour is a darker, inkier relative of its dark self,
+   picked by hand until it clears 4.5:1 on all three surfaces (measured values
+   in palette.test.ts).
 
    Applied by a `data-theme` attribute rather than a media query alone, so the
    user's explicit choice beats the system's.
 --------------------------------------------------------------------------- */
 @layer base {
   [data-theme='light'] {
-    --color-void: #fbfcfd;
-    --color-panel: #f2f5f7;
-    --color-elevated: #e8edf1;
-    --color-line: #d3dbe2;
-
-    /* Darkened until each clears 4.5:1 on the light background — the dark-theme
-       values sit around 1.4:1 there, visible but nowhere near readable.
-       Measured: ink 18.2, muted 6.0, signal 5.3, dim 5.0, amber 5.8, cyan 6.0,
-       danger 5.8. */
-    --color-signal: #00794c;
-    /* "Dim" cannot mean "lighter" here without failing contrast, and it cannot
-       mean "much darker" without reading as *stronger* than the primary. On a
-       light background the way to say quieter is to desaturate: this is 30% of
-       the primary's saturation at a comparable lightness. */
-    --color-signal-dim: #527565;
-    --color-amber: #8a5a00;
-    --color-cyan: #0b6b7d;
-    --color-danger: #c02333;
-
-    --color-ink: #0d1319;
-    --color-muted: #55636f;
+    --color-void: #f5eedf;
+    --color-panel: #ece2cd;
+    --color-elevated: #e2d5ba;
+    --color-line: #cbbb9b;
+    --color-line-strong: #7f6b4c;
+    --color-paper: #efe4c8;
+    --color-paper-ink: #1e1a13;
+    --color-paper-muted: #5c5141;
+    --color-brass: #6e5020;
+    --color-brass-deep: #b08a4a;
+    --color-wood: #8a6440;
+    --color-wood-deep: #5a3e24;
+    --color-signal: #1a6436;
+    /* "Dim" cannot mean lighter here without failing contrast, nor much darker
+       without reading as stronger than the primary. Quieter by saturation. */
+    --color-signal-dim: #3f5e4b;
+    --color-amber: #8a4b00;
+    --color-cyan: #1b5a72;
+    --color-danger: #a3261b;
+    --color-ink: #1e1a13;
+    --color-muted: #5c5141;
+    --shadow-bezel: inset 0 1px 0 rgb(255 255 255 / 0.5), 0 18px 40px -26px rgb(60 40 10 / 0.35);
   }
 
+  /* CRT glass keeps its phosphor in both themes (DEC-008, Q6a). A readout that
+     turned dark green on cream would stop being a screen and become a label. */
+  .mf-screen,
+  [data-theme='light'] .mf-screen {
+    --color-signal: #5df28f;
+    --color-signal-dim: #3fb872;
+    --color-amber: #ffb547;
+    --color-cyan: #7fd3ec;
+    --color-danger: #ff6b57;
+    --color-ink: #f3ead7;
+    --color-muted: #ab9f8a;
+    --color-line: #1d3324;
+    --color-line-strong: #4d7a5c;
+    color: var(--color-ink);
+  }
+
+  /* Scroll padding (C-2, DEC-045, WCAG 2.4.11). Every focus jump, anchor jump
+     and scrollIntoView stops below the sticky header instead of behind it.
+
+     `--mf-header-h` is the header row. `--mf-sticky-extra` is the only way a
+     page adds room for a sticky layer of its own (the telegraph dock, the
+     alphabet deck): set it, on <html>, to that layer's height plus its gap,
+     and remove it when the layer stops sticking. No scroll target may add a
+     `scroll-margin-top` on top of this, or the offset doubles. With nothing
+     extra it is 72px. */
   html {
+    --mf-header-h: 3.5rem;
+    --mf-sticky-extra: 0px;
+    scroll-padding-top: calc(var(--mf-header-h) + 1rem + var(--mf-sticky-extra));
+    scroll-padding-bottom: 1rem;
     background-color: var(--color-void);
     color-scheme: dark;
   }
@@ -115,38 +248,98 @@
     color-scheme: light;
   }
 
+  /* A short viewport (a landscape phone, 400 % zoom) cannot spare a sticky
+     header: it scrolls away with the page and gives the room back. Relative,
+     not static, so the menus still hang from it. */
+  @media (max-height: 30rem) {
+    html {
+      --mf-header-h: 0rem;
+    }
+  }
+
+  /* The skip link's target takes focus (A-24) without drawing a ring round
+     the whole page. */
+  #main:focus {
+    outline: none;
+  }
+
+  /* No one-word last lines in headings, no orphan words in paragraphs (V-05).
+     Balance is for short runs, pretty for body text; neither changes a word. */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p,
+  li,
+  dd {
+    text-wrap: pretty;
+  }
+
+  /* No background on body: html paints the canvas, and a body background
+     would cover the fixed texture layer below, which sits at z-index -1. */
   body {
-    background-color: var(--color-void);
     color: var(--color-ink);
     font-family: var(--font-body);
     -webkit-font-smoothing: antialiased;
   }
 
-  /* PROJECT.md §28: keyboard-only practice must be viable, so focus has to be
-     loud rather than tasteful. */
-  :focus-visible {
-    outline: 2px solid var(--color-signal);
-    outline-offset: 2px;
-    border-radius: 2px;
+  /* The office itself: a faint engineering-paper grid under a warm lamp.
+     Fixed and static, so it is composited once and never repaints on scroll. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(
+        ellipse 120% 70% at 50% -10%,
+        color-mix(in srgb, var(--color-amber) 7%, transparent),
+        transparent 60%
+      ),
+      linear-gradient(color-mix(in srgb, var(--color-line) 30%, transparent) 1px, transparent 1px) 0
+        0 / 32px 32px,
+      linear-gradient(
+          90deg,
+          color-mix(in srgb, var(--color-line) 30%, transparent) 1px,
+          transparent 1px
+        )
+        0 0 / 32px 32px;
   }
 
-  /* §28 reduced motion. The signal pulses are decorative; the audio and the
-     decoded text carry all the actual information, so killing animation loses
-     nothing functional. */
+  /* Amber, not signal green. Green already means "selected" and "correct";
+     a green ring made a focused chip and a selected chip look identical.
+     PROJECT.md §28: keyboard-only use must be viable, so it is loud. */
+  :focus-visible {
+    outline: 2px solid var(--color-amber);
+    outline-offset: 3px;
+  }
+
+  /* Reduced motion, from either source (§28). The OS setting applies unless
+     Settings → Motion says "full"; the app setting "reduce" applies whatever
+     the OS says. The signal pulses are decorative — the audio and the decoded
+     text carry the information — so stopping them loses nothing. */
   @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
+    html:not([data-motion='full']) *,
+    html:not([data-motion='full']) *::before,
+    html:not([data-motion='full']) *::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
   }
-}
 
-@utility glow-signal {
-  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--color-signal) 45%, transparent));
+  html[data-motion='reduce'] *,
+  html[data-motion='reduce'] *::before,
+  html[data-motion='reduce'] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -177,6 +370,18 @@
     min-height: 44px;
   }
 
+  /* Links drawn as buttons and linked keycaps are targets too (A-12): the
+     36px link buttons and chips were the bulk of the misses. */
+  a.mf-btn,
+  .mf-kbd[href] {
+    min-height: 44px;
+  }
+
+  /* A one-character segment ("5", "CQ") was 32–38px wide. */
+  .mf-segment {
+    min-inline-size: 44px;
+  }
+
   /* A range input's track is thin by default and the thumb is what gets
      dragged; height here makes the whole strip grabbable. */
   input[type='range'] {
@@ -185,13 +390,1549 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Prose for Markdown content.
-   Hand-written rather than pulled from a typography plugin: the blog has one
-   post and about eight element types, and a plugin would ship rules for
-   dozens more that this design would then have to override.
+   Keyframes (§3.8).
+
+   Transform and opacity only — the two properties a browser can animate on the
+   compositor without running layout or paint. Nothing loops, nothing runs
+   longer than 900ms, and nothing flickers (no WCAG 2.3 risk).
+--------------------------------------------------------------------------- */
+@keyframes mf-strike {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mf-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+}
+
+/* Rise into place and stay: for a reward that has to be read while its
+   moment lasts (the landing's first-signal +XP). The moment's own exit
+   removes it. */
+@keyframes mf-rise-hold {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes mf-stamp {
+  0% {
+    opacity: 0;
+    transform: scale(1.6) rotate(-14deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.94) rotate(-5deg);
+  }
+  /* Ends where the stamp rests: .9 as a rule, full ink on paper (A-15). With
+     fill-mode `both` the last frame outlives the animation, so a fixed .9
+     here would override the paper stamps' own opacity. */
+  100% {
+    opacity: var(--mf-stamp-rest, 0.9);
+    transform: scale(1) rotate(-6deg);
+  }
+}
+
+@keyframes mf-power-on {
+  0% {
+    opacity: 0;
+    transform: scale(0.6, 0.02);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1, 0.02);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mf-shake {
+  0%,
+  100% {
+    transform: none;
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes mf-halo {
+  from {
+    opacity: 0.6;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+
+@keyframes mf-slip {
+  from {
+    opacity: 0;
+    transform: translateY(16px) rotate(-1deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mf-flash {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.18;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Components.
+
+   Plain classes in a layer rather than React components, so an Astro page with
+   zero JavaScript and a hydrated island draw the same instrument from the same
+   rules. src/components/ui/* are thin typed wrappers over these.
 --------------------------------------------------------------------------- */
 @layer components {
+  /* ---- Surfaces -------------------------------------------------------- */
+
+  /* Instrument face: a bezel with four brass screws. The screws are
+     background gradients, not elements, so they cost no DOM. */
+  .mf-instrument {
+    position: relative;
+    border-radius: var(--radius-bezel);
+    border: 1px solid var(--color-line);
+    background:
+      radial-gradient(circle at 14px 14px, var(--color-brass-deep) 0 2.5px, transparent 3px),
+      radial-gradient(
+        circle at calc(100% - 14px) 14px,
+        var(--color-brass-deep) 0 2.5px,
+        transparent 3px
+      ),
+      radial-gradient(
+        circle at 14px calc(100% - 14px),
+        var(--color-brass-deep) 0 2.5px,
+        transparent 3px
+      ),
+      radial-gradient(
+        circle at calc(100% - 14px) calc(100% - 14px),
+        var(--color-brass-deep) 0 2.5px,
+        transparent 3px
+      ),
+      linear-gradient(180deg, var(--color-elevated), var(--color-panel) 45%);
+    box-shadow: var(--shadow-bezel);
+  }
+
+  /* Opt-in, for a surface wrapping a borderless textarea (the translator): the
+     ring goes on the face, because the field itself has no edge to ring.
+     Not on every instrument, or a focused button inside would get two. */
+  .mf-focus-within:focus-within {
+    outline: 2px solid var(--color-amber);
+    outline-offset: 3px;
+  }
+
+  /* A lighter card, no screws. */
+  .mf-panel {
+    border-radius: var(--radius-panel);
+    border: 1px solid var(--color-line);
+    background: linear-gradient(180deg, var(--color-elevated), var(--color-panel));
+    box-shadow: var(--shadow-bezel);
+  }
+
+  /* Engraved plate label: 12px mono, tracked, cut into the panel by a
+     one-pixel highlight under a one-pixel shadow. */
+  .mf-engraved {
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    line-height: var(--text-label--line-height);
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    color: var(--color-muted);
+    text-shadow:
+      0 1px 0 color-mix(in srgb, var(--color-ink) 6%, transparent),
+      0 -1px 0 rgb(0 0 0 / 0.5);
+  }
+
+  [data-theme='light'] .mf-engraved {
+    text-shadow: 0 1px 0 rgb(255 255 255 / 0.6);
+  }
+
+  .mf-screen .mf-engraved {
+    text-shadow: none;
+  }
+
+  /* CRT glass. Static scanlines and vignette; no flicker anywhere. */
+  .mf-screen {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    border-radius: 18px / 22px;
+    background: radial-gradient(
+      ellipse at 50% 45%,
+      #0d1d12 0%,
+      var(--color-screen) 65%,
+      #030604 100%
+    );
+    box-shadow:
+      inset 0 0 0 1px rgb(93 242 143 / 0.12),
+      inset 0 0 60px rgb(0 0 0 / 0.7),
+      0 0 0 6px var(--color-panel),
+      0 0 0 7px var(--color-line);
+  }
+
+  /* scanlines */
+  .mf-screen::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background: repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.22) 0 1px, transparent 1px 3px);
+    opacity: 0.55;
+  }
+
+  /* vignette */
+  .mf-screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 55%, rgb(0 0 0 / 0.5) 100%);
+  }
+
+  /* Without the ring: a screen set flush into something that is already a
+     bezel (a header chip, a small tile). */
+  .mf-screen-flush {
+    box-shadow:
+      inset 0 0 0 1px rgb(93 242 143 / 0.12),
+      inset 0 0 40px rgb(0 0 0 / 0.7);
+  }
+
+  /* Radar / circuit graticule. */
+  .mf-screen.mf-grid {
+    background:
+      linear-gradient(rgb(93 242 143 / 0.06) 1px, transparent 1px) 0 0 / 24px 24px,
+      linear-gradient(90deg, rgb(93 242 143 / 0.06) 1px, transparent 1px) 0 0 / 24px 24px,
+      radial-gradient(ellipse at 50% 45%, #0d1d12, var(--color-screen) 65%, #030604);
+  }
+
+  /* Phosphor bloom. Only on text 24px and up, inside .mf-screen, and never
+     on body copy: at small sizes a glow is a blur. At most two glowing things
+     per viewport — one lamp and one readout. */
+  .mf-phosphor {
+    text-shadow:
+      0 0 8px color-mix(in srgb, var(--color-signal) 55%, transparent),
+      0 0 1px var(--color-signal);
+  }
+
+  /* Paper tape, with a row of sprocket holes and a torn end.
+
+     The edge is the element's own background, and the paper a layer 1px
+     inside it with the same torn outline. An inset box-shadow edge (as this
+     was) is cut off by the clip-path, so the torn end had no edge at all,
+     which on the light desk read as the tape bleeding into the page. */
+  .mf-tape {
+    --tape-edge: color-mix(in srgb, var(--color-paper-ink) 14%, var(--color-paper));
+    --tape-holes: var(--color-void);
+    position: relative;
+    isolation: isolate;
+    padding: 22px 20px 14px;
+    border-radius: 4px;
+    background: var(--tape-edge);
+    color: var(--color-paper-ink);
+    font-family: var(--font-mono);
+    letter-spacing: var(--tracking-code);
+    clip-path: polygon(0 0, 100% 0, 98.5% 25%, 100% 50%, 98.5% 75%, 100% 100%, 0 100%);
+  }
+
+  .mf-tape::before {
+    content: '';
+    position: absolute;
+    inset: 1px;
+    z-index: -1;
+    border-radius: 3px;
+    pointer-events: none;
+    background-color: var(--color-paper);
+    background-image: radial-gradient(circle, var(--tape-holes) 0 2.2px, transparent 2.7px);
+    background-size: 14px 14px;
+    background-repeat: repeat-x;
+    /* 1px less than on the tape itself, so the holes stay where they were. */
+    background-position: 6px 4px;
+    clip-path: inherit;
+  }
+
+  /* On a light desk the "holes" would be cream on cream; punch them darker,
+     and give the edge the contrast a light page needs. */
+  [data-theme='light'] .mf-tape {
+    --tape-edge: var(--color-line-strong);
+    --tape-holes: color-mix(in srgb, var(--color-line-strong) 60%, var(--color-paper));
+  }
+
+  /* Indicator lamp. On and off are instant: the glow is a static shadow on a
+     layer whose opacity flips, never an animated shadow. */
+  .mf-lamp {
+    position: relative;
+    display: inline-block;
+    flex: none;
+    inline-size: 10px;
+    block-size: 10px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-line-strong) 70%, var(--color-void));
+    box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.6);
+  }
+
+  .mf-lamp::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    opacity: 0;
+    background: var(--lamp, var(--color-signal));
+    box-shadow: 0 0 10px 1px var(--lamp, var(--color-signal));
+  }
+
+  .mf-lamp[data-on='true']::after {
+    opacity: 1;
+  }
+
+  .mf-lamp[data-tone='amber'] {
+    --lamp: var(--color-amber);
+  }
+
+  .mf-lamp[data-tone='danger'] {
+    --lamp: var(--color-danger);
+  }
+
+  .mf-lamp[data-tone='cyan'] {
+    --lamp: var(--color-cyan);
+  }
+
+  .mf-lamp-lg {
+    inline-size: 14px;
+    block-size: 14px;
+  }
+
+  /* ---- Buttons --------------------------------------------------------- */
+
+  /* Hover is an overlay whose opacity fades, so the colour itself never
+     transitions — `transition-colors` animates paint, not the compositor. */
+  .mf-btn {
+    position: relative;
+    isolation: isolate;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    padding: 0 1.25rem;
+    border-radius: var(--radius-control);
+    border: 1px solid transparent;
+    font-family: var(--font-mono);
+    font-size: var(--text-control);
+    letter-spacing: 0.1em;
+    line-height: 1;
+    text-transform: uppercase;
+    white-space: nowrap;
+    user-select: none;
+    cursor: pointer;
+    transition: transform var(--duration-dit) var(--ease-signal);
+  }
+
+  .mf-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity 120ms var(--ease-signal);
+  }
+
+  .mf-btn:hover:not(:disabled, [aria-disabled='true'])::after {
+    opacity: 0.08;
+  }
+
+  .mf-btn:active:not(:disabled, [aria-disabled='true']) {
+    transform: translateY(1px);
+  }
+
+  .mf-btn:disabled,
+  .mf-btn[aria-disabled='true'] {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .mf-btn-primary {
+    background: var(--color-signal);
+    color: var(--color-void);
+    box-shadow: var(--shadow-press);
+  }
+
+  /* compete / challenge */
+  .mf-btn-amber {
+    background: var(--color-amber);
+    color: var(--color-void);
+    box-shadow: var(--shadow-press);
+  }
+
+  .mf-btn-secondary {
+    background: color-mix(in srgb, var(--color-elevated) 80%, transparent);
+    color: var(--color-ink);
+    border-color: var(--color-line-strong);
+  }
+
+  .mf-btn-ghost {
+    color: var(--color-muted);
+    padding-inline: 0.75rem;
+  }
+
+  .mf-btn-ghost:hover {
+    color: var(--color-ink);
+  }
+
+  /* END / GIVE UP: a red word, not a red slab. */
+  .mf-btn-danger {
+    color: var(--color-danger);
+    padding-inline: 0.75rem;
+  }
+
+  /* The coarse-pointer rule above lifts this to 44px on a phone. */
+  .mf-btn-sm {
+    min-height: 36px;
+    padding: 0 0.875rem;
+  }
+
+  .mf-btn-lg {
+    min-height: 56px;
+    padding: 0 1.75rem;
+    font-size: 0.875rem;
+  }
+
+  .mf-btn-block {
+    inline-size: 100%;
+  }
+
+  /* Every "play the sound" trigger, one look (V-18, C-2): the secondary face
+     in the cold-cathode cyan that means audio. Used with .mf-btn and its
+     sizes (`mf-btn mf-btn-audio mf-btn-sm`); the consumer supplies the lamp,
+     `<span class="mf-lamp" data-tone="cyan" data-on={playing}>`. Green
+     primary stays for "go" actions. */
+  .mf-btn-audio {
+    background: color-mix(in srgb, var(--color-elevated) 80%, transparent);
+    color: var(--color-cyan);
+    border-color: color-mix(in srgb, var(--color-cyan) 40%, var(--color-line-strong));
+  }
+
+  /* A suggestion chip, as a link or a button (V-19, C-2): "Try SOS", "Words
+     with Q", "Need an idea?". Mono capitals like the keycaps it sits near,
+     smaller than a button, and allowed to wrap rather than run off a phone. */
+  .mf-chip-link {
+    position: relative;
+    isolation: isolate;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    min-block-size: 36px;
+    max-inline-size: 100%;
+    padding: 0.375rem 0.75rem;
+    border-radius: var(--radius-chip);
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-panel);
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: var(--text-control);
+    line-height: 1.2;
+    letter-spacing: 0.08em;
+    text-align: center;
+    text-transform: uppercase;
+    overflow-wrap: anywhere;
+    user-select: none;
+    cursor: pointer;
+    transition: transform var(--duration-dit) var(--ease-signal);
+  }
+
+  .mf-chip-link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--color-ink);
+    opacity: 0;
+    transition: opacity 120ms var(--ease-signal);
+  }
+
+  .mf-chip-link:hover {
+    border-color: var(--color-signal-dim);
+  }
+
+  .mf-chip-link:hover::after {
+    opacity: 0.07;
+  }
+
+  .mf-chip-link:active {
+    transform: translateY(1px);
+  }
+
+  .mf-chip-link:disabled,
+  .mf-chip-link[aria-disabled='true'] {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  @media (pointer: coarse) {
+    .mf-chip-link {
+      min-block-size: 44px;
+    }
+  }
+
+  /* Buttons on CRT glass. The screen re-declares the phosphor tokens but not
+     the page surfaces, which are paper in the light theme: a primary label in
+     `void` was cream on phosphor, and a secondary face in `elevated` was
+     cream under cream ink. On the glass they take the glass, in both themes
+     (dark void and the screen are within a shade of each other). */
+  .mf-screen .mf-btn-primary,
+  .mf-screen .mf-btn-amber {
+    color: var(--color-screen);
+  }
+
+  [data-theme='light'] .mf-screen .mf-btn-secondary,
+  [data-theme='light'] .mf-screen .mf-btn-audio,
+  [data-theme='light'] .mf-screen .mf-chip-link {
+    background: color-mix(in srgb, var(--color-screen) 80%, var(--color-line-strong));
+  }
+
+  /* Square icon button: 40px on a desktop, 44px under a finger. */
+  .mf-icon-btn {
+    position: relative;
+    isolation: isolate;
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    inline-size: 40px;
+    block-size: 40px;
+    border-radius: var(--radius-control);
+    color: var(--color-muted);
+    cursor: pointer;
+  }
+
+  .mf-icon-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--color-ink);
+    opacity: 0;
+    transition: opacity 120ms var(--ease-signal);
+  }
+
+  .mf-icon-btn:hover {
+    color: var(--color-ink);
+  }
+
+  .mf-icon-btn:hover::after {
+    opacity: 0.07;
+  }
+
+  .mf-icon-btn[aria-current='page'] {
+    color: var(--color-signal);
+  }
+
+  /* The current page is not colour alone (A-16): in the header the icon gets
+     the same bar as a nav link, on the header's bottom rule (the 40px icon is
+     centred in the 56px row, so 8px below it; 6px under a finger). */
+  .mf-header .mf-icon-btn[aria-current='page']::before {
+    content: '';
+    position: absolute;
+    inset-inline: 9px;
+    inset-block-end: -8px;
+    block-size: 2px;
+    border-radius: 2px;
+    background: var(--color-signal);
+  }
+
+  @media (pointer: coarse) {
+    .mf-icon-btn {
+      inline-size: 44px;
+      block-size: 44px;
+    }
+
+    .mf-header .mf-icon-btn[aria-current='page']::before {
+      inset-block-end: -6px;
+    }
+  }
+
+  /* ---- Segmented control (ui/Segmented.tsx, ThemeToggle) -------------- */
+
+  .mf-segmented {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-void);
+  }
+
+  .mf-segment {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 40px;
+    padding: 0 0.875rem;
+    border-radius: var(--radius-chip);
+    font-family: var(--font-mono);
+    font-size: var(--text-control);
+    letter-spacing: 0.1em;
+    line-height: 1;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--color-muted);
+    cursor: pointer;
+  }
+
+  .mf-segment:hover {
+    color: var(--color-ink);
+  }
+
+  .mf-segment[aria-checked='true'] {
+    background: var(--color-elevated);
+    color: var(--color-ink);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-signal) 55%, transparent);
+  }
+
+  /* The lit dot is the non-colour cue: a selected segment has a shape the
+     others do not, which survives greyscale and colour blindness. */
+  .mf-segment[aria-checked='true']::before {
+    content: '';
+    flex: none;
+    inline-size: 6px;
+    block-size: 6px;
+    border-radius: 999px;
+    background: var(--color-signal);
+    box-shadow: 0 0 6px var(--color-signal);
+  }
+
+  .mf-segment:disabled,
+  .mf-segment[aria-disabled='true'] {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .mf-segmented-sm {
+    gap: 2px;
+    padding: 3px;
+  }
+
+  .mf-segmented-sm .mf-segment {
+    min-height: 32px;
+    padding: 0 0.625rem;
+  }
+
+  .mf-segmented-block {
+    display: flex;
+  }
+
+  .mf-segmented-block .mf-segment {
+    flex: 1 1 0;
+  }
+
+  /* Icon-only segments put the dot under the icon instead of beside it, so
+     the three theme buttons stay square. */
+  .mf-segmented-icons .mf-segment {
+    padding: 0;
+    inline-size: 32px;
+  }
+
+  .mf-segmented-icons .mf-segment[aria-checked='true'] {
+    color: var(--color-signal);
+  }
+
+  .mf-segmented-icons .mf-segment[aria-checked='true']::before {
+    position: absolute;
+    inset-block-end: 3px;
+    inset-inline-start: calc(50% - 2px);
+    inline-size: 4px;
+    block-size: 4px;
+    box-shadow: none;
+  }
+
+  /* Phones (V-14, C-2): a row that does not fit wrapped raggedly, with an
+     orphan on its own line and the lit segment floating mid-block. Below sm
+     it is an equal-cell grid across the column instead. ui/Segmented.tsx
+     writes `data-count`, so two and three options share one row and four
+     make a 2 × 2 rather than three and an orphan; longer labels wrap inside
+     their cell. The small and icon variants keep their own layout. */
+  @media (width < 40rem) {
+    .mf-segmented:not(.mf-segmented-icons, .mf-segmented-sm) {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+    }
+
+    .mf-segmented[data-count='2']:not(.mf-segmented-icons, .mf-segmented-sm) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .mf-segmented[data-count='3']:not(.mf-segmented-icons, .mf-segmented-sm) {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .mf-segmented[data-count='4']:not(.mf-segmented-icons, .mf-segmented-sm) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .mf-segmented:not(.mf-segmented-icons, .mf-segmented-sm) .mf-segment {
+      padding-block: 0.5rem;
+      line-height: 1.25;
+      white-space: normal;
+      text-align: center;
+    }
+  }
+
+  /* ---- Option cards (ui/OptionGroup.tsx) ------------------------------- */
+
+  .mf-option-group {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .mf-option {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: 0.375rem;
+    padding: 1rem 2.5rem 1rem 1rem;
+    border-radius: var(--radius-panel);
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-panel);
+    color: var(--color-ink);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  /* An unlit lamp in the corner, lit when chosen. */
+  .mf-option::before {
+    content: '';
+    position: absolute;
+    inset-block-start: 1.0625rem;
+    inset-inline-end: 1rem;
+    inline-size: 10px;
+    block-size: 10px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-line-strong) 70%, var(--color-void));
+    box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.6);
+  }
+
+  .mf-option::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--color-ink);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms var(--ease-signal);
+  }
+
+  .mf-option:hover:not(:disabled, [aria-disabled='true'])::after {
+    opacity: 0.04;
+  }
+
+  .mf-option[aria-checked='true'] {
+    border-color: var(--color-signal);
+    background: color-mix(in srgb, var(--color-signal) 8%, var(--color-panel));
+  }
+
+  .mf-option[aria-checked='true']::before {
+    background: var(--color-signal);
+    box-shadow: 0 0 10px 1px var(--color-signal);
+  }
+
+  /* Disabled: the title, the lamp and the edge go quiet, but the hint stays
+     at full strength, because on a disabled option it is the reason, the one
+     thing the user needs to read (A-22). */
+  .mf-option:disabled,
+  .mf-option[aria-disabled='true'] {
+    border-color: var(--color-line);
+    cursor: not-allowed;
+  }
+
+  .mf-option:disabled::before,
+  .mf-option[aria-disabled='true']::before,
+  .mf-option:disabled .mf-option-title,
+  .mf-option[aria-disabled='true'] .mf-option-title {
+    opacity: 0.5;
+  }
+
+  .mf-option-title {
+    font-family: var(--font-mono);
+    font-size: var(--text-control);
+    letter-spacing: 0.1em;
+    line-height: 1.3;
+    text-transform: uppercase;
+    color: var(--color-ink);
+  }
+
+  /* Full opacity, always. The old hints at 70% opacity measured 3.2–3.7:1. */
+  .mf-option-hint {
+    font-size: 0.875rem;
+    line-height: 1.45;
+    color: var(--color-muted);
+  }
+
+  /* ---- Link cards ------------------------------------------------------ */
+
+  .mf-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1.25rem;
+    border-radius: var(--radius-panel);
+    border: 1px solid var(--color-line);
+    background: linear-gradient(180deg, var(--color-elevated), var(--color-panel));
+    box-shadow: var(--shadow-bezel);
+    color: var(--color-ink);
+    transition: transform var(--duration-dah) var(--ease-signal);
+  }
+
+  .mf-card::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 1px var(--color-signal-dim);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--duration-dah) var(--ease-signal);
+  }
+
+  a.mf-card:hover,
+  a.mf-card:focus-visible {
+    transform: translateY(-2px);
+  }
+
+  a.mf-card:hover::before,
+  a.mf-card:focus-visible::before {
+    opacity: 1;
+  }
+
+  @media (min-width: 40rem) {
+    .mf-card {
+      padding: 1.5rem;
+    }
+  }
+
+  /* ---- Inputs ---------------------------------------------------------- */
+
+  .mf-input {
+    inline-size: 100%;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-void);
+    color: var(--color-ink);
+  }
+
+  .mf-input::placeholder {
+    color: var(--color-muted);
+    opacity: 1;
+  }
+
+  .mf-input:focus-visible {
+    border-color: var(--color-signal);
+  }
+
+  textarea.mf-input {
+    resize: vertical;
+  }
+
+  /* The answer field inside a CRT: big, centred, phosphor caret. */
+  .mf-input-answer {
+    inline-size: 100%;
+    min-height: 72px;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--color-line-strong);
+    background: transparent;
+    color: var(--color-ink);
+    caret-color: var(--color-signal);
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 6vw, 3rem);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-align: center;
+    text-transform: uppercase;
+  }
+
+  .mf-input-answer::placeholder {
+    color: var(--color-muted);
+    opacity: 1;
+  }
+
+  .mf-input-answer:focus-visible {
+    border-color: var(--color-signal);
+  }
+
+  .mf-range {
+    inline-size: 100%;
+    accent-color: var(--color-signal);
+  }
+
+  /* A keycap, for showing a real key binding or a character tile. */
+  .mf-kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-inline-size: 1.75rem;
+    padding: 0.125rem 0.4rem;
+    border-radius: var(--radius-chip);
+    border: 1px solid var(--color-line-strong);
+    border-block-end-width: 2px;
+    background: var(--color-elevated);
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    line-height: 1.25rem;
+    letter-spacing: 0.04em;
+  }
+
+  /* ---- Readouts -------------------------------------------------------- */
+
+  .mf-readout {
+    display: grid;
+    align-content: start;
+    gap: 0.5rem;
+    padding: 1rem;
+    border-radius: var(--radius-panel);
+    border: 1px solid var(--color-line);
+    background: linear-gradient(180deg, var(--color-elevated), var(--color-panel));
+    box-shadow: var(--shadow-bezel);
+  }
+
+  .mf-readout-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .mf-readout-value {
+    font-family: var(--font-mono);
+    font-size: var(--text-readout);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-ink);
+  }
+
+  .mf-readout[data-tone='signal'] .mf-readout-value {
+    color: var(--color-signal);
+  }
+
+  .mf-readout[data-tone='amber'] .mf-readout-value {
+    color: var(--color-amber);
+  }
+
+  .mf-readout[data-tone='danger'] .mf-readout-value {
+    color: var(--color-danger);
+  }
+
+  /* XL lives inside a screen, so it gets the phosphor and loses the plate. */
+  .mf-readout-xl {
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .mf-readout-xl .mf-readout-value {
+    font-size: var(--text-readout-xl);
+    line-height: 0.9;
+    color: var(--color-signal);
+    text-shadow:
+      0 0 8px color-mix(in srgb, var(--color-signal) 55%, transparent),
+      0 0 1px var(--color-signal);
+  }
+
+  /* ---- Stamp ------------------------------------------------------------ */
+
+  .mf-stamp {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border: 2px solid currentColor;
+    border-radius: 4px;
+    font-family: var(--font-display);
+    font-size: var(--text-h3);
+    font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.9;
+    transform: rotate(-6deg);
+    /* The gap between the two rings is the surface the stamp is pressed on. */
+    box-shadow:
+      inset 0 0 0 2px var(--stamp-ground, var(--color-panel)),
+      inset 0 0 0 3px currentColor;
+  }
+
+  .mf-screen .mf-stamp {
+    --stamp-ground: var(--color-screen);
+  }
+
+  /* After the screen rule, so a slip on the glass is still paper. Full ink
+     on paper (A-15): at .9 a 16px stamp fell under 4.5:1. */
+  .mf-tape .mf-stamp {
+    --stamp-ground: var(--color-paper);
+  }
+
+  .mf-tape .mf-stamp,
+  .mf-slip .mf-stamp {
+    --mf-stamp-rest: 1;
+    opacity: 1;
+  }
+
+  /* ---- Header chrome ---------------------------------------------------- */
+
+  /* One 56px row at every width. The backdrop blur is static; the amber
+     hairline under the border is the lamp-light catching the desk edge. */
+  .mf-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    border-block-end: 1px solid var(--color-line);
+    background: color-mix(in srgb, var(--color-void) 85%, transparent);
+    /* Prefixed first: the CSS minifier collapses the pair and keeps the last
+       declaration, so with the standard one first only `-webkit-` survived and
+       Chrome and Firefox drew no blur at all. */
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+
+  /* With --mf-header-h at 0 (see the base layer), the header scrolls away. */
+  @media (max-height: 30rem) {
+    .mf-header {
+      position: relative;
+    }
+  }
+
+  .mf-header::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: 100%;
+    block-size: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--color-amber) 22%, transparent) 20%,
+      color-mix(in srgb, var(--color-amber) 22%, transparent) 80%,
+      transparent
+    );
+    pointer-events: none;
+  }
+
+  /* The dropdown and mobile panels hang from the header's bottom edge. */
+  .mf-menu-panel {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: 100%;
+    z-index: 50;
+  }
+
+  /* A closed <details> wraps its content in a slot with content-visibility:
+     hidden, which implies layout containment — so the slot, 44px wide, becomes
+     the panel's containing block instead of the header. The panel's content
+     then spills past the right edge and widens every page on a phone by
+     ~65px, even though nothing is painted. Not rendering it at all while
+     closed removes the box entirely. */
+  details:not([open]) > .mf-menu-panel {
+    display: none;
+  }
+
+  /* A small menu hanging from its own button, right-aligned to it (the theme
+     menu). Same closed-<details> rule as the panels above. */
+  .mf-popover {
+    position: absolute;
+    inset-inline-end: 0;
+    inset-block-start: calc(100% + 8px);
+    z-index: 50;
+    min-inline-size: 11.5rem;
+    padding: 6px;
+    border-radius: 12px;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-panel);
+    box-shadow: 0 18px 40px -18px rgb(0 0 0 / 0.55);
+  }
+
+  details:not([open]) > .mf-popover {
+    display: none;
+  }
+
+  .mf-popover-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    inline-size: 100%;
+    min-block-size: 40px;
+    padding: 0 0.75rem;
+    border-radius: var(--radius-chip);
+    color: var(--color-muted);
+    font-size: 0.9375rem;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .mf-popover-item:hover,
+  .mf-popover-item:focus-visible {
+    background: color-mix(in srgb, var(--color-ink) 7%, transparent);
+    color: var(--color-ink);
+  }
+
+  .mf-popover-item[aria-checked='true'] {
+    color: var(--color-ink);
+  }
+
+  /* The check is the non-colour cue for the current choice. */
+  .mf-popover-check {
+    visibility: hidden;
+    color: var(--color-signal);
+  }
+
+  .mf-popover-item[aria-checked='true'] .mf-popover-check {
+    visibility: visible;
+  }
+
+  @media (pointer: coarse) {
+    .mf-popover-item {
+      min-block-size: 44px;
+    }
+  }
+
+  /* The theme button shows the theme in force. `data-theme` is set before
+     first paint, so the right icon is there from the first frame. */
+  .mf-theme-icon-light,
+  html[data-theme='light'] .mf-theme-icon-dark {
+    display: none;
+  }
+
+  html[data-theme='light'] .mf-theme-icon-light {
+    display: block;
+  }
+
+  .mf-summary {
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .mf-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .mf-nav-link {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    font-size: 0.9375rem;
+    color: var(--color-ink);
+  }
+
+  .mf-nav-link::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: 4px;
+    block-size: 2px;
+    border-radius: 2px;
+    background: var(--color-signal);
+    opacity: 0;
+    transform: scaleX(0.4);
+    transition:
+      opacity var(--duration-dah) var(--ease-signal),
+      transform var(--duration-dah) var(--ease-signal);
+  }
+
+  /* In the header bar the links run the full height of the row, so the
+     current-page bar sits on the header's bottom rule rather than floating
+     under the word. The padding (cancelled by the margin, so nothing moves)
+     gives the focus ring room: it is drawn 6px inside the link, so it stays
+     on screen at the top and clears the word by 4px on each side (V-09). */
+  .mf-header .mf-nav-link {
+    min-height: 56px;
+    padding-inline: 0.625rem;
+    margin-inline: -0.625rem;
+  }
+
+  .mf-header .mf-nav-link:focus-visible {
+    outline-offset: -6px;
+    border-radius: var(--radius-control);
+  }
+
+  .mf-header .mf-nav-link::after {
+    inset-block-end: 0;
+    inset-inline: 0.625rem;
+  }
+
+  .mf-nav-link:hover::after {
+    opacity: 0.45;
+    transform: none;
+  }
+
+  .mf-nav-link[aria-current='page'] {
+    color: var(--color-signal);
+  }
+
+  .mf-nav-link[aria-current='page']::after {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* A link in a menu panel: label, then a one-line hint. */
+  .mf-menu-link {
+    display: block;
+    margin-inline: -0.625rem;
+    padding: 0.5rem 0.625rem;
+    border-radius: var(--radius-chip);
+    color: var(--color-ink);
+  }
+
+  .mf-menu-link:hover {
+    background: color-mix(in srgb, var(--color-ink) 6%, transparent);
+  }
+
+  /* The current page is marked by a leading bar as well as the colour
+     (A-16): in light theme the green and the ink differ by hue alone. */
+  .mf-menu-link[aria-current='page'],
+  .mf-menu-row[aria-current='page'] {
+    color: var(--color-signal);
+    box-shadow: inset 2px 0 0 var(--color-signal);
+  }
+
+  /* A label-only row in the phone menu's lists: the tiles above carry the
+     hints, these only have to be found and hit. 40px, 44px under a finger. */
+  .mf-menu-row {
+    display: flex;
+    align-items: center;
+    min-block-size: 40px;
+    margin-inline: -0.625rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: var(--radius-chip);
+    color: var(--color-ink);
+    font-size: 0.9375rem;
+    line-height: 1.3;
+  }
+
+  .mf-menu-row:hover {
+    background: color-mix(in srgb, var(--color-ink) 6%, transparent);
+  }
+
+  @media (pointer: coarse) {
+    .mf-menu-row {
+      min-block-size: 44px;
+    }
+  }
+
+  /* The primary destinations at the top of the phone menu: big, boxed. */
+  .mf-menu-tile {
+    display: block;
+    block-size: 100%;
+    padding: 0.75rem 0.875rem;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-elevated);
+    color: var(--color-ink);
+  }
+
+  .mf-menu-tile[aria-current='page'] {
+    border-color: var(--color-signal);
+    color: var(--color-signal);
+    box-shadow: inset 3px 0 0 var(--color-signal);
+  }
+
+  .mf-menu-link-label {
+    display: block;
+    font-size: 0.9375rem;
+    line-height: 1.35;
+  }
+
+  .mf-menu-link-hint {
+    display: block;
+    margin-block-start: 0.125rem;
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    color: var(--color-muted);
+  }
+
+  /* Header progress chip: a small brass-edged plate. */
+  .mf-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 36px;
+    padding: 0 0.75rem;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-panel);
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: var(--text-control);
+    letter-spacing: 0.06em;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .mf-chip:hover {
+    border-color: var(--color-signal-dim);
+  }
+
+  /* The label in the bar's own voice: mono capitals like every other plate
+     label, in ink rather than muted, so it never reads as disabled (V-12). */
+  .mf-chip-label {
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* On a phone a streak is the lamp and "5d"; the label joins from sm up. */
+  @media (width < 40rem) {
+    .mf-chip[data-streak='true'] .mf-chip-label {
+      display: none;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .mf-chip {
+      min-height: 44px;
+    }
+  }
+
+  /* The header logo: the lockup, or the mark alone while the chip is
+     showing on a narrow phone, so logo, chip and three icons fit down to
+     320px. "5d" fits beside the lockup from 380px; the wider CONTINUE label
+     (no streak yet) from 432px. */
+  .mf-logo-mark {
+    display: none;
+  }
+
+  @media (width < 23.75rem) {
+    .mf-header:has([data-progress-chip]:not([hidden])) .mf-logo-full {
+      display: none;
+    }
+
+    .mf-header:has([data-progress-chip]:not([hidden])) .mf-logo-mark {
+      display: block;
+    }
+  }
+
+  @media (width < 27rem) {
+    .mf-header:has([data-progress-chip][data-streak='false']:not([hidden])) .mf-logo-full {
+      display: none;
+    }
+
+    .mf-header:has([data-progress-chip][data-streak='false']:not([hidden])) .mf-logo-mark {
+      display: block;
+    }
+  }
+
+  /* ---- Moments (§4.4) --------------------------------------------------- */
+
+  /* Each is a class toggled by state; none loops. Under reduced motion the
+     universal rule above shortens them to their end state, and the ones whose
+     end state is invisible are switched off outright below. */
+  .mf-strike {
+    animation: mf-strike 120ms var(--ease-signal) both;
+  }
+
+  .mf-rise {
+    animation: mf-rise 900ms var(--ease-signal) both;
+  }
+
+  .mf-rise-hold {
+    animation: mf-rise-hold var(--duration-word) var(--ease-signal) both;
+  }
+
+  .mf-stamp-in {
+    animation: mf-stamp var(--duration-word) var(--ease-signal) both;
+  }
+
+  .mf-power-on {
+    animation: mf-power-on 380ms var(--ease-signal) both;
+  }
+
+  .mf-shake {
+    animation: mf-shake var(--duration-dah) linear 2;
+  }
+
+  /* SVG nodes need their own box as the transform origin. */
+  .mf-halo {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: mf-halo var(--duration-word) var(--ease-signal) both;
+  }
+
+  .mf-slip {
+    animation: mf-slip 240ms var(--ease-signal) both;
+  }
+
+  .mf-flash {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: var(--color-signal);
+    opacity: 0;
+    animation: mf-flash var(--duration-dah) linear both;
+  }
+
+  /* The +XP must stay readable when it cannot rise and fade; a halo or flash
+     whose last frame is invisible has nothing to show statically. */
+  @media (prefers-reduced-motion: reduce) {
+    html:not([data-motion='full']) .mf-rise,
+    html:not([data-motion='full']) .mf-rise-hold,
+    html:not([data-motion='full']) .mf-halo,
+    html:not([data-motion='full']) .mf-flash {
+      animation: none;
+    }
+  }
+
+  html[data-motion='reduce'] .mf-rise,
+  html[data-motion='reduce'] .mf-rise-hold,
+  html[data-motion='reduce'] .mf-halo,
+  html[data-motion='reduce'] .mf-flash {
+    animation: none;
+  }
+
+  /* ---- Page shell (PageShell.astro, C-1) -------------------------------- */
+
+  /* Two widths (DEC-043): tools and reference at 6xl, prose and forms at 3xl.
+     At 1440 that puts every H1's left edge at 168 or 360, and every H1 at the
+     same height, because the rail above it is always one line at sm and up.
+     A flex column, so a phone can reorder the parts without moving them in
+     the HTML. Never an `overflow` here: the telegraph dock is sticky. */
+  .mf-page {
+    display: flex;
+    flex-direction: column;
+    inline-size: 100%;
+    max-inline-size: 72rem;
+    margin-inline: auto;
+    padding: 2rem 1.25rem;
+  }
+
+  .mf-page[data-width='prose'] {
+    max-inline-size: 48rem;
+  }
+
+  /* Breadcrumb left, the brass eyebrow right, on one engraved line: the head
+     of a telegram form. On a phone the eyebrow drops under the crumbs. */
+  .mf-page-rail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.375rem 2rem;
+    margin-block-end: 1.25rem;
+  }
+
+  .mf-page-intro {
+    margin-block-start: 1rem;
+    max-inline-size: 60ch;
+  }
+
+  .mf-page-instrument {
+    min-inline-size: 0;
+    margin-block-start: 2rem;
+  }
+
+  /* Everything under the instrument. The grid's gap is the spacing between
+     sections and the FAQ, so none of them carries its own margin. */
+  .mf-page-more {
+    display: grid;
+    gap: 4rem;
+    margin-block-start: 4rem;
+  }
+
+  .mf-page-more > * {
+    min-inline-size: 0;
+  }
+
+  @media (width >= 40rem) {
+    .mf-page {
+      padding: 3rem 1.5rem;
+    }
+
+    .mf-page-more {
+      gap: 5rem;
+      margin-block-start: 5rem;
+    }
+  }
+
+  /* DEC-044: on a phone the instrument comes straight under the H1, and the
+     intro after it. The crumbs go (the header and the H1 say where you are);
+     the order of the HTML is untouched. */
+  @media (width < 40rem) {
+    .mf-page[data-instrument-first] .mf-page-crumbs {
+      display: none;
+    }
+
+    .mf-page[data-instrument-first] .mf-page-rail:not(:has(.mf-page-eyebrow)) {
+      display: none;
+    }
+
+    .mf-page[data-instrument-first] .mf-page-instrument {
+      order: 2;
+      margin-block-start: 1.25rem;
+    }
+
+    .mf-page[data-instrument-first] .mf-page-intro {
+      order: 3;
+      margin-block-start: 2rem;
+    }
+
+    .mf-page[data-instrument-first] .mf-page-more {
+      order: 4;
+    }
+  }
+
+  /* ---- Prose for Markdown content -------------------------------------- */
+
+  /* Hand-written rather than pulled from a typography plugin: the blog has one
+     post and about eight element types, and a plugin would ship rules for
+     dozens more that this design would then have to override. */
   .mf-prose {
+    max-width: 68ch;
     line-height: 1.75;
   }
 
@@ -199,21 +1940,35 @@
     margin-top: 1.25em;
   }
 
+  /* On the site's scale (V-07): a prose H2 is the same size as every other
+     H2, and a prose H3 the same as every other H3, so the spacing in em
+     matches the pages that already set `text-h2` on their prose headings. */
   .mf-prose h2 {
     font-family: var(--font-display);
-    font-size: 1.5rem;
+    font-size: var(--text-h2);
     font-weight: 700;
-    letter-spacing: -0.01em;
+    line-height: var(--text-h2--line-height);
+    letter-spacing: var(--text-h2--letter-spacing);
+    color: var(--color-ink);
     margin-top: 2.5em;
     margin-bottom: 0.6em;
   }
 
   .mf-prose h3 {
     font-family: var(--font-display);
-    font-size: 1.125rem;
-    font-weight: 600;
+    font-size: var(--text-h3);
+    font-weight: 700;
+    line-height: var(--text-h3--line-height);
+    color: var(--color-ink);
     margin-top: 2em;
     margin-bottom: 0.5em;
+  }
+
+  /* A prose block that opens with its heading is not pushed down by it: in
+     the shell's `more` grid the gap above is already the section spacing. */
+  .mf-prose > h2:first-child,
+  .mf-prose > h3:first-child {
+    margin-top: 0;
   }
 
   .mf-prose p,
@@ -229,7 +1984,8 @@
   .mf-prose a {
     color: var(--color-signal);
     text-decoration: underline;
-    text-decoration-color: color-mix(in srgb, var(--color-signal) 40%, transparent);
+    text-decoration-thickness: 1px;
+    text-decoration-color: color-mix(in srgb, var(--color-signal) 45%, transparent);
     text-underline-offset: 4px;
   }
 

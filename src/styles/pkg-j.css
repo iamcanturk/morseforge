@@ -1,0 +1,167 @@
+/* ---------------------------------------------------------------------------
+   Settings: the station's control panel (Package J).
+
+   Only what the shared classes in global.css lack: the switch, the rebindable
+   keycap, the timing strip, the section rail and the confirmation dialog.
+   Colours are the global tokens; nothing here animates anything but transform
+   and opacity, and the global reduced-motion rules still apply.
+--------------------------------------------------------------------------- */
+
+@layer components {
+  /* ---- Switch: a lever in a slot. The knob's position is the non-colour
+     cue; the track's colour change is instant. */
+  .pj-switch {
+    position: relative;
+    flex: none;
+    inline-size: 3.25rem;
+    block-size: 1.875rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-void);
+    box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.45);
+    cursor: pointer;
+  }
+
+  .pj-switch::before {
+    content: '';
+    position: absolute;
+    inset-block-start: 3px;
+    inset-inline-start: 3px;
+    inline-size: 1.375rem;
+    block-size: 1.375rem;
+    border-radius: 999px;
+    background: var(--color-muted);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.25),
+      0 1px 2px rgb(0 0 0 / 0.5);
+    transition: transform var(--duration-dah) var(--ease-signal);
+  }
+
+  .pj-switch[aria-checked='true'] {
+    border-color: var(--color-signal);
+    background: color-mix(in srgb, var(--color-signal) 18%, var(--color-void));
+  }
+
+  .pj-switch[aria-checked='true']::before {
+    background: var(--color-signal);
+    transform: translateX(1.375rem);
+  }
+
+  /* ---- Keycap: a rebindable key, drawn as the key it is. */
+  .pj-keycap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-block-size: 3rem;
+    min-inline-size: 6.5rem;
+    padding: 0 1rem;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--color-line-strong);
+    border-block-end-width: 3px;
+    background: linear-gradient(180deg, var(--color-elevated), var(--color-panel));
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: var(--text-control);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: transform var(--duration-dit) var(--ease-signal);
+  }
+
+  .pj-keycap:active {
+    transform: translateY(2px);
+  }
+
+  .pj-keycap[data-listening='true'] {
+    border-color: var(--color-amber);
+    color: var(--color-amber);
+  }
+
+  .pj-keycap[data-conflict='true'] {
+    border-color: var(--color-danger);
+  }
+
+  /* ---- Timing strip: PARIS drawn to scale on the screen. */
+  .pj-strip {
+    display: block;
+    inline-size: 100%;
+    block-size: 2.5rem;
+  }
+
+  .pj-strip-tone {
+    fill: var(--color-signal);
+  }
+
+  .pj-strip-base {
+    stroke: var(--color-signal-dim);
+    stroke-width: 1;
+  }
+
+  /* ---- Section rail (desktop). */
+  .pj-rail-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-block-size: 2.5rem;
+    padding: 0 0.75rem;
+    border-radius: var(--radius-chip);
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-control);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .pj-rail-link:hover {
+    color: var(--color-ink);
+  }
+
+  .pj-rail-link[aria-current='true'] {
+    background: var(--color-elevated);
+    color: var(--color-ink);
+    box-shadow: inset 0 0 0 1px var(--color-line-strong);
+  }
+
+  /* ---- Erase: a danger action with an edge, for the one irreversible
+     button on the page. */
+  .pj-btn-erase {
+    color: var(--color-danger);
+    border-color: color-mix(in srgb, var(--color-danger) 70%, var(--color-line-strong));
+  }
+
+  /* ---- Confirmation dialog. */
+  .pj-dialog {
+    inline-size: min(34rem, calc(100vw - 2rem));
+    max-block-size: calc(100dvh - 2rem);
+    margin: auto;
+    padding: 0;
+    color: var(--color-ink);
+    overflow: auto;
+  }
+
+  .pj-dialog::backdrop {
+    background: rgb(6 5 3 / 0.72);
+  }
+
+  /* An import or reset outcome, stamped beside its section. */
+  .pj-outcome {
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .pj-outcome[data-state='restored'] {
+    color: var(--color-signal);
+  }
+
+  .pj-outcome[data-state='rejected'] {
+    color: var(--color-danger);
+  }
+
+  .pj-outcome[data-state='absent'] {
+    color: var(--color-muted);
+  }
+}

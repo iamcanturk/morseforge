@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { drawFrame, type Palette } from './draw'
+import { STUDIO_PALETTE, drawFrame } from './draw'
 import { layout } from './scene'
 
 /**
@@ -49,13 +49,7 @@ function recordingContext() {
   return { context: context as unknown as CanvasRenderingContext2D, bars, lines }
 }
 
-const palette: Palette = {
-  background: '#080b10',
-  signal: '#00e88f',
-  dim: '#00a868',
-  cyan: '#22d3ee',
-  ink: '#f0f4f8',
-}
+const palette = STUDIO_PALETTE
 
 /** A single tone at `bin`, as the analyser would report it. */
 function tone(bin: number, length = 1024) {

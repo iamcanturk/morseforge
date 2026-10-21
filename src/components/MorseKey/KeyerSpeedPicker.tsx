@@ -1,3 +1,6 @@
+import { useId } from 'react'
+import { Segmented } from '../ui/Segmented'
+import { formatSeconds } from '../../data/format'
 import { KEYER_PRESETS, type KeyerPreset, matchKeyerPreset } from '../../storage/settings'
 import type { SettingsRecord } from '../../storage/settings'
 
@@ -9,52 +12,57 @@ import type { SettingsRecord } from '../../storage/settings'
  * controls playback; this controls how long you may hesitate mid-character,
  * which is a completely different thing that happens to be measured in
  * milliseconds too.
+ *
+ * A radio group (one choice, arrow keys) rather than the row of toggles it
+ * used to be. The seconds come from `KEYER_PRESETS`, so the label can never
+ * disagree with what the key actually does.
  */
 export function KeyerSpeedPicker({
   timing,
   onChange,
+  className,
 }: {
   timing: SettingsRecord['timing']
   onChange: (preset: KeyerPreset) => void
+  className?: string
 }) {
+  const labelId = useId()
   const active = matchKeyerPreset(timing)
+  const names = Object.keys(KEYER_PRESETS) as KeyerPreset[]
+
+  const options = names.map((name) => {
+    const preset = KEYER_PRESETS[name]
+    const detail = preset.autoCommit ? `${formatSeconds(preset.characterGapMs)} s` : 'No timer'
+    return {
+      value: name,
+      ariaLabel: `${preset.label}, ${preset.autoCommit ? `${formatSeconds(preset.characterGapMs)} seconds` : 'no timer'}`,
+      label: (
+        <span className="flex flex-col items-center gap-1 py-1 leading-none">
+          <span>{preset.label}</span>
+          <span className="font-mono text-label tracking-normal normal-case">{detail}</span>
+        </span>
+      ),
+    }
+  })
 
   return (
-    <fieldset>
-      <legend className="font-mono text-[10px] tracking-[0.18em] text-muted">
-        TIME TO FINISH A CHARACTER
-      </legend>
-
-      <div className="mt-3 flex flex-wrap gap-2">
-        {(Object.keys(KEYER_PRESETS) as KeyerPreset[]).map((name) => {
-          const preset = KEYER_PRESETS[name]
-          const selected = active === name
-          return (
-            <button
-              key={name}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => onChange(name)}
-              className="rounded-lg border px-3 py-2 text-left transition-colors"
-              style={{
-                borderColor: selected ? 'var(--color-signal)' : 'var(--color-line)',
-                color: selected ? 'var(--color-signal)' : 'var(--color-muted)',
-              }}
-            >
-              <span className="block font-mono text-xs tracking-[0.12em]">
-                {preset.label.toUpperCase()}
-              </span>
-              <span className="mt-0.5 block text-[11px] opacity-70">
-                {preset.autoCommit ? `${(preset.characterGapMs / 1000).toFixed(1)}s` : 'no timer'}
-              </span>
-            </button>
-          )
-        })}
+    <div className={className}>
+      <div className="flex items-baseline justify-between gap-3">
+        <span id={labelId} className="mf-engraved">
+          Time to finish a character
+        </span>
+        {active === null && <span className="mf-engraved text-amber">Custom, set in Settings</span>}
       </div>
-
-      {active === null && (
-        <p className="mt-2 font-mono text-[10px] tracking-[0.14em] text-amber">CUSTOM</p>
-      )}
-    </fieldset>
+      <Segmented
+        label="Time to finish a character"
+        labelledBy={labelId}
+        value={active}
+        options={options}
+        onChange={onChange}
+        size="sm"
+        block
+        className="kc-seg-grid mt-2"
+      />
+    </div>
   )
 }

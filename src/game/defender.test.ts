@@ -1,23 +1,30 @@
 import { describe, expect, it } from 'vitest'
 import {
+  DEFENDER_SKILL,
   FALL_MS,
   RAMP_MS,
   SPAWN_MS,
+  OUTCOME_LOG,
   STARTING_LIVES,
   accuracy,
   advance,
+  endRun,
   fallDuration,
   hitScore,
   isOver,
   newDefenderGame,
   pressure,
+  runXp,
   shoot,
+  shots,
   spawnDelay,
   weakest,
   type DefenderState,
   type Signal,
 } from './defender'
 import { createRandom } from './random'
+import { xpForAnswer } from './progression'
+import { answer, emptyProgress, getCharacter } from '../storage/progress'
 
 const ALPHABET = ['E', 'T', 'A', 'N']
 const random = () => createRandom(7)
@@ -213,5 +220,98 @@ describe('the result', () => {
 
   it('has nothing to report when nothing leaked', () => {
     expect(weakest(newDefenderGame())).toEqual([])
+  })
+})
+
+describe('what a run records', () => {
+  const at = (signals: Signal[]): DefenderState => ({ ...newDefenderGame(), signals })
+
+  it('blames a wrong shot on the signal only when nothing else could have been meant', () => {
+    const lone = at([{ id: 1, character: 'E', y: 0.4, x: 0.5 }])
+    const shot = shoot(lone, 'T')
+    expect(shot.blamed?.id).toBe(1)
+    expect(shot.state.signals[0]?.wrong).toBe(true)
+
+    const twins = at([
+      { id: 1, character: 'E', y: 0.4, x: 0.3 },
+      { id: 2, character: 'E', y: 0.2, x: 0.7 },
+    ])
+    expect(shoot(twins, 'T').blamed?.id).toBe(1)
+
+    const mixed = at([
+      { id: 1, character: 'E', y: 0.4, x: 0.3 },
+      { id: 2, character: 'A', y: 0.2, x: 0.7 },
+    ])
+    const guess = shoot(mixed, 'T')
+    expect(guess.blamed).toBeNull()
+    expect(guess.state.signals.some((signal) => signal.wrong)).toBe(false)
+
+    expect(shoot(newDefenderGame(), 'T').blamed).toBeNull()
+  })
+
+  it('blames a signal once, however many wrong keys it draws', () => {
+    const once = shoot(at([{ id: 1, character: 'E', y: 0.4, x: 0.5 }]), 'T').state
+    expect(shoot(once, 'A').blamed).toBeNull()
+  })
+
+  it('hands back what landed, so the screen can record it as missed', () => {
+    const state = at([{ id: 4, character: 'Q', y: 0.99, x: 0.5, wrong: true }])
+    const { landed, state: next } = advance(state, 200, ['E'], createRandom(1))
+    expect(landed.map((signal) => signal.id)).toEqual([4])
+    expect(landed[0]?.wrong).toBe(true)
+    expect(next.outcomes).toEqual([false])
+  })
+
+  it('logs every outcome in order, and keeps only the latest stretch', () => {
+    let state = at([{ id: 1, character: 'E', y: 0.4, x: 0.5 }])
+    state = shoot(state, 'E').state
+    state = shoot(state, 'T').state
+    expect(state.outcomes).toEqual([true, false])
+
+    const long = { ...newDefenderGame(), outcomes: Array<boolean>(OUTCOME_LOG).fill(true) }
+    const next = shoot(long, 'T').state
+    expect(next.outcomes).toHaveLength(OUTCOME_LOG)
+    expect(next.outcomes.at(-1)).toBe(false)
+  })
+
+  it('pays XP per character knocked down, at the practice rate', () => {
+    let state = at([
+      { id: 1, character: 'E', y: 0.4, x: 0.3 },
+      { id: 2, character: 'Q', y: 0.2, x: 0.7 },
+    ])
+    state = shoot(state, 'E').state
+    state = shoot(state, 'Q').state
+    expect(state.caught).toEqual(['E', 'Q'])
+    expect(runXp(state)).toBe(xpForAnswer('E') + xpForAnswer('Q'))
+    expect(runXp(newDefenderGame())).toBe(0)
+  })
+
+  it('counts only what was typed as shots, not what leaked', () => {
+    const state = { ...newDefenderGame(), hits: 4, misses: 3, leaked: ['E', 'T'] }
+    expect(shots(state)).toBe(5)
+    expect(shots(newDefenderGame())).toBe(0)
+  })
+
+  it('can be ended early and keeps its score', () => {
+    const state = { ...newDefenderGame(), score: 90, lives: 2 }
+    const ended = endRun(state)
+    expect(isOver(ended)).toBe(true)
+    expect(ended.score).toBe(90)
+    expect(ended.lives).toBe(2)
+    expect(advance(ended, 500, ['E'], createRandom(1)).state).toBe(ended)
+    expect(endRun(ended)).toBe(ended)
+  })
+})
+
+describe('what a hit is evidence of (DEC-027)', () => {
+  it('records recognition, never listening: the code is on screen', () => {
+    expect(DEFENDER_SKILL).toBe('recognition')
+    const signal: Signal = { id: 1, character: 'E', y: 0.5, x: 0.5 }
+    const hit = shoot({ ...newDefenderGame(), signals: [signal] }, 'E').hit
+    expect(hit?.character).toBe('E')
+    const progress = answer(emptyProgress(), hit!.character, DEFENDER_SKILL, true, 0)
+    const { skills } = getCharacter(progress, 'E', 0)
+    expect(skills.recognition).toEqual({ attempts: 1, correct: 1 })
+    expect(skills.listening).toEqual({ attempts: 0, correct: 0 })
   })
 })

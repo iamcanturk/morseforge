@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MODES, SIZES, extensionFor, fileName, keyedElements, layout, type ModeId } from './scene'
-import { drawCaption, drawFrame, drawLogo, readPalette } from './draw'
+import { STUDIO_PALETTE, drawCaption, drawFrame, drawLogo } from './draw'
 import { AudioEngine } from '../../engine/audioEngine'
 import { encode, prettify } from '../../engine/morseEncoder'
 import { buildTimeline, estimateDuration } from '../../engine/timingEngine'
@@ -76,7 +76,7 @@ export function StudioScreen() {
       if (!element || !context) return
 
       const frame = layout(element.width, element.height)
-      const palette = readPalette(element)
+      const palette = STUDIO_PALETTE
 
       const bins = analyser.current?.frequencyBinCount ?? 0
       const frequency = new Uint8Array(bins)
@@ -310,7 +310,7 @@ export function StudioScreen() {
           height={size.height}
           className="mx-auto block rounded-lg"
           style={{
-            background: '#080b10',
+            background: STUDIO_PALETTE.background,
             width: 'auto',
             height: 'auto',
             maxWidth: '100%',

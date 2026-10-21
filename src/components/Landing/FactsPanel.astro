@@ -1,0 +1,94 @@
+---
+/**
+ * Section 2: what Morse code is, and the code by the numbers (TASK-001 §5.4).
+ *
+ * The quotable definition from the registry beside a bank of readout plates.
+ * Every figure is computed from the data it describes — no user counts, no
+ * testimonials, nothing typed (Q2a).
+ */
+import { FACTS } from '../../config/facts'
+import { LANDING } from '../../config/landing'
+import { CITATIONS } from '../../config/site'
+import { joinList, numberWord } from '../../data/format'
+import { METHODS, METHOD_IDS } from '../../data/methods'
+import { MORSE_TREE, treeDepth } from '../../data/tree'
+import Linked from './Linked.astro'
+
+const oneElement = FACTS.lettersByLength[1] ?? []
+
+const plates = [
+  {
+    label: 'Letters',
+    value: FACTS.letterCount,
+    caption: `${joinList([...oneElement])} are one element each`,
+  },
+  {
+    label: 'Digits',
+    value: FACTS.digitCount,
+    caption: `Every one is ${numberWord(FACTS.digitElements)} elements long`,
+  },
+  {
+    label: 'Tree levels',
+    value: treeDepth(MORSE_TREE),
+    caption: 'A dot goes left, a dash goes right',
+  },
+  {
+    label: 'Days in the plan',
+    value: FACTS.planDays,
+    caption: `${FACTS.planTime} of practice in total`,
+  },
+  {
+    label: 'Words explained',
+    value: FACTS.wordCount,
+    caption: 'Each one playable, from SOS to 73',
+  },
+  {
+    label: 'Teaching orders',
+    value: METHOD_IDS.length,
+    caption: joinList(METHOD_IDS.map((id) => METHODS[id].name)),
+  },
+]
+---
+
+<section class="py-16 md:py-24" aria-labelledby="what-is-morse">
+  <div
+    class="mx-auto grid max-w-7xl gap-10 px-5 sm:px-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-14"
+  >
+    <div>
+      <p class="mf-engraved text-brass">Reference</p>
+      <h2 id="what-is-morse" class="mt-3 font-display text-h2 font-bold text-ink">
+        {LANDING.whatIsMorse.heading}
+      </h2>
+      <Linked
+        paragraph={LANDING.whatIsMorse.paragraph}
+        class="mt-5 max-w-[60ch] leading-relaxed text-muted"
+      />
+    </div>
+
+    <div>
+      <h3 class="mf-engraved">The code, by the numbers</h3>
+      <dl class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {
+          plates.map((plate) => (
+            <div class="mf-readout">
+              <dt class="mf-readout-label mf-engraved">{plate.label}</dt>
+              <dd class="mf-readout-value">{plate.value}</dd>
+              <dd class="text-sm leading-snug text-muted">{plate.caption}</dd>
+            </div>
+          ))
+        }
+      </dl>
+      <p class="mt-4 text-sm text-muted">
+        Letters, digits and {FACTS.ituPunctuationCount} punctuation marks as defined by Recommendation{
+          ' '
+        }
+        <a
+          href={CITATIONS.itu.url}
+          rel="noopener"
+          class="text-signal underline decoration-signal/40 underline-offset-4 hover:decoration-signal"
+          >{CITATIONS.itu.short}</a
+        >.
+      </p>
+    </div>
+  </div>
+</section>

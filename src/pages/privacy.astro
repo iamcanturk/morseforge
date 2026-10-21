@@ -1,6 +1,12 @@
 ---
+import '../styles/pkg-i.css'
 import BaseLayout from '../layouts/BaseLayout.astro'
+import PageShell from '../components/PageShell.astro'
+import { breadcrumbTrail, getPage } from '../config/pages'
 import { AUTHOR, SITE } from '../config/site'
+import { breadcrumbs, webPage } from '../seo/schema'
+import { capitalise, numberWord } from '../data/format'
+import { ENDPOINT } from '../analytics/track'
 
 /**
  * The privacy page.
@@ -15,166 +21,184 @@ import { AUTHOR, SITE } from '../config/site'
  * What *is* required is telling people what happens, which is this page.
  * A banner would have been theatre implying tracking that does not exist.
  */
-const title = 'Privacy — What MorseForge Stores and Sends | MorseForge'
-const description =
-  'No cookies, no accounts, no tracking. Your progress is stored in your own browser and never leaves it. Exactly what is collected, why, and how to switch it off.'
+const page = getPage('/privacy/')
+const trail = breadcrumbTrail(page.path)
 
 const schema = [
+  webPage({ path: page.path, name: page.h1, description: page.description, aboutMorse: false }),
+  breadcrumbs(trail),
+]
+
+/** The short version, as a ledger: what there is and is not, before the detail. */
+const ledger = [
+  { item: 'Cookies', value: 'None', on: false },
+  { item: 'Accounts', value: 'None', on: false },
+  { item: 'Advertising', value: 'None', on: false },
+  { item: 'Your progress', value: 'Your browser only', on: true },
+  { item: 'Page views', value: 'Cloudflare, cookieless', on: true },
+  { item: 'Usage counts', value: 'Our own, no identifier', on: true },
+]
+
+/** What sits in your browser's local storage, one entry per stored record. */
+const stored = [
   {
-    '@context': 'https://schema.org',
-    '@type': 'WebPage',
-    name: 'Privacy',
-    url: `${SITE.url}/privacy/`,
-    description,
-    isPartOf: { '@id': `${SITE.url}/#website` },
-    publisher: { '@id': `${SITE.url}/#author` },
-    inLanguage: 'en',
+    name: 'Your progress',
+    detail: 'which characters you have met and how you have done on each, per skill.',
   },
+  {
+    name: 'Your settings',
+    detail: 'speed, pitch, key bindings, motion and whether the usage counter is on.',
+  },
+  { name: 'Your statistics', detail: 'sessions, streak, XP, achievements and best scores.' },
+  { name: 'Your daily challenge results', detail: 'the last few weeks of them.' },
+  { name: 'Your theme', detail: 'dark, light or following your system.' },
 ]
 ---
 
-<BaseLayout title={title} description={description} path="/privacy/" schema={schema}>
-  <main class="mx-auto max-w-3xl px-6 py-14">
-    <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Privacy</h1>
+<BaseLayout title={page.title} description={page.description} path={page.path} schema={schema}>
+  <PageShell width="prose" trail={trail} eyebrow="Station notice" h1={page.h1} intro={page.intro}>
+    <dl class="mf-instrument grid overflow-hidden px-3 py-2 sm:px-4">
+      {
+        ledger.map((row) => (
+          <div class="flex items-center justify-between gap-4 border-b border-line px-4 py-3 last:border-b-0">
+            <dt class="mf-engraved">{row.item}</dt>
+            <dd class="flex items-center gap-2.5 text-right font-mono text-control text-ink">
+              {row.value}
+              <span
+                class="mf-lamp"
+                data-tone={row.on ? 'amber' : undefined}
+                data-on={row.on ? 'true' : 'false'}
+                aria-hidden="true"
+              />
+            </dd>
+          </div>
+        ))
+      }
+    </dl>
 
-    <p class="mt-4 text-lg leading-relaxed text-ink">
-      There are no cookies on this site, no accounts, and no third-party trackers. Your progress is
-      stored in your own browser and is never sent anywhere.
-    </p>
-
-    <p class="mt-4 leading-relaxed text-muted">
-      That is also why there is no consent banner. A banner is required when a site stores or reads
-      information on your device for something you did not ask for. This one does not, so the banner
-      would be theatre — implying tracking that is not happening. This page is the honest version of
-      the same obligation.
-    </p>
-
-    <section class="mt-12">
-      <h2 class="font-display text-xl font-bold tracking-tight">What stays on your device</h2>
-      <p class="mt-3 leading-relaxed text-muted">
-        Four things, in your browser's local storage. None of them are sent to any server, and none
-        of them are readable by anyone but you.
-      </p>
-      <ul class="mt-4 space-y-2 text-muted">
-        <li>
-          <strong class="text-ink">Your progress</strong> — which characters you have met and how you
-          have done on each, per skill.
-        </li>
-        <li>
-          <strong class="text-ink">Your settings</strong> — speed, pitch, key bindings, theme, motion.
-        </li>
-        <li>
-          <strong class="text-ink">Your statistics</strong> — sessions, streak, XP, best speed.
-        </li>
-        <li>
-          <strong class="text-ink">Your daily challenge results</strong> — the last few weeks of them.
-        </li>
-      </ul>
-      <p class="mt-4 leading-relaxed text-muted">
-        Clearing your browser data erases all of it, and there is no copy anywhere else to restore
-        from. If it matters to you, export it from
-        <a href="/settings/" class="text-signal underline underline-offset-4">settings</a> — it is a plain
-        JSON file you keep.
-      </p>
-    </section>
-
-    <section class="mt-12">
-      <h2 class="font-display text-xl font-bold tracking-tight">What is counted</h2>
-      <p class="mt-3 leading-relaxed text-muted">
-        Two things, both of them counts rather than records of a person.
+    <div class="mf-prose pi-manual mt-12">
+      <p>
+        There is no consent banner, and that is deliberate. A banner is required when a site stores
+        or reads information on your device for something you did not ask for. This one stores only
+        the progress and settings you create by using it, and neither of the two counters described
+        below sets a cookie or keeps an identifier on your device. This page is the honest version
+        of the same obligation.
       </p>
 
-      <h3 class="mt-6 font-display font-semibold text-ink">Anonymous usage counters</h3>
-      <p class="mt-2 leading-relaxed text-muted">
-        When you start a practice session or finish a game, the browser sends a request naming that
-        event — <code class="text-signal-dim">practice_start</code>, and sometimes a short label
-        like <code class="text-signal-dim">listening</code>. That is the whole message. There is no
-        identifier, no session token, nothing you typed, and no way to connect two events to the
-        same person.
-      </p>
-      <p class="mt-3 leading-relaxed text-muted">
-        The server answers with an empty response and stores nothing; the request line in its own
-        access log is the only record, and a scheduled script turns those lines into daily totals.
-        You can turn this off in
-        <a href="/settings/" class="text-signal underline underline-offset-4">settings</a>, and it
-        is never sent at all if your browser asks not to be tracked.
-      </p>
+      <section>
+        <h2>What stays on your device</h2>
+        <p>
+          {capitalise(numberWord(stored.length))} things, in your browser's local storage. None of them
+          are sent to any server, and none of them are readable by anyone but you.
+        </p>
+        <ul>
+          {
+            stored.map((entry) => (
+              <li>
+                <strong>{entry.name}</strong>: {entry.detail}
+              </li>
+            ))
+          }
+        </ul>
+        <p>
+          Clearing your browser data erases all of it, and there is no copy anywhere else to restore
+          from. If it matters to you, export it from{' '}
+          <a href="/settings/">settings</a> — it is a plain JSON file you keep.
+        </p>
+      </section>
 
-      <h3 class="mt-6 font-display font-semibold text-ink">Cloudflare Web Analytics</h3>
-      <p class="mt-2 leading-relaxed text-muted">
-        Counts page views. It is
-        <a
-          href="https://developers.cloudflare.com/web-analytics/"
-          rel="noopener"
-          class="text-signal underline underline-offset-4">cookieless by design</a
-        > and does not fingerprint or follow anyone between sites. Cloudflare processes this on our behalf
-        and it is the only third party this site contacts.
-      </p>
-    </section>
+      <section>
+        <h2>What is counted</h2>
+        <p>Two things, both of them counts rather than records of a person.</p>
 
-    <section class="mt-12">
-      <h2 class="font-display text-xl font-bold tracking-tight">Your IP address</h2>
-      <p class="mt-3 leading-relaxed text-muted">
-        Like every web server, ours records the address each request came from. That is unavoidable
-        — it is how a reply finds its way back — and the log is what makes it possible to see that a
-        site is being attacked.
-      </p>
-      <p class="mt-3 leading-relaxed text-muted">
-        The script that produces the visitor counts does not keep addresses. It hashes each one with
-        a secret that is regenerated every day and never stored, counts the hash, and discards it.
-        Two visits on the same day collapse into one count; the same person tomorrow does not, so
-        nobody can be followed across days — not even by us. The raw logs rotate daily and only the
-        most recent few days exist on the server.
-      </p>
-    </section>
+        <h3>Our own usage counter</h3>
+        <p>
+          When you start a practice session or finish a game, the browser sends a request to{' '}
+          <code>{ENDPOINT}</code> on this site, naming that event: <code>practice_start</code>, and
+          sometimes a short label like <code>listening</code>. That is the whole message. There is
+          no identifier, no session token, nothing you typed, and no way to connect two events to
+          the same person.
+        </p>
+        <p>
+          The server answers with an empty response and stores nothing; the request line in its own
+          access log is the only record, and a scheduled script turns those lines into daily totals.
+          You can turn this counter off in <a href="/settings/">settings</a>, and it is never sent
+          at all if your browser asks not to be tracked. That switch and that signal cover this
+          counter only, not the Cloudflare beacon below.
+        </p>
 
-    <section class="mt-12">
-      <h2 class="font-display text-xl font-bold tracking-tight">What there is none of</h2>
-      <ul class="mt-4 space-y-2 text-muted">
-        <li>No cookies. Not one, not even a "necessary" one.</li>
-        <li>No accounts, no email addresses, no names.</li>
-        <li>No advertising, no advertising networks, no data sold or shared.</li>
-        <li>
-          No fonts and no images from anyone else's server — they are all served from this domain.
-          One script is not: Cloudflare's analytics beacon, described above. It is the only file
-          this site loads from anywhere else.
-        </li>
-        <li>No profiling and no automated decisions about you.</li>
-      </ul>
-      <p class="mt-4 leading-relaxed text-muted">
-        You can check all of this rather than take our word for it: open your browser's developer
-        tools on any page here and look at the cookie jar and the network tab. The
-        <a href={SITE.repo} rel="noopener" class="text-signal underline underline-offset-4"
-          >whole source is public</a
-        >, including the script that processes the logs.
-      </p>
-    </section>
+        <h3>Cloudflare Web Analytics</h3>
+        <p>
+          A small script from Cloudflare counts page views. It reports the address of the page you
+          are on, the page you came from, your browser's user agent and how quickly the page loaded.
+          It is{' '}
+          <a href="https://developers.cloudflare.com/web-analytics/" rel="noopener"
+            >cookieless by design</a
+          > and does not fingerprint you or follow you between sites. Cloudflare processes this on our
+          behalf, and it is the only third party this site contacts.
+        </p>
+        <p>
+          It is not loaded on the <a href="/message/">secret message</a> page, because the message lives
+          in that page's address and must not be sent anywhere.
+        </p>
+      </section>
 
-    <section class="mt-12">
-      <h2 class="font-display text-xl font-bold tracking-tight">Your rights</h2>
-      <p class="mt-3 leading-relaxed text-muted">
-        Under the GDPR you can ask what data is held about you, ask for it to be corrected or
-        deleted, and object to how it is processed. In practice there is very little to ask about:
-        we hold no account, no contact details and nothing that identifies you. Your progress is
-        already in your hands — deleting it is a button in
-        <a href="/settings/" class="text-signal underline underline-offset-4">settings</a> and needs nobody's
-        permission.
-      </p>
-      <p class="mt-3 leading-relaxed text-muted">
-        For anything else, or to ask a question about this page, contact
-        <a href={AUTHOR.url} rel="me" class="text-signal underline underline-offset-4"
-          >{AUTHOR.name}</a
-        >.
-      </p>
-    </section>
+      <section>
+        <h2>Your IP address</h2>
+        <p>
+          Like every web server, ours records the address each request came from. That is
+          unavoidable — it is how a reply finds its way back — and the log is what makes it possible
+          to see that a site is being attacked.
+        </p>
+        <p>
+          The script that produces the visitor counts does not keep addresses. It hashes each one
+          with a secret that is regenerated every day and never stored, counts the hash, and
+          discards it. Two visits on the same day collapse into one count; the same person tomorrow
+          does not, so nobody can be followed across days — not even by us. The raw logs rotate
+          daily and only the most recent few days exist on the server.
+        </p>
+      </section>
+
+      <section>
+        <h2>What there is none of</h2>
+        <ul>
+          <li>No cookies. Not one, not even a "necessary" one.</li>
+          <li>No accounts, no email addresses, no names.</li>
+          <li>No advertising, no advertising networks, no data sold or shared.</li>
+          <li>
+            No fonts and no images from anyone else's server — they are all served from this domain.
+            One script is not: Cloudflare's analytics beacon, described above. It is the only file
+            this site loads from anywhere else.
+          </li>
+          <li>No profiling and no automated decisions about you.</li>
+        </ul>
+        <p>
+          You can check all of this rather than take our word for it: open your browser's developer
+          tools on any page here and look at the cookie jar and the network tab. The{' '}
+          <a href={SITE.repo} rel="noopener">whole source is public</a>, including the script that
+          processes the logs.
+        </p>
+      </section>
+
+      <section>
+        <h2>Your rights</h2>
+        <p>
+          Under the GDPR you can ask what data is held about you, ask for it to be corrected or
+          deleted, and object to how it is processed. In practice there is very little to ask about:
+          we hold no account, no contact details and nothing that identifies you. Your progress is
+          already in your hands — deleting it is a button in{' '}
+          <a href="/settings/">settings</a> and needs nobody's permission.
+        </p>
+        <p>
+          For anything else, or to ask a question about this page, contact{' '}
+          <a href={AUTHOR.url} rel="me">{AUTHOR.name}</a>.
+        </p>
+      </section>
+    </div>
 
     <p class="mt-12 border-t border-line pt-6 text-sm text-muted">
-      If this page ever stops matching what the site does, that is a bug. Please
-      <a
-        href={`${SITE.repo}/issues`}
-        rel="noopener"
-        class="text-signal underline underline-offset-4">report it</a
-      >.
+      If this page ever stops matching what the site does, that is a bug. Please{' '}
+      <a href={`${SITE.repo}/issues`} rel="noopener" class="pi-link">report it</a>.
     </p>
-  </main>
+  </PageShell>
 </BaseLayout>

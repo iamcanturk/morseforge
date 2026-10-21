@@ -1,7 +1,9 @@
 ---
 title: Farnsworth timing, and why it beats slowing down
+seoTitle: 'Farnsworth Timing: Why It Beats Slowing Down'
 description: Full-speed characters with stretched gaps teach the rhythm of each one. Slowing the characters themselves teaches counting, which caps you at 10 WPM.
 published: 2026-08-23
+updated: 2026-10-21
 answer: Farnsworth timing sends each character at full speed but stretches the silence between characters, so the overall rate stays slow while the characters themselves sound exactly as they will at speed. Slowing the characters down instead teaches you to count individual beeps, and that habit becomes a ceiling you have to unlearn later — which is much harder than never building it.
 tags: [technique, timing, speed]
 ---
@@ -56,10 +58,12 @@ Morse is defined in units, where a dot is one unit:
 
 The reference word PARIS is exactly 50 units long including its trailing word
 gap, which is where words-per-minute comes from: at W WPM, one unit lasts
-`1200 / W` milliseconds.
+`1200 / W` milliseconds. The [Morse code speed chart](/morse-code-speed/) works
+that out for every speed.
 
-Of those 50 units, 31 are the actual keying and 19 are the gaps. The ARRL
-method for Farnsworth keeps the 31 at the character speed and expands the 19
+Of those 50 units, 31 are the actual keying and 19 are the gaps. The
+[ARRL method](https://www.arrl.org/files/file/Technology/x9004008.pdf) for
+Farnsworth keeps the 31 at the character speed and expands the 19
 until the whole thing takes as long as the slower effective speed requires,
 distributing the extra time across character and word gaps in their normal 3:7
 ratio.

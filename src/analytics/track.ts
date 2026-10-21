@@ -46,6 +46,17 @@ export type EventName =
   | 'alphabet_play'
   | 'method_change'
   | 'install'
+  // The growth loop (TASK-006). Declared together, up front, so the packages
+  // that fire them never edit this file in parallel. wired.test.ts fails for
+  // each one until something actually sends it — which is the point.
+  | 'hero_send'
+  | 'share_open'
+  | 'share_copy'
+  | 'daily_share'
+  | 'message_create'
+  | 'message_open'
+  | 'easter_egg'
+  | 'install_prompt'
 
 /** Values are short, non-identifying labels: a mode, a method, pass or fail. */
 const SAFE_VALUE = /^[a-z0-9_-]{1,24}$/

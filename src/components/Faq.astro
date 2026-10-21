@@ -1,0 +1,95 @@
+---
+/**
+ * The visible FAQ block and its FAQPage structured data, from one array.
+ *
+ * Both come from the same `FaqItem[]` (src/data/faq.ts) so the schema can
+ * never claim an answer the page does not show — the mismatch search engines
+ * treat as spam, and the one an assistant quoting the page would expose.
+ *
+ * Answers stay open rather than in an accordion: the FAQ is the part of a page
+ * an answer engine lifts, and text behind a collapsed disclosure is weighted
+ * as secondary content.
+ *
+ * Start-aligned with the page column and without an outer margin (V-06): in
+ * PageShell's `more` slot the grid supplies the space above it, and anywhere
+ * else the caller does.
+ */
+import type { FaqItem } from '../data/faq'
+import { jsonLd } from '../seo/head'
+import { faqPage } from '../seo/schema'
+
+export interface Props {
+  items: readonly FaqItem[]
+  heading?: string
+  /** Anchor for the section, so a page can link straight to its questions. */
+  id?: string
+  /**
+   * Off when a page already emits FAQPage through its own schema graph:
+   * two FAQPage blocks on one URL is invalid.
+   */
+  schema?: boolean
+}
+
+const { items, heading = 'Common questions', id = 'faq', schema = true } = Astro.props
+
+type Part = { text: string; href?: string }
+
+/**
+ * Split an answer so the first occurrence of each link phrase becomes a link.
+ * Done on plain strings — the answer is never parsed as HTML.
+ */
+function parts(item: FaqItem): Part[] {
+  let out: Part[] = [{ text: item.answer }]
+  for (const link of item.links ?? []) {
+    const next: Part[] = []
+    let done = false
+    for (const part of out) {
+      const at = done || part.href ? -1 : part.text.indexOf(link.text)
+      if (at < 0) {
+        next.push(part)
+        continue
+      }
+      done = true
+      if (at > 0) next.push({ text: part.text.slice(0, at) })
+      next.push({ text: link.text, href: link.href })
+      const rest = part.text.slice(at + link.text.length)
+      if (rest) next.push({ text: rest })
+    }
+    out = next
+  }
+  return out
+}
+---
+
+{
+  items.length > 0 && (
+    <section id={id} class="max-w-[68ch]" aria-labelledby={`${id}-heading`}>
+      <h2 id={`${id}-heading`} class="font-display text-h2 font-bold text-ink">
+        {heading}
+      </h2>
+      <dl class="mt-8 space-y-8">
+        {items.map((item) => (
+          <div>
+            <dt class="font-display text-h3 font-semibold text-ink">{item.question}</dt>
+            <dd class="mt-2 leading-relaxed text-muted">
+              {parts(item).map((part) =>
+                part.href ? (
+                  <a
+                    href={part.href}
+                    class="text-signal underline decoration-signal/40 underline-offset-4 hover:decoration-signal"
+                  >
+                    {part.text}
+                  </a>
+                ) : (
+                  part.text
+                ),
+              )}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {/* `<` escaped so an answer containing "</script>" cannot end the block early. */}
+      {schema && <script is:inline type="application/ld+json" set:html={jsonLd(faqPage(items))} />}
+    </section>
+  )
+}

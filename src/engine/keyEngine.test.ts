@@ -1,5 +1,12 @@
 import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest'
-import { KeyEngine, type KeyEngineClock, resolveThresholds } from './keyEngine'
+import {
+  KeyEngine,
+  TIMESTAMP_TOLERANCE_MS,
+  bindKeyboard,
+  isOnClock,
+  type KeyEngineClock,
+  resolveThresholds,
+} from './keyEngine'
 import { LiveDecoder } from './morseDecoder'
 
 /** A clock the test drives by hand, so no test ever waits on a real timer. */
@@ -175,6 +182,53 @@ describe('KeyEngine', () => {
     engine.release()
     expect(engine.isPressed).toBe(false)
   })
+  describe('timed by the input events', () => {
+    it('measures the hold between the event stamps, not when the handlers ran', () => {
+      // The first press builds the AudioContext and blocks the page: the
+      // keyup handler runs 400ms after the key came up 60ms into the hold.
+      harness.advance(1000)
+      engine.press(1000)
+      harness.advance(460)
+      engine.release(1060)
+      expect(onElement).toHaveBeenLastCalledWith('.', 60)
+    })
+
+    it('falls back to the clock without a usable stamp', () => {
+      for (const stamp of [undefined, 0, Number.NaN, -5]) {
+        engine.press(stamp)
+        harness.advance(300)
+        engine.release(stamp)
+        expect(onElement).toHaveBeenLastCalledWith('-', 300)
+      }
+    })
+
+    it('ignores a stamp from another clock, such as React falling back to Date.now()', () => {
+      harness.advance(1000)
+      const epoch = Date.UTC(2026, 9, 21)
+      engine.press(epoch)
+      harness.advance(80)
+      engine.release(epoch + 80)
+      // Both stamps rejected, so the hold is the clock's own 80ms: a dot,
+      // not the decades between the two timelines.
+      expect(onElement).toHaveBeenLastCalledWith('.', 80)
+    })
+
+    it('trusts a stamp within the tolerance of the clock, and nothing beyond it', () => {
+      expect(isOnClock(5000, 5000)).toBe(true)
+      expect(isOnClock(5000 - TIMESTAMP_TOLERANCE_MS, 5000 + 0)).toBe(false)
+      expect(isOnClock(5000 + TIMESTAMP_TOLERANCE_MS, 5000)).toBe(true)
+      expect(isOnClock(5001 + TIMESTAMP_TOLERANCE_MS, 5000)).toBe(false)
+      expect(isOnClock(Date.UTC(2026, 9, 21), 1234)).toBe(false)
+      expect(isOnClock(undefined, 1234)).toBe(false)
+    })
+
+    it('never reports a negative hold when the two timelines mix', () => {
+      harness.advance(1000)
+      engine.press()
+      engine.release(990)
+      expect(onElement).toHaveBeenLastCalledWith('.', 0)
+    })
+  })
 })
 
 describe('KeyEngine + LiveDecoder', () => {
@@ -311,5 +365,60 @@ describe('explicit gap overrides', () => {
     expect(onCharacterGap).not.toHaveBeenCalled()
     harness.advance(1)
     expect(onCharacterGap).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('a hold dropped without a release', () => {
+  /** A stand-in for `window`, enough to fire a blur. */
+  function fakeWindow() {
+    const listeners = new Map<string, Set<(event: unknown) => void>>()
+    return {
+      addEventListener(type: string, handler: (event: unknown) => void) {
+        listeners.set(type, (listeners.get(type) ?? new Set()).add(handler))
+      },
+      removeEventListener(type: string, handler: (event: unknown) => void) {
+        listeners.get(type)?.delete(handler)
+      },
+      fire(type: string) {
+        for (const handler of listeners.get(type) ?? []) handler({})
+      },
+    }
+  }
+
+  it('reports the cancelled hold, so the tone can stop', () => {
+    const harness = createTestClock()
+    const onCancel = vi.fn()
+    const onKeyUp = vi.fn()
+    const onElement = vi.fn()
+    const engine = new KeyEngine({ wpm: 20 }, { onCancel, onKeyUp, onElement }, harness.clock)
+    engine.press()
+    engine.reset()
+    expect(onCancel).toHaveBeenCalledTimes(1)
+    expect(onKeyUp).not.toHaveBeenCalled()
+    expect(onElement).not.toHaveBeenCalled()
+    expect(engine.isPressed).toBe(false)
+  })
+
+  it('says nothing when there was no hold to drop', () => {
+    const harness = createTestClock()
+    const onCancel = vi.fn()
+    const engine = new KeyEngine({ wpm: 20 }, { onCancel }, harness.clock)
+    engine.reset()
+    engine.press()
+    engine.release()
+    engine.reset()
+    expect(onCancel).not.toHaveBeenCalled()
+  })
+
+  it('cancels through bindKeyboard when the window loses focus mid-hold', () => {
+    const harness = createTestClock()
+    const onCancel = vi.fn()
+    const engine = new KeyEngine({ wpm: 20 }, { onCancel }, harness.clock)
+    const target = fakeWindow()
+    const unbind = bindKeyboard(engine, undefined, target)
+    engine.press()
+    target.fire('blur')
+    expect(onCancel).toHaveBeenCalledTimes(1)
+    unbind()
   })
 })

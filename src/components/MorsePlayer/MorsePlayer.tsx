@@ -1,8 +1,20 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import '../../styles/pkg-i.css'
 import { AudioEngine, type Playback } from '../../engine/audioEngine'
-import { WPM_MAX, WPM_MIN, playheadAt } from './player'
+import {
+  WPM_MAX,
+  WPM_MIN,
+  initialChannels,
+  playGate,
+  playheadAt,
+  startGated,
+  storedSettings,
+} from './player'
 import { buildTimeline, timelineDuration } from '../../engine/timingEngine'
 import { prettify } from '../../engine/morseEncoder'
+import { spokenCode } from '../../engine/spokenCode'
+import { type SettingsRecord, audioOptions, createSettingsStore } from '../../storage/settings'
+import { Lamp } from '../ui/Lamp'
 import { canVibrate, stopVibration, vibrateTimeline } from '../../engine/vibrationEngine'
 
 /**
@@ -41,6 +53,12 @@ export interface MorsePlayerProps {
    * is, the caller says what a play means to it.
    */
   onPlay?: () => void
+  /**
+   * `panel` (default): a CRT strip with the code and the lamp, controls below.
+   * `deck`: one low strip of lamp and controls, for a caller that already
+   * shows the code on its own screen (the translator).
+   */
+  layout?: 'panel' | 'deck'
 }
 
 /** Where the playhead is, and whether the key is down at that instant. */
@@ -60,6 +78,7 @@ export function MorsePlayer({
   autoPlay = false,
   onPlay,
   compact = false,
+  layout = 'panel',
 }: MorsePlayerProps) {
   const [wpm, setWpm] = useState(initialWpm)
   const [flash, setFlash] = useState(initialFlash)
@@ -73,6 +92,39 @@ export function MorsePlayer({
   const playback = useRef<Playback | null>(null)
   const frame = useRef<number | null>(null)
   const endTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** Which press of Play is live; see `playGate`. */
+  const gate = useRef(playGate())
+  /**
+   * Sound as `play` must see it. A ref as well as state because the
+   * lesson's autoplay fires in the same commit that reads the Signal
+   * setting, before the state from that read has rendered: the ref is what
+   * keeps a Lamp learner's first character silent.
+   */
+  const soundOn = useRef(sound)
+  soundOn.current = sound
+  const settings = useRef<SettingsRecord | null>(null)
+
+  // Start where the learner set the site (A-18): Signal = Lamp means a
+  // silent Play and the lamp on. Read after mount, since the page is
+  // prerendered with no storage. A later change of the setting (in another
+  // tab, say) applies too; the player's own toggles still win until then.
+  useEffect(() => {
+    const store = createSettingsStore()
+    let applied: SettingsRecord['signal'] | null = null
+    const apply = (next: SettingsRecord) => {
+      settings.current = next
+      audio.current?.update(audioOptions(next))
+      if (next.signal === applied) return
+      applied = next.signal
+      const start = initialChannels(next, initialFlash)
+      soundOn.current = start.sound
+      setSound(start.sound)
+      if (start.lamp) setFlash(true)
+    }
+    const stored = storedSettings()
+    if (stored) apply(stored)
+    return store.subscribe(apply)
+  }, [initialFlash])
 
   const timeline = useMemo(() => buildTimeline(morse, { wpm }), [morse, wpm])
   const durationMs = useMemo(() => timelineDuration(timeline), [timeline])
@@ -84,6 +136,8 @@ export function MorsePlayer({
   }, [])
 
   const stop = useCallback(() => {
+    // A press still waiting for the audio to start is now stale.
+    gate.current.cancel()
     stopVibration()
     playback.current?.stop()
     playback.current = null
@@ -118,6 +172,7 @@ export function MorsePlayer({
       return
     }
 
+    const ticket = gate.current.begin()
     setPlaying(true)
     onPlay?.()
 
@@ -125,9 +180,20 @@ export function MorsePlayer({
     // so a muted player still lights up on exactly the right beats.
     const startedAt = performance.now()
 
-    if (sound) {
-      audio.current ??= new AudioEngine()
-      playback.current = await audio.current.playTimeline(timeline)
+    if (soundOn.current) {
+      // At the learner's own tone and volume, like every other tone here.
+      const engine = (audio.current ??= new AudioEngine(
+        settings.current ? audioOptions(settings.current) : {},
+      ))
+      const started = await startGated(ticket, () => engine.playTimeline(timeline))
+      // Stopped during start-up: `stop()` already reset everything, and the
+      // late playback has been silenced. Failed: reset, or it reads "Stop".
+      if (!ticket.isCurrent()) return
+      if (!started) {
+        stop()
+        return
+      }
+      playback.current = started
     }
 
     // Fired once for the whole message rather than per element: the API takes
@@ -159,7 +225,7 @@ export function MorsePlayer({
       frame.current = requestAnimationFrame(tick)
     }
     frame.current = requestAnimationFrame(tick)
-  }, [playing, stop, sound, buzz, timeline, durationMs, stopVisuals, onPlay])
+  }, [playing, stop, buzz, timeline, durationMs, stopVisuals, onPlay])
 
   // Keyed on the code, so moving to the next character in a lesson plays the
   // new one and nothing replays when a setting changes.
@@ -173,106 +239,128 @@ export function MorsePlayer({
 
   const seconds = (durationMs / 1000).toFixed(1)
 
-  return (
-    <div className="rounded-xl border border-line bg-panel p-5">
-      {label && (
-        <div className="mb-1 font-mono text-[10px] tracking-[0.18em] text-muted">{label}</div>
+  // The lamp is aria-hidden: the Morse itself is already in the DOM, and a
+  // screen reader announcing every flash would be unusable. On and off are
+  // instant (no transition): easing would blur the dot/dash distinction the
+  // learner is meant to be reading.
+  const bulb = flash ? (
+    <div
+      aria-hidden="true"
+      data-on={lit ? 'true' : 'false'}
+      className={layout === 'deck' ? 'pi-bulb' : 'pi-bulb pi-bulb-lg'}
+    />
+  ) : null
+
+  const controls = (
+    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+      <button type="button" onClick={() => void play()} className="mf-btn mf-btn-audio min-w-28">
+        <Lamp on={playing} tone="cyan" />
+        {playing ? 'Stop' : 'Play'}
+      </button>
+
+      <Toggle on={sound} onToggle={() => setSound((on) => !on)}>
+        Sound
+      </Toggle>
+
+      {vibrationSupported && (
+        <Toggle on={buzz} tone="amber" onToggle={() => setBuzz((on) => !on)}>
+          Buzz
+        </Toggle>
       )}
 
-      <p className="font-mono text-lg break-all text-cyan" aria-label={`Morse code: ${morse}`}>
-        {prettify(morse)}
-      </p>
+      <Toggle on={flash} tone="cyan" onToggle={() => setFlash((on) => !on)}>
+        Lamp
+      </Toggle>
 
-      {/* The lamp. `aria-hidden` because the Morse itself is already in the DOM
-          above — a screen reader announcing every flash would be unusable. */}
-      {flash && (
-        <div
-          aria-hidden="true"
-          className="mt-4 h-24 rounded-lg border"
-          style={{
-            borderColor: lit ? 'var(--color-signal)' : 'var(--color-line)',
-            background: lit ? 'var(--color-signal)' : 'var(--color-void)',
-            boxShadow: lit
-              ? '0 0 60px color-mix(in srgb, var(--color-signal) 60%, transparent)'
-              : 'none',
-            // No transition: a signal lamp is on or off. Easing it would blur
-            // the dot/dash distinction the learner is meant to be reading.
-          }}
-        />
+      {!compact && (
+        <span className="ml-auto font-mono text-control text-muted tabular-nums">
+          <span className="sr-only">Length </span>~{seconds}s
+        </span>
       )}
-
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() => void play()}
-          className="rounded-lg px-5 py-2.5 font-mono text-xs tracking-[0.14em]"
-          style={{
-            background: playing ? 'var(--color-line)' : 'var(--color-signal)',
-            color: playing ? 'var(--color-ink)' : 'var(--color-void)',
-          }}
-        >
-          {playing ? '■ STOP' : '▶ PLAY'}
-        </button>
-
-        <button
-          type="button"
-          aria-pressed={sound}
-          onClick={() => setSound((on) => !on)}
-          className="rounded-lg border px-3 py-2.5 font-mono text-xs tracking-[0.14em]"
-          style={{
-            borderColor: sound ? 'var(--color-signal)' : 'var(--color-line)',
-            color: sound ? 'var(--color-signal)' : 'var(--color-muted)',
-          }}
-        >
-          SOUND
-        </button>
-
-        {vibrationSupported && (
-          <button
-            type="button"
-            aria-pressed={buzz}
-            onClick={() => setBuzz((on) => !on)}
-            className="rounded-lg border px-3 py-2.5 font-mono text-xs tracking-[0.14em]"
-            style={{
-              borderColor: buzz ? 'var(--color-amber)' : 'var(--color-line)',
-              color: buzz ? 'var(--color-amber)' : 'var(--color-muted)',
-            }}
-          >
-            BUZZ
-          </button>
-        )}
-
-        <button
-          type="button"
-          aria-pressed={flash}
-          onClick={() => setFlash((on) => !on)}
-          className="rounded-lg border px-3 py-2.5 font-mono text-xs tracking-[0.14em]"
-          style={{
-            borderColor: flash ? 'var(--color-cyan)' : 'var(--color-line)',
-            color: flash ? 'var(--color-cyan)' : 'var(--color-muted)',
-          }}
-        >
-          LAMP
-        </button>
-
-        {!compact && (
-          <span className="font-mono text-[11px] tracking-[0.12em] text-muted">~{seconds}s</span>
-        )}
-      </div>
-
-      <label className="mt-4 flex items-center gap-3">
-        <span className="font-mono text-[10px] tracking-[0.16em] text-muted">SPEED</span>
-        <input
-          type="range"
-          min={WPM_MIN}
-          max={WPM_MAX}
-          value={wpm}
-          onChange={(event) => setWpm(Number(event.target.value))}
-          className="flex-1 accent-[var(--color-signal)]"
-          aria-label="Speed in words per minute"
-        />
-        <span className="w-16 text-right font-mono text-xs text-signal">{wpm} WPM</span>
-      </label>
     </div>
+  )
+
+  const speed = (
+    <label className="flex items-center gap-3">
+      <span className="mf-engraved">Speed</span>
+      <input
+        type="range"
+        min={WPM_MIN}
+        max={WPM_MAX}
+        value={wpm}
+        onChange={(event) => setWpm(Number(event.target.value))}
+        className="mf-range flex-1"
+        aria-label="Speed in words per minute"
+      />
+      <span className="w-16 text-right font-mono text-control text-signal tabular-nums">
+        {wpm} WPM
+      </span>
+    </label>
+  )
+
+  if (layout === 'deck') {
+    return (
+      <div className="mf-panel flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:gap-6 sm:p-5">
+        <div className="flex items-center gap-4">
+          <div className="mf-screen mf-screen-flush grid size-24 shrink-0 place-items-center">
+            {bulb ?? <span className="mf-engraved">Off</span>}
+          </div>
+          {label && <span className="mf-engraved sm:hidden">{label}</span>}
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          {controls}
+          {speed}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mf-panel p-3 sm:p-4">
+      <div className="mf-screen flex items-center gap-5 px-5 py-5 sm:px-6">
+        <div className="relative min-w-0 flex-1">
+          {label && <p className="mf-engraved">{label}</p>}
+          <p className="pi-code mt-2 font-mono text-xl text-signal sm:text-2xl">
+            <span className="sr-only">{spokenCode(morse)}</span>
+            <span aria-hidden="true">{prettify(morse)}</span>
+          </p>
+        </div>
+        {bulb}
+      </div>
+      <div className="mt-4 space-y-4 px-1">
+        {controls}
+        {speed}
+      </div>
+    </div>
+  )
+}
+
+/** An on/off control: aria-pressed, with its own small lamp as the non-colour cue. */
+function Toggle({
+  on,
+  tone,
+  onToggle,
+  children,
+}: {
+  on: boolean
+  tone?: 'amber' | 'cyan'
+  onToggle: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={onToggle}
+      className="mf-btn mf-btn-secondary mf-btn-sm pi-toggle"
+    >
+      <span
+        className="mf-lamp"
+        data-tone={tone}
+        data-on={on ? 'true' : 'false'}
+        aria-hidden="true"
+      />
+      {children}
+    </button>
   )
 }

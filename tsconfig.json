@@ -8,14 +8,13 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "verbatimModuleSyntax": true,
-    "baseUrl": ".",
     "paths": {
-      "@engine/*": ["src/engine/*"],
-      "@data/*": ["src/data/*"],
-      "@storage/*": ["src/storage/*"],
-      "@game/*": ["src/game/*"],
-      "@components/*": ["src/components/*"],
-      "@lib/*": ["src/lib/*"]
+      "@engine/*": ["./src/engine/*"],
+      "@data/*": ["./src/data/*"],
+      "@storage/*": ["./src/storage/*"],
+      "@game/*": ["./src/game/*"],
+      "@components/*": ["./src/components/*"],
+      "@lib/*": ["./src/lib/*"]
     }
   }
 }

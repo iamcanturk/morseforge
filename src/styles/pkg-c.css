@@ -1,0 +1,345 @@
+/* ---------------------------------------------------------------------------
+   Package C: the key station and the telegraph (TASK-011).
+
+   Only what the shared classes in global.css do not already provide: the
+   brass key's button, the fuse, the ticker tape and the target printed on it.
+   Plain CSS on Package A's tokens; no new colours. Only transform and opacity
+   ever transition, and nothing here loops.
+--------------------------------------------------------------------------- */
+
+/* ---- The key ------------------------------------------------------------ */
+
+/* The whole drawing is the hit area. A felt mat under it, and a warm lamp
+   that comes up on hover as an opacity fade, never a colour transition. */
+.kc-key {
+  position: relative;
+  isolation: isolate;
+  cursor: pointer;
+  border: 1px solid var(--color-line);
+  background: color-mix(in srgb, var(--color-void) 55%, transparent);
+  box-shadow: inset 0 2px 10px rgb(0 0 0 / 0.35);
+  -webkit-tap-highlight-color: transparent;
+  /* A long press is a dash: no iOS callout, no text selection. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+[data-theme='light'] .kc-key {
+  box-shadow: inset 0 2px 8px rgb(60 40 10 / 0.12);
+}
+
+.kc-key::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(
+    ellipse 70% 60% at 50% 55%,
+    color-mix(in srgb, var(--color-amber) 10%, transparent),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 160ms var(--ease-signal);
+}
+
+.kc-key:hover:not(:disabled)::before,
+.kc-key[data-down='true']::before {
+  opacity: 1;
+}
+
+/* A thumb needs the full 160px the spec asks for. */
+@media (pointer: coarse) {
+  .kc-key {
+    min-height: 160px;
+  }
+}
+
+.kc-nameplate {
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--color-brass) 55%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-brass) 16%, transparent),
+    color-mix(in srgb, var(--color-brass) 5%, transparent)
+  );
+  white-space: nowrap;
+}
+
+/* ---- The fuse (commit countdown) --------------------------------------- */
+
+.kc-fuse {
+  display: block;
+  block-size: 3px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-line-strong) 35%, transparent);
+}
+
+.kc-fuse-burn {
+  display: block;
+  block-size: 100%;
+  inline-size: 100%;
+  transform-origin: left center;
+  background: var(--color-signal-dim);
+}
+
+.kc-fuse[data-late='true'] .kc-fuse-burn {
+  background: var(--color-amber);
+}
+
+/* ---- The tape ---------------------------------------------------------- */
+
+/* Below lg the tape can stick under the 56px header. While stuck it needs
+   something opaque around its torn edge, or the page scrolls through it. */
+@media (max-width: 1023.98px) {
+  .kc-tape-dock {
+    margin-inline: -6px;
+    padding: 6px;
+    border-radius: 10px;
+    background: var(--color-elevated);
+  }
+}
+
+/* It sticks only where there is room for it (DEC-045, A11Y-13). At 400% zoom
+   (320×256) or on a phone held sideways, the header and the dock together
+   covered three quarters of the screen and the key could never be seen
+   whole. KeyStation reads the computed position to publish the dock's height
+   into the page's scroll padding, so this media query is the only switch. */
+@media (max-width: 1023.98px) and (min-height: 37.5rem) {
+  .kc-tape-dock[data-sticky] {
+    position: sticky;
+    top: var(--mf-header-h, 3.5rem);
+    z-index: 20;
+  }
+}
+
+.kc-tape {
+  /* Room on the right for the torn end, so the newest character is never
+     clipped by it. */
+  padding: 24px 30px 12px 18px;
+}
+
+.kc-tape-line {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  block-size: 3rem;
+  overflow: hidden;
+  white-space: nowrap;
+  /* Older characters fade off the left edge as the tape runs on. */
+  mask-image: linear-gradient(90deg, transparent, black 3rem);
+}
+
+.kc-tape-line[data-empty='true'] {
+  mask-image: none;
+}
+
+.kc-tape-line-centre {
+  justify-content: center;
+  gap: 1rem;
+  mask-image: none;
+}
+
+.kc-ticker {
+  display: flex;
+  flex: none;
+}
+
+.kc-char {
+  display: inline-block;
+  font-size: clamp(1.625rem, 1.2rem + 1.6vw, 2.25rem);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1;
+}
+
+/* The punch head: the code being keyed, and a bar where the next mark lands. */
+.kc-punch {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: 0.5rem;
+  font-size: 1.25rem;
+  letter-spacing: var(--tracking-code);
+  color: var(--color-paper-muted);
+}
+
+.kc-punch::after {
+  content: '';
+  display: inline-block;
+  inline-size: 2px;
+  block-size: 1.6rem;
+  margin-inline-start: 0.25rem;
+  background: currentColor;
+  opacity: 0.45;
+}
+
+.kc-punch[data-on='true'] {
+  color: var(--color-paper-ink);
+}
+
+.kc-tape-empty {
+  margin-inline-end: auto;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  letter-spacing: normal;
+  color: var(--color-paper-muted);
+}
+
+.kc-pending-code {
+  font-size: 2rem;
+  letter-spacing: var(--tracking-code);
+  line-height: 1;
+}
+
+.kc-pending-preview {
+  font-size: 1.125rem;
+  color: var(--color-paper-muted);
+}
+
+/* ---- The target, printed along the tape's top edge --------------------- */
+
+.kc-tape-header {
+  margin-block-end: 0.5rem;
+  padding-block-end: 0.5rem;
+  border-block-end: 1px dashed color-mix(in srgb, var(--color-paper-ink) 28%, transparent);
+}
+
+.kc-target {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 0.75rem;
+  letter-spacing: normal;
+}
+
+.kc-target-label,
+.kc-target-done {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.kc-target-label {
+  color: var(--color-paper-muted);
+}
+
+.kc-target-word {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.kc-target-gap {
+  inline-size: 0.625rem;
+}
+
+.kc-target-char {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 1.75rem;
+  block-size: 1.75rem;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-paper-muted);
+}
+
+.kc-target-char[data-state='done'] {
+  color: var(--color-paper-ink);
+  background: color-mix(in srgb, var(--color-paper-ink) 11%, transparent);
+}
+
+/* Not colour alone: the next letter is boxed and underlined. */
+.kc-target-char[data-state='next'] {
+  color: var(--color-paper-ink);
+  border-color: var(--color-paper-ink);
+  box-shadow: 0 2px 0 var(--color-paper-ink);
+}
+
+.kc-target-hint {
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  color: var(--color-paper-muted);
+}
+
+.kc-target-done {
+  margin-inline-start: auto;
+  padding: 0 0.375rem;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+  color: var(--color-paper-ink);
+}
+
+/* ---- The answer from the instrument: a stamp on the tape --------------- */
+
+/* On the left of the ticker line: the text runs in from the right, so the
+   newest characters stay readable under a fresh stamp. */
+.kc-stamp-slot {
+  position: absolute;
+  inset-block-end: 12px;
+  inset-inline-start: 1.25rem;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.kc-tape .mf-stamp,
+.kc-slip .mf-stamp {
+  white-space: nowrap;
+  /* The ring gap is paper already (global.css, .mf-tape .mf-stamp). */
+  background: color-mix(in srgb, var(--color-paper) 72%, transparent);
+}
+
+.kc-stamp {
+  font-size: 1rem;
+}
+
+/* ---- Actions ----------------------------------------------------------- */
+
+.kc-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .kc-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
+/* ---- Achievement slip -------------------------------------------------- */
+
+.kc-slip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 24px 22px 14px 16px;
+  letter-spacing: normal;
+}
+
+.kc-slip-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.kc-slip-stamp {
+  font-size: var(--text-label);
+  padding: 0.125rem 0.5rem;
+}
+
+/* ---- Time to finish: two by two on a phone, one row from sm ------------ */
+
+@media (max-width: 639.98px) {
+  .kc-seg-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

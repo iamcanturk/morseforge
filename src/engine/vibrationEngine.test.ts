@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest'
-import { patternDuration, toVibrationPattern } from './vibrationEngine'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  patternDuration,
+  stopVibration,
+  toVibrationPattern,
+  vibrateTimeline,
+} from './vibrationEngine'
 import { buildTimeline, timelineDuration } from './timingEngine'
 import { encode } from './morseEncoder'
 
@@ -83,5 +88,45 @@ describe('toVibrationPattern', () => {
     for (const value of toVibrationPattern(buildTimeline(encode('Q'), { wpm: 13 }))) {
       expect(Number.isInteger(value)).toBe(true)
     }
+  })
+})
+
+describe('vibrate calls before and after user activation', () => {
+  const timeline = buildTimeline(encode('E'), { wpm: 20 })
+
+  function fakeNavigator(hasBeenActive: boolean) {
+    const calls: Array<number | number[]> = []
+    const nav = {
+      userActivation: { hasBeenActive, isActive: hasBeenActive },
+      vibrate: (pattern: number | number[]) => {
+        calls.push(pattern)
+        return true
+      },
+    }
+    vi.stubGlobal('navigator', nav)
+    return { calls, nav }
+  }
+
+  afterEach(() => {
+    stopVibration()
+    vi.unstubAllGlobals()
+  })
+
+  it('never calls vibrate before the user has interacted (Chrome logs each refusal)', () => {
+    const { calls } = fakeNavigator(false)
+    stopVibration()
+    expect(vibrateTimeline(timeline)).toBe(false)
+    stopVibration()
+    expect(calls).toEqual([])
+  })
+
+  it('stops only a vibration it actually started', () => {
+    const { calls } = fakeNavigator(true)
+    stopVibration()
+    expect(calls).toEqual([])
+    expect(vibrateTimeline(timeline)).toBe(true)
+    stopVibration()
+    stopVibration()
+    expect(calls).toEqual([toVibrationPattern(timeline), 0])
   })
 })

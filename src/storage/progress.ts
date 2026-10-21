@@ -8,8 +8,16 @@
  * award.
  */
 
+import { LESSON_STAGES } from '../data/lessonStages'
 import { ALL_LETTERS } from '../data/morseAlphabet'
-import { DEFAULT_METHOD, METHODS, type MethodId, activeCharacters } from '../data/methods'
+import {
+  DEFAULT_METHOD,
+  METHODS,
+  type MethodId,
+  activeCharacters,
+  nextUnlockCount,
+  shouldUnlock,
+} from '../data/methods'
 import {
   type Skill,
   type SkillStats,
@@ -23,17 +31,24 @@ import {
 import {
   type DueItem,
   type ReviewState,
+  MAX_INTERVAL_MS,
   newReviewState,
   review,
   selectDue,
 } from '../game/spacedRepetition'
-import { Store, type StorageDriver, count, isRecord, num, oneOf } from './store'
+import { type Store, type StorageDriver, sharedStore, count, isRecord, num, oneOf } from './store'
 
 /** Method ids as a plain tuple, for `oneOf`. */
 const METHOD_VALUES = ['signal', 'koch', 'alphabetical'] as const
 
 export const PROGRESS_KEY = 'morseforge_progress'
 export const PROGRESS_VERSION = 1
+
+/**
+ * Ceiling for any counter read back from storage or an import. Far beyond
+ * real practice, and low enough that sums over the alphabet stay exact.
+ */
+const MAX_COUNT = 1_000_000_000
 
 export interface CharacterProgress {
   /** Introduced in a lesson, whether or not it has been answered yet. */
@@ -79,10 +94,10 @@ function validateSkills(value: unknown): SkillStats {
   for (const skill of SKILLS) {
     const raw = value[skill]
     if (!isRecord(raw)) continue
-    const attempts = count(raw['attempts'])
+    const attempts = count(raw['attempts'], 0, MAX_COUNT)
     // Correct can never exceed attempts. A hand-edited export claiming 500
     // correct out of 3 would otherwise show 16,000% accuracy forever.
-    stats[skill] = { attempts, correct: Math.min(count(raw['correct']), attempts) }
+    stats[skill] = { attempts, correct: Math.min(count(raw['correct'], 0, MAX_COUNT), attempts) }
   }
 
   return stats
@@ -91,15 +106,23 @@ function validateSkills(value: unknown): SkillStats {
 function validateSchedule(value: unknown, now: number): ReviewState {
   if (!isRecord(value)) return newReviewState(now)
   return {
-    streak: count(value['streak']),
-    intervalMs: num(value['intervalMs'], 0, 0),
-    dueAt: num(value['dueAt'], now, 0),
-    lapses: count(value['lapses']),
+    streak: count(value['streak'], 0, MAX_COUNT),
+    intervalMs: num(value['intervalMs'], 0, 0, MAX_INTERVAL_MS),
+    // No review can be due further out than the longest interval: a date in
+    // 2099 would hide the character from practice for good.
+    dueAt: num(value['dueAt'], now, 0, now + MAX_INTERVAL_MS),
+    lapses: count(value['lapses'], 0, MAX_COUNT),
     ease: num(value['ease'], 2.5, 1.3, 2.8),
   }
 }
 
-function validateProgress(value: unknown): ProgressRecord | null {
+/**
+ * Narrow untrusted data to a progress record, or null if it is not one.
+ *
+ * Exported for the backup import, which needs "invalid" as an answer rather
+ * than the empty record `validateOrDefault` would substitute.
+ */
+export function validateProgress(value: unknown): ProgressRecord | null {
   if (!isRecord(value)) return null
 
   const method = oneOf(value['method'], METHOD_VALUES, DEFAULT_METHOD)
@@ -126,13 +149,32 @@ function validateProgress(value: unknown): ProgressRecord | null {
   return { characters, method, unlocked }
 }
 
+/**
+ * Whether untrusted data is a whole progress record rather than a fragment.
+ *
+ * For the import, where `{ method: 'signal' }` must not "restore" an empty
+ * character map over real progress. Only `characters` is required: `method`
+ * and `unlocked` arrived later without a version bump, so genuine old exports
+ * lack them. When present they must have the right type.
+ */
+export function isCompleteProgress(value: unknown): boolean {
+  if (!isRecord(value) || !isRecord(value['characters'])) return false
+  // Every entry must be a record too. The validator skips a malformed one,
+  // so `{ E: 'garbage' }` would otherwise restore E as never practised.
+  if (!Object.values(value['characters']).every(isRecord)) return false
+  const method = value['method']
+  const unlocked = value['unlocked']
+  if (method !== undefined && typeof method !== 'string') return false
+  return unlocked === undefined || typeof unlocked === 'number'
+}
+
 /** A fresh, empty progress record. */
 export function emptyProgress(): ProgressRecord {
   return { characters: {}, method: DEFAULT_METHOD, unlocked: 0 }
 }
 
 export function createProgressStore(driver?: StorageDriver): Store<ProgressRecord> {
-  return new Store<ProgressRecord>(
+  return sharedStore<ProgressRecord>(
     {
       key: PROGRESS_KEY,
       version: PROGRESS_VERSION,
@@ -158,11 +200,68 @@ export function setMethod(record: ProgressRecord, method: MethodId): ProgressRec
   return { ...record, method, unlocked: 0 }
 }
 
-/** Unlock the next character in the current method. */
+/**
+ * Unlock the next step in the current method: one character for Koch, the
+ * whole next stage for the staged methods.
+ */
 export function unlockNext(record: ProgressRecord): ProgressRecord {
-  const limit = METHODS[record.method].order.length - METHODS[record.method].startingCount
-  if (record.unlocked >= limit) return record
-  return { ...record, unlocked: record.unlocked + 1 }
+  const next = nextUnlockCount(METHODS[record.method], record.unlocked)
+  if (next <= record.unlocked) return record
+  return { ...record, unlocked: next }
+}
+
+/**
+ * The unlock a finished session has earned, if any: the record after at most
+ * one `unlockNext`, or the same record when the bar was not cleared.
+ *
+ * At most one step by construction. The practice screen once re-ran its
+ * unlock on every change of `unlocked`, so a single good session cascaded
+ * through every stage to all 36 characters. A caller must still apply this
+ * once per finished session; it cannot tell one session from the next.
+ */
+export function unlockForSession(
+  record: ProgressRecord,
+  session: { accuracy: number; total: number },
+): ProgressRecord {
+  if (!shouldUnlock(METHODS[record.method], session.accuracy, session.total)) return record
+  return unlockNext(record)
+}
+
+/** The characters `after` has that `before` did not, in teaching order. */
+export function newlyUnlocked(before: ProgressRecord, after: ProgressRecord): string[] {
+  const had = new Set(unlockedCharacters(before))
+  return unlockedCharacters(after).filter((character) => !had.has(character))
+}
+
+/**
+ * Make sure at least the first `count` characters of the method are unlocked.
+ *
+ * Only ever raises. A lesson finished after the practice screen had already
+ * unlocked further must not take characters away, and calling this twice for
+ * the same lesson must be harmless.
+ */
+export function unlockThrough(record: ProgressRecord, count: number): ProgressRecord {
+  const method = METHODS[record.method]
+  const limit = method.order.length - method.startingCount
+  const wanted = Math.min(Math.max(Math.floor(count) - method.startingCount, 0), limit)
+  if (!Number.isFinite(wanted) || wanted <= record.unlocked) return record
+  return { ...record, unlocked: wanted }
+}
+
+/**
+ * Unlock as far as `taught` covers the method's own order, from the start.
+ *
+ * For the lesson, which teaches in tree order whatever method is chosen. Under
+ * Signal, finishing stage 2 unlocks exactly stage 2. Under Koch, teaching E and
+ * T unlocks nothing, because Koch's third character is R and unlocking through
+ * to E would hand the learner a dozen characters nobody has shown them.
+ */
+export function unlockTaught(record: ProgressRecord, taught: readonly string[]): ProgressRecord {
+  const method = METHODS[record.method]
+  const covered = new Set([...unlockedCharacters(record), ...taught.map((c) => c.toUpperCase())])
+  let prefix = 0
+  while (prefix < method.order.length && covered.has(method.order[prefix]!)) prefix++
+  return unlockThrough(record, prefix)
 }
 
 /** Progress for a character, defaulted if it has never been touched. */
@@ -248,6 +347,32 @@ export function masteredCharacters(
     const progress = getCharacter(record, character, now)
     return isMastered(progress.skills, progress.seen)
   })
+}
+
+/**
+ * How many lesson stages are taught, counting from the first.
+ *
+ * Over `LESSON_STAGES`, the plan days the lesson screen teaches, so "stage 5"
+ * here is stage 5 on /learn/ and on the progress page. It used to count the
+ * four tree layers, which put a learner at "stage 3 of 4" while the lesson
+ * said "stage 5 of 7".
+ *
+ * A stage counts once every character in it has been answered correctly at
+ * least once (level 2) — the same bar the lesson uses to move on. Counted as a
+ * run from stage 1 rather than as a total, so it reads as the lesson's own
+ * position: drilling Q alone does not make anyone four stages in.
+ */
+export function stagesTaught(record: ProgressRecord, now: number): number {
+  let taught = 0
+  for (const stage of LESSON_STAGES) {
+    const complete = stage.every((character) => {
+      const entry = getCharacter(record, character, now)
+      return masteryLevel(entry.skills, entry.seen) >= 2
+    })
+    if (!complete) break
+    taught++
+  }
+  return taught
 }
 
 /**

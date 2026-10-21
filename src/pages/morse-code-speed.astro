@@ -1,0 +1,357 @@
+---
+/**
+ * /morse-code-speed/: how WPM is measured, the unit rule, PARIS unit by unit,
+ * and the dot length at every speed the sliders offer. Every number is read
+ * from the timing engine (`resolveTiming`, `buildTimeline`) at build time;
+ * the Farnsworth post argues the method, this page is the reference tables.
+ */
+import BaseLayout from '../layouts/BaseLayout.astro'
+import MorsePlayer from '../components/MorsePlayer/MorsePlayer.astro'
+import Faq from '../components/Faq.astro'
+import PageShell from '../components/PageShell.astro'
+import SectionHead from '../components/Reference/SectionHead.astro'
+import {
+  HIGHLIGHTED_SPEEDS,
+  SPEED_INTRO_LINKS,
+  farnsworthRows,
+  formatMs,
+  linkParts,
+  parisSegments,
+  speedRows,
+} from '../components/Reference/reference'
+import { FACTS } from '../config/facts'
+import { CITATIONS } from '../config/site'
+import { breadcrumbTrail, getPage } from '../config/pages'
+import { faqFor } from '../data/faq'
+import { numberWord } from '../data/format'
+import { encode } from '../engine/morseEncoder'
+import { createLastmod } from '../../scripts/lastmod.mjs'
+import {
+  PARIS_KEYING_UNITS,
+  PARIS_SPACING_UNITS,
+  PARIS_UNITS,
+  UNITS,
+  resolveTiming,
+} from '../engine/timingEngine'
+import { article, breadcrumbs, webPage } from '../seo/schema'
+import '../styles/pkg-n.css'
+
+const page = getPage('/morse-code-speed/')
+const trail = breadcrumbTrail(page.path)
+const faq = faqFor(page.path)
+const example = resolveTiming({ wpm: FACTS.exampleWpm })
+const rows = speedRows()
+const farnsworth = farnsworthRows()
+const slowestFarnsworth = farnsworth[0]!
+const segments = parisSegments()
+const reference = 'PARIS'
+const unitsOf = (kinds: readonly string[]) =>
+  segments
+    .filter((segment) => kinds.includes(segment.kind))
+    .reduce((sum, segment) => sum + segment.units, 0)
+const toneUnits = unitsOf(['dot', 'dash'])
+const innerGapUnits = unitsOf(['element-gap'])
+
+const elements = [
+  { name: 'Dot (dit)', units: UNITS.DOT, ms: example.dot, gap: false },
+  { name: 'Dash (dah)', units: UNITS.DASH, ms: example.dash, gap: false },
+  { name: 'Gap inside a character', units: UNITS.ELEMENT_GAP, ms: example.elementGap, gap: true },
+  { name: 'Gap between letters', units: UNITS.CHARACTER_GAP, ms: example.characterGap, gap: true },
+  { name: 'Gap between words', units: UNITS.WORD_GAP, ms: example.wordGap, gap: true },
+]
+
+/** Units each letter of PARIS occupies, its trailing gap included, for the label row. */
+const letterSpans = [...reference].map((letter) => ({
+  letter,
+  units: segments
+    .filter((segment) => segment.letter === letter)
+    .reduce((sum, segment) => sum + segment.units, 0),
+}))
+
+/** When this page first shipped. Later edits show up as `dateModified`. */
+const PUBLISHED = '2026-10-21'
+const modified: string | undefined = createLastmod()(page.path)
+
+const schema = [
+  webPage({ path: page.path, name: page.h1, description: page.description }),
+  breadcrumbs(trail),
+  article({
+    path: page.path,
+    headline: page.h1,
+    description: page.description,
+    datePublished: PUBLISHED,
+    // The sitemap's own date for this page, so the two never disagree and the
+    // schema moves when the page does. Absent until the page is committed.
+    ...(modified && modified > PUBLISHED ? { dateModified: modified } : {}),
+    cites: ['arrl'],
+    hasWebPage: true,
+  }),
+]
+---
+
+<BaseLayout title={page.title} description={page.description} path={page.path} schema={schema}>
+  <PageShell
+    width="tool"
+    trail={trail}
+    eyebrow="Reference plate · Timing"
+    h1={page.h1}
+    intro={page.intro}
+  >
+    {
+      /* The same intro with its two jump links, where the shell offers an intro
+        slot; the plain `intro` above is the fallback. */
+    }
+    <Fragment slot="intro">
+      {
+        linkParts(page.intro, SPEED_INTRO_LINKS).map((part) =>
+          part.href ? (
+            <a href={part.href} class="pkg-n-link">
+              {part.text}
+            </a>
+          ) : (
+            part.text
+          ),
+        )
+      }
+    </Fragment>
+
+    <div class="grid grid-cols-1 items-start gap-5 lg:grid-cols-2 lg:gap-8">
+      <div class="mf-instrument p-5 sm:p-6">
+        <span class="mf-engraved">The formula</span>
+        <div class="mf-screen mf-grid mt-4 grid place-items-center px-6 py-8">
+          <p class="pkg-n-formula relative z-[3] text-center font-mono text-signal mf-phosphor">
+            <span>1 unit =</span>{' '}
+            <span>{`${FACTS.unitMsAtOneWpm} ÷ WPM`}</span>
+          </p>
+          <p class="mf-engraved relative z-[3] mt-3">milliseconds per dot</p>
+        </div>
+        <dl class="pkg-n-readouts mt-5 grid gap-3">
+          <div class="mf-readout">
+            <dt class="mf-readout-label mf-engraved">{reference}</dt>
+            <dd class="mf-readout-value">
+              {PARIS_UNITS}<span class="pkg-n-unit">units</span>
+            </dd>
+          </div>
+          <div class="mf-readout" data-tone="signal">
+            <dt class="mf-readout-label mf-engraved">{`Dot at ${FACTS.exampleWpm}`}</dt>
+            <dd class="mf-readout-value">
+              {FACTS.unitMs}<span class="pkg-n-unit">ms</span>
+            </dd>
+          </div>
+          <div class="mf-readout">
+            <dt class="mf-readout-label mf-engraved">WPM range</dt>
+            <dd class="mf-readout-value">{`${FACTS.wpmMin}–${FACTS.wpmMax}`}</dd>
+          </div>
+        </dl>
+      </div>
+      <MorsePlayer
+        morse={encode(reference)}
+        label={`${reference} · the reference word`}
+        initialWpm={FACTS.exampleWpm}
+      />
+    </div>
+
+    <section slot="more" aria-labelledby="units">
+      <SectionHead id="units" index={1} label="The rule">
+        {`The ${UNITS.DOT}:${UNITS.DASH}:${UNITS.WORD_GAP} timing rule`}
+      </SectionHead>
+      <p class="mt-4 max-w-[64ch] leading-relaxed text-muted">
+        {
+          `Everything in Morse code is measured in units, and a unit is the length of one dot. A dash is ${numberWord(UNITS.DASH)} units, the silence inside a character ${numberWord(UNITS.ELEMENT_GAP)}, between letters ${numberWord(UNITS.CHARACTER_GAP)} and between words ${numberWord(UNITS.WORD_GAP)}. Speed changes how long a unit lasts, never these ratios.`
+        }
+      </p>
+      <div class="pkg-n-table-wrap mt-8">
+        <table class="pkg-n-table">
+          <caption class="mf-engraved"
+            >{`Each element in units, and in milliseconds at ${FACTS.exampleWpm} WPM`}</caption
+          >
+          <thead>
+            <tr>
+              <th scope="col">Element</th>
+              <th scope="col">Units</th>
+              <th scope="col">{`At ${FACTS.exampleWpm} WPM`}</th>
+              <th scope="col"><span class="sr-only">Length to scale</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {
+              elements.map((element) => (
+                <tr>
+                  <th scope="row">{element.name}</th>
+                  <td>{element.units}</td>
+                  <td>{formatMs(element.ms)} ms</td>
+                  <td>
+                    <span
+                      class:list={['pkg-n-bar', element.gap && 'is-gap']}
+                      style={`--pkg-n-span: ${element.units};`}
+                      aria-hidden="true"
+                    />
+                  </td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section slot="more" aria-labelledby="paris">
+      <SectionHead id="paris" index={2} label="Reference word"
+        >{`${reference}, unit by unit`}</SectionHead
+      >
+      <p class="mt-4 max-w-[64ch] leading-relaxed text-muted">
+        {
+          `Speed is quoted in words per minute, and the word is ${reference}. Sent with its trailing word gap it is exactly ${PARIS_UNITS} units: ${PARIS_KEYING_UNITS} of dots, dashes and the gaps inside letters, and ${PARIS_SPACING_UNITS} of spacing between letters and after the word. So ${FACTS.exampleWpm} WPM means ${FACTS.exampleWpm} × ${PARIS_UNITS} = ${FACTS.exampleWpm * PARIS_UNITS} units a minute, and one unit is ${FACTS.unitMs} milliseconds.`
+        }
+      </p>
+      <figure class="mf-panel mt-8 p-5 sm:p-8">
+        <div
+          class="pkg-n-paris"
+          style={`--pkg-n-units: ${PARIS_UNITS};`}
+          role="img"
+          aria-label={`${reference} as ${PARIS_UNITS} units: ${PARIS_KEYING_UNITS} keyed, ${PARIS_SPACING_UNITS} of spacing.`}
+        >
+          {
+            segments.map((segment) => (
+              <span
+                class:list={[
+                  'pkg-n-cell',
+                  (segment.kind === 'dot' || segment.kind === 'dash') && 'is-on',
+                  (segment.kind === 'character-gap' || segment.kind === 'word-gap') && 'is-space',
+                ]}
+                style={`grid-column: span ${segment.units};`}
+              />
+            ))
+          }
+        </div>
+        <div
+          class="pkg-n-paris-letters"
+          style={`--pkg-n-units: ${PARIS_UNITS};`}
+          aria-hidden="true"
+        >
+          {
+            letterSpans.map((span) => (
+              <span style={`grid-column: span ${span.units};`}>{span.letter}</span>
+            ))
+          }
+        </div>
+        <figcaption class="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted">
+          <span>
+            <span class="pkg-n-swatch bg-signal" aria-hidden="true"></span>
+            {` Tone: ${toneUnits} units`}
+          </span>
+          <span>
+            <span class="pkg-n-swatch pkg-n-cell" aria-hidden="true"></span>
+            {` Gaps inside letters: ${innerGapUnits} units`}
+          </span>
+          <span>
+            <span class="pkg-n-swatch pkg-n-cell is-space" aria-hidden="true"></span>
+            {` Letter and word spacing: ${PARIS_SPACING_UNITS} units`}
+          </span>
+        </figcaption>
+      </figure>
+    </section>
+
+    <section slot="more" aria-labelledby="speeds">
+      <SectionHead id="speeds" index={3} label="Chart">
+        {`Dot length at every speed from ${FACTS.wpmMin} to ${FACTS.wpmMax} WPM`}
+      </SectionHead>
+      <p class="mt-4 max-w-[64ch] leading-relaxed text-muted">
+        {
+          `Computed by the same timing engine that plays every sound on this site, in milliseconds. The marked rows are the speeds the trainer offers as presets.`
+        }
+      </p>
+      <div class="pkg-n-table-wrap mt-8">
+        <table class="pkg-n-table">
+          <caption class="mf-engraved"
+            >Element and gap lengths in milliseconds, standard timing</caption
+          >
+          <thead>
+            <tr>
+              <th scope="col">WPM</th>
+              <th scope="col">Dot</th>
+              <th scope="col">Dash</th>
+              <th scope="col">Letter gap</th>
+              <th scope="col">Word gap</th>
+              <th scope="col">{reference}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {
+              rows.map((row) => (
+                <tr class:list={[HIGHLIGHTED_SPEEDS.has(row.wpm) && 'is-marked']}>
+                  <th scope="row">{row.wpm}</th>
+                  <td>{formatMs(row.dot)}</td>
+                  <td>{formatMs(row.dash)}</td>
+                  <td>{formatMs(row.characterGap)}</td>
+                  <td>{formatMs(row.wordGap)}</td>
+                  <td>{formatMs(row.paris)}</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section slot="more" aria-labelledby="farnsworth">
+      <SectionHead id="farnsworth" index={4} label="Farnsworth">
+        Character speed and Farnsworth speed
+      </SectionHead>
+      <div class="pkg-n-prose mt-4 max-w-[64ch] space-y-4 leading-relaxed text-muted">
+        <p>
+          {
+            `Farnsworth timing keeps every character at its full speed and stretches only the gaps between characters and words, so the overall rate is slower while each letter sounds as it will at speed. With characters at ${FACTS.exampleWpm} WPM and an overall ${slowestFarnsworth.effective} WPM, the gap after each letter grows from ${formatMs(example.characterGap)} to ${formatMs(slowestFarnsworth.timing.characterGap)} milliseconds. The stretch follows the `
+          }<a href={CITATIONS.arrl.url} rel="noopener">{CITATIONS.arrl.short} standard</a>.
+        </p>
+        <p>
+          Why it beats slowing the characters down is in{' '}
+          <a href="/blog/what-farnsworth-timing-is/">the note on Farnsworth timing</a>.
+        </p>
+      </div>
+      <div class="pkg-n-table-wrap mt-8">
+        <table class="pkg-n-table">
+          <caption class="mf-engraved"
+            >{
+              `Characters at ${FACTS.exampleWpm} WPM, gaps stretched for a slower overall speed, in milliseconds`
+            }</caption
+          >
+          <thead>
+            <tr>
+              <th scope="col">Overall WPM</th>
+              <th scope="col">Dot</th>
+              <th scope="col">Dash</th>
+              <th scope="col">Letter gap</th>
+              <th scope="col">Word gap</th>
+            </tr>
+          </thead>
+          <tbody>
+            {
+              farnsworth.map((row) => (
+                <tr class:list={[row.effective === FACTS.exampleWpm && 'is-marked']}>
+                  <th scope="row">
+                    {row.effective === FACTS.exampleWpm
+                      ? `${row.effective} (standard)`
+                      : row.effective}
+                  </th>
+                  <td>{formatMs(row.timing.dot)}</td>
+                  <td>{formatMs(row.timing.dash)}</td>
+                  <td>{formatMs(row.timing.characterGap)}</td>
+                  <td>{formatMs(row.timing.wordGap)}</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-8 flex flex-wrap gap-3">
+        <a href="/practice/" class="mf-btn mf-btn-primary">Practise at your speed</a>
+        <a href="/how-to-learn-morse-code/" class="mf-btn mf-btn-secondary"
+          >How to learn Morse code</a
+        >
+      </div>
+    </section>
+
+    <Faq slot="more" items={faq} heading="Questions about Morse code speed" />
+  </PageShell>
+</BaseLayout>

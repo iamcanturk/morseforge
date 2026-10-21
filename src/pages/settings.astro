@@ -1,22 +1,32 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro'
+import PageShell from '../components/PageShell.astro'
+import ThemeToggle from '../components/ThemeToggle.astro'
 import { SettingsScreen } from '../components/Settings/SettingsScreen'
+import { breadcrumbTrail, getPage } from '../config/pages'
+import '../styles/pkg-j.css'
 
-const title = 'Settings | MorseForge'
-const description =
-  'Adjust the CW tone, speed, Farnsworth spacing and key bindings, and export or import your progress.'
+/**
+ * Settings: the station's control panel.
+ *
+ * Title, description, H1 and intro come from the page registry. BaseLayout
+ * reads `indexable: false` from the same entry, so the page is noindex.
+ * The theme switch is the header's own component, handed to the island as a
+ * slot, so there is one implementation of theme switching, not two.
+ */
+const page = getPage('/settings/')
 ---
 
-<BaseLayout title={title} description={description} path="/settings/">
-  <main class="mx-auto max-w-3xl px-6 py-14">
-    <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Settings</h1>
-    <p class="mt-3 max-w-2xl leading-relaxed text-muted">
-      Everything applies immediately and is stored in this browser. There is no account and nothing
-      is sent anywhere.
-    </p>
-
-    <div class="mt-10">
-      <SettingsScreen client:load />
-    </div>
-  </main>
+<BaseLayout title={page.title} description={page.description} path={page.path}>
+  <PageShell
+    width="tool"
+    trail={breadcrumbTrail(page.path)}
+    eyebrow="Applies instantly · Stored in this browser only"
+    h1={page.h1}
+    intro={page.intro}
+  >
+    <SettingsScreen client:load>
+      <ThemeToggle slot="theme" />
+    </SettingsScreen>
+  </PageShell>
 </BaseLayout>

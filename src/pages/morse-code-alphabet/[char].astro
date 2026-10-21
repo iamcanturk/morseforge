@@ -1,0 +1,321 @@
+---
+/**
+ * One reference plate per letter and digit: /morse-code-alphabet/a/ … /9/.
+ *
+ * Built only for characters with at least six distinct computed facts
+ * (`characterPages()`, tested), so no page is a chart row with a URL. Every
+ * value comes from `src/data/characters.ts`; the template holds no Morse and
+ * no figures. The player is the vanilla `MorsePlayer.astro`: no React here.
+ */
+import type { GetStaticPaths } from 'astro'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import MorsePlayer from '../../components/MorsePlayer/MorsePlayer.astro'
+import Faq from '../../components/Faq.astro'
+import PageShell from '../../components/PageShell.astro'
+import CharTile from '../../components/Reference/CharTile.astro'
+import CharacterStrip from '../../components/Reference/CharacterStrip.astro'
+import SectionHead from '../../components/Reference/SectionHead.astro'
+import TreePath from '../../components/Reference/TreePath.astro'
+import {
+  characterFactRows,
+  characterHref,
+  characterIntro,
+  characterPages,
+  characterSiblings,
+  linkParts,
+  planDayHref,
+  treePath,
+} from '../../components/Reference/reference'
+import { FACTS } from '../../config/facts'
+import { breadcrumbTrail, characterPage, getPage } from '../../config/pages'
+import type { CharacterFacts } from '../../data/characters'
+import { characterFaq } from '../../data/faq'
+import { joinList, numberWord } from '../../data/format'
+import { METHODS } from '../../data/methods'
+import { prettify } from '../../engine/morseEncoder'
+import { breadcrumbs, definedTerm, absoluteUrl, webPage } from '../../seo/schema'
+import '../../styles/pkg-n.css'
+
+export const getStaticPaths = (() =>
+  characterPages().map((facts) => ({
+    params: { char: facts.slug },
+    props: { facts },
+  }))) satisfies GetStaticPaths
+
+interface Props {
+  facts: CharacterFacts
+}
+
+const { facts } = Astro.props
+const c = facts.character
+const meta = characterPage(facts)
+const hub = getPage(meta.parent)
+const numbers = getPage('/morse-code-numbers/')
+const trail = breadcrumbTrail(meta.path, { name: c, parent: meta.parent })
+const faq = characterFaq(facts)
+const rows = characterFactRows(facts)
+const siblings = characterSiblings(facts)
+const layout = treePath(facts.code)
+const dayHref = planDayHref(facts)
+
+const group = characterPages().filter((page) => page.kind === facts.kind)
+const position = group.findIndex((page) => page.character === c) + 1
+const kindLabel = facts.kind === 'letter' ? 'Letter' : 'Number'
+
+/** Mirror, reversal and neighbours, each once, with what makes them close. */
+const confusable: { character: string; caption: string }[] = []
+if (facts.mirror) confusable.push({ character: facts.mirror, caption: 'Mirror image' })
+if (facts.reverse && facts.reverse !== facts.mirror) {
+  confusable.push({ character: facts.reverse, caption: 'Read backwards' })
+}
+for (const other of facts.neighbours) {
+  if (!confusable.some((entry) => entry.character === other)) {
+    confusable.push({ character: other, caption: 'One element away' })
+  }
+}
+
+const treeNote =
+  facts.tree !== null
+    ? `${c} sits ${numberWord(facts.tree.steps)} ${facts.tree.steps === 1 ? 'step' : 'steps'} from the root${facts.tree.parent ? `, directly below ${facts.tree.parent}` : ''}.${facts.tree.dot || facts.tree.dash ? ` From ${c}, ${[facts.tree.dot && `a dot leads to ${facts.tree.dot}`, facts.tree.dash && `a dash leads to ${facts.tree.dash}`].filter(Boolean).join(' and ')}.` : ` No letter hangs below ${c}: it is a leaf of the tree.`}`
+    : `Every digit sits ${numberWord(FACTS.digitElements)} steps from the root, one layer below the longest letters, so its path runs through letters you already know.`
+
+const schema = [
+  webPage({ path: meta.path, name: meta.h1, description: meta.description }),
+  breadcrumbs(trail),
+  definedTerm(
+    {
+      name: c,
+      termCode: facts.code,
+      description: `${c} in Morse code: ${facts.code} (${facts.spoken})`,
+      url: absoluteUrl(meta.path),
+    },
+    '/morse-code-alphabet/',
+  ),
+]
+---
+
+<BaseLayout title={meta.title} description={meta.description} path={meta.path} schema={schema}>
+  <PageShell
+    width="tool"
+    trail={trail}
+    eyebrow={`Reference plate · ${kindLabel} ${position} of ${group.length}`}
+    h1={meta.h1}
+    intro={characterIntro(facts)}
+  >
+    <div class="grid grid-cols-1 items-start gap-5 lg:grid-cols-2 lg:gap-8">
+      <div class="mf-instrument p-5 sm:p-6">
+        <div class="flex items-center justify-between">
+          <span class="mf-engraved">{kindLabel} {c}</span>
+          <span class="mf-engraved"
+            >{facts.elements} {facts.elements === 1 ? 'element' : 'elements'}</span
+          >
+        </div>
+        <div class="mf-screen mf-grid mt-4 grid place-items-center px-6 py-8 sm:py-10">
+          <p class="pkg-n-glyph font-display font-bold text-signal mf-phosphor" aria-hidden="true">
+            {c}
+          </p>
+          <p class="pkg-n-elements pkg-n-elements-lg mt-5" aria-hidden="true">
+            {
+              [...facts.code].map((element) => (
+                <span class:list={['pkg-n-el', element === '-' && 'is-dash']} />
+              ))
+            }
+          </p>
+          <p class="mf-engraved mt-4">{facts.spoken}</p>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-5">
+        <dl class="pkg-n-readouts grid gap-3">
+          <div class="mf-readout">
+            <dt class="mf-readout-label mf-engraved">Code</dt>
+            <dd class="mf-readout-value pkg-n-readout-code text-cyan">{prettify(facts.code)}</dd>
+          </div>
+          <div class="mf-readout" data-tone="signal">
+            <dt class="mf-readout-label mf-engraved">{`At ${FACTS.exampleWpm} WPM`}</dt>
+            <dd class="mf-readout-value">
+              {facts.durationMs.wpm20}<span class="pkg-n-unit">ms</span>
+            </dd>
+          </div>
+          <div class="mf-readout">
+            <dt class="mf-readout-label mf-engraved">
+              {facts.planDay !== null ? 'Plan day' : 'Elements'}
+            </dt>
+            <dd class="mf-readout-value">{facts.planDay ?? facts.elements}</dd>
+          </div>
+        </dl>
+        <MorsePlayer
+          morse={facts.code}
+          label={`${c} · ${facts.spoken}`}
+          initialWpm={FACTS.exampleWpm}
+        />
+        <div class="flex flex-wrap gap-3">
+          <a href="/practice/" class="mf-btn mf-btn-primary">Practise {c}</a>
+          <a href="/telegraph/" class="mf-btn mf-btn-secondary">Send it on the key</a>
+        </div>
+      </div>
+    </div>
+
+    <section slot="more" aria-labelledby="facts">
+      <SectionHead id="facts" index={1} label="Specification">{c} at a glance</SectionHead>
+      <dl class="pkg-n-spec mt-8">
+        {
+          rows.map((row) => (
+            <div class="pkg-n-spec-row">
+              <dt class="mf-engraved">{row.label}</dt>
+              <dd class="mt-2 font-mono text-ink">
+                {linkParts(
+                  row.value,
+                  (row.links ?? []).map((link) => ({ text: link.character, href: link.href })),
+                ).map((part) => (part.href ? <a href={part.href}>{part.text}</a> : part.text))}
+                {row.code && row.label !== 'Morse code' && (
+                  <span class="ml-2 text-cyan" aria-hidden="true">
+                    {prettify(row.code)}
+                  </span>
+                )}
+              </dd>
+            </div>
+          ))
+        }
+      </dl>
+    </section>
+
+    <section slot="more" aria-labelledby="tree">
+      <SectionHead id="tree" index={2} label="Morse tree"
+        >Where {c} sits in the Morse code tree</SectionHead
+      >
+      <div class="mt-8 grid items-center gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div class="mf-screen pkg-n-tree-screen grid place-items-center p-4 sm:p-6">
+          <TreePath code={facts.code} id={`tree-${facts.slug}`} />
+        </div>
+        <div class="max-w-[60ch]">
+          <p class="text-lead text-ink">{layout.description}</p>
+          <p class="mt-4 leading-relaxed text-muted">
+            In the Morse code tree a dot branches left and a dash branches right, so every character
+            sits exactly where its own code leads. {treeNote}
+          </p>
+          <a href="/tree/" class="pkg-n-link pkg-n-link-solo mt-6">See the whole Morse code tree</a>
+        </div>
+      </div>
+    </section>
+
+    {
+      confusable.length > 0 && (
+        <section slot="more" aria-labelledby="confused">
+          <SectionHead id="confused" index={3} label="Close calls">
+            Characters confused with {c}
+          </SectionHead>
+          <p class="mt-4 max-w-[60ch] leading-relaxed text-muted">
+            {c} is easiest to mistake for{' '}
+            {joinList(
+              confusable.map((entry) => entry.character),
+              'or',
+            )}
+            . Practise them back to back until the difference is a sound rather than a count.
+          </p>
+          <ul class="pkg-n-tiles mt-8">
+            {confusable.map((entry) => (
+              <li>
+                <CharTile character={entry.character} caption={entry.caption} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )
+    }
+
+    <section slot="more" aria-labelledby="learn">
+      <SectionHead id="learn" index={confusable.length > 0 ? 4 : 3} label="Learn it">
+        How to learn {c}
+      </SectionHead>
+      <div class="mt-8 grid gap-5 md:grid-cols-2">
+        <div class="mf-panel p-6">
+          <p class="mf-engraved">{FACTS.planDays}-day plan</p>
+          <p class="mt-3 leading-relaxed text-muted">
+            {
+              facts.planDay !== null && dayHref ? (
+                <>
+                  The plan teaches {c} on{' '}
+                  <a href={dayHref} class="pkg-n-link">
+                    day {facts.planDay}
+                  </a>
+                  {facts.companions.length > 0 && <>, together with {joinList(facts.companions)}</>}
+                  . Learn it by its sound, "{facts.spoken}", at full speed rather than by counting
+                  its elements.
+                </>
+              ) : (
+                <>
+                  Learn it by its sound, "{facts.spoken}", at full speed rather than by counting its
+                  elements.
+                </>
+              )
+            }
+          </p>
+          {
+            facts.kochPosition !== null && (
+              <p class="mt-3 leading-relaxed text-muted">
+                {`In the Koch method it is character ${facts.kochPosition} of ${METHODS.koch.order.length}.`}
+              </p>
+            )
+          }
+        </div>
+        <div class="mf-panel p-6">
+          <p class="mf-engraved">Practise</p>
+          <p class="mt-3 leading-relaxed text-muted">
+            Practice brings {c} back just before you would forget it, in all three skills: copying it
+            by ear, reading it, and sending it yourself.
+          </p>
+          <div class="mt-5 flex flex-wrap gap-3">
+            <a href="/learn/" class="mf-btn mf-btn-secondary mf-btn-sm">Guided lessons</a>
+            <a href="/practice/" class="mf-btn mf-btn-secondary mf-btn-sm">Practice</a>
+            {
+              facts.kind === 'digit' && (
+                <a href={numbers.path} class="mf-btn mf-btn-ghost mf-btn-sm">
+                  {numbers.navLabel}
+                </a>
+              )
+            }
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {
+      facts.words.length > 0 && (
+        <section slot="more" aria-labelledby="words">
+          <SectionHead id="words" index={(confusable.length > 0 ? 4 : 3) + 1} label="In use">
+            Words with {c} in them
+          </SectionHead>
+          <ul class="mt-8 flex flex-wrap gap-2">
+            {facts.words.map((word) => (
+              <li>
+                <a href={`/words/${word.slug}/`} class="mf-chip-link">
+                  {word.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )
+    }
+
+    <Faq slot="more" items={faq} heading={`Questions about ${c} in Morse code`} />
+
+    <div slot="more" class="mf-panel p-6 sm:p-8">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <a href={characterHref(siblings.previous.character)!} class="pkg-n-step" rel="prev">
+          <span class="mf-engraved">Previous</span>{' '}
+          <span class="font-display text-h3 font-bold text-ink">{siblings.previous.character}</span>
+        </a>
+        <a href={hub.path} class="mf-btn mf-btn-ghost mf-btn-sm">The whole alphabet</a>
+        <a href={characterHref(siblings.next.character)!} class="pkg-n-step text-right" rel="next">
+          <span class="mf-engraved">Next</span>{' '}
+          <span class="font-display text-h3 font-bold text-ink">{siblings.next.character}</span>
+        </a>
+      </div>
+      <div class="mt-6 border-t border-line pt-6">
+        <CharacterStrip current={c} />
+      </div>
+    </div>
+  </PageShell>
+</BaseLayout>

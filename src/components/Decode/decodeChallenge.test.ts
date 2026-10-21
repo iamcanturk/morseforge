@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { DECODE_ROUNDS } from './DecodeChallenge'
+import { DECODE_ROUNDS, stampFor } from './DecodeChallenge'
 import { encode } from '../../engine/morseEncoder'
 import { decode } from '../../engine/morseDecoder'
-import { isEncodable } from '../../data/morseAlphabet'
+import { ALL_LETTERS, isEncodable } from '../../data/morseAlphabet'
+import { capitalise, numberWord } from '../../data/format'
 
 /**
  * This is the first thing a visitor interacts with. A puzzle whose Morse does
@@ -50,6 +51,28 @@ describe('DECODE_ROUNDS', () => {
   it('gives every round a note worth reading', () => {
     for (const round of DECODE_ROUNDS) {
       expect(round.note.trim().split(/\s+/).length, round.answer).toBeGreaterThanOrEqual(8)
+    }
+  })
+})
+
+describe('a finished round', () => {
+  it('stamps a decode as received, and a revealed answer as shown, never received', () => {
+    expect(stampFor('correct')).toBe('Received')
+    expect(stampFor('revealed')).toBe('Shown')
+  })
+
+  it('counts the last round’s note from its own word', () => {
+    const last = DECODE_ROUNDS.at(-1)!
+    const letters = new Set(last.answer).size
+    expect(last.note).toMatch(
+      new RegExp(
+        `^${capitalise(numberWord(last.answer.length))} characters, ${numberWord(letters)} different letters`,
+      ),
+    )
+    // "nearly a quarter" must stay true of the share it describes.
+    if (last.note.includes('nearly a quarter')) {
+      expect(letters / ALL_LETTERS.length).toBeGreaterThanOrEqual(0.2)
+      expect(letters / ALL_LETTERS.length).toBeLessThan(0.25)
     }
   })
 })

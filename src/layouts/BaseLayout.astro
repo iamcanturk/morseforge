@@ -2,7 +2,21 @@
 import '../styles/global.css'
 import Footer from '../components/Footer.astro'
 import Header from '../components/Header.astro'
-import { AUTHOR, AUTHOR_SAME_AS, AUTHOR_X_URL, CF_ANALYTICS_TOKEN, SITE } from '../config/site'
+import {
+  AUTHOR,
+  AUTHOR_GITHUB_URL,
+  AUTHOR_SAME_AS,
+  AUTHOR_X_URL,
+  CF_ANALYTICS_TOKEN,
+  MORSE_CODE_ABOUT,
+  SITE,
+} from '../config/site'
+import { findPage } from '../config/pages'
+import { DEFAULT_OG_IMAGE, OG_LOCALE, headMeta, jsonLd } from '../seo/head'
+import { markdownPathFor } from '../seo/markdown'
+import { INSTALLABLE_EVENT, INSTALL_GONE_EVENT, INSTALL_HANDLE } from '../components/ui/install'
+import { SETTINGS_KEY } from '../storage/settings'
+import { THEME_COLOR, THEME_KEY } from '../styles/palette'
 
 export interface Props {
   title: string
@@ -20,8 +34,39 @@ export interface Props {
    * browser and has to strip navigation, scripts and a footer to reach the
    * text — which is where quotes get mangled and headings get lost. This is
    * how it is supposed to find the clean copy instead.
+   *
+   * Optional: when omitted it comes from the page registry (`markdown`) or,
+   * for a word page, from the word list (`markdownPathFor`). Pass `null` to
+   * suppress it.
    */
-  markdown?: string
+  markdown?: string | null
+  /**
+   * Keep the page out of search results but let crawlers follow its links:
+   * `noindex, follow`, no canonical. Structured data stays.
+   *
+   * Optional: when omitted it is `true` for every page the registry marks
+   * `indexable: false` (stats, settings, the 404), so those pages need not
+   * pass it. Unlike `private`, this keeps the layout and the JSON-LD.
+   */
+  noindex?: boolean
+  /**
+   * Load the analytics beacon on this page. Default true.
+   *
+   * The beacon reports the page URL. `/message/` keeps its message in the URL
+   * fragment and promises that it is never sent anywhere, so it turns this off.
+   */
+  analytics?: boolean
+  /** `og:type`. Default `article` when `article` is given, else `website`. */
+  ogType?: 'website' | 'article'
+  /** Site path (or absolute URL) of the share image. Default `/og/default.png`. */
+  ogImage?: string
+  /** Alt text for the share image. Required in practice whenever `ogImage` is set. */
+  ogImageAlt?: string
+  /** Pixel width and height of `ogImage`, emitted as `og:image:width`/`height`. */
+  ogImageWidth?: number
+  ogImageHeight?: number
+  /** Dates for `article:published_time` / `article:modified_time`, e.g. on blog posts. */
+  article?: { published: Date | string; modified?: Date | string | undefined }
   /**
    * Keep the page out of every index: no crawling, no structured data, no
    * canonical, no sitemap entry.
@@ -41,11 +86,35 @@ const {
   schema = [],
   bare = false,
   private: isPrivate = false,
-  markdown,
+  analytics = true,
+  ogType,
+  ogImage,
+  ogImageAlt,
+  ogImageWidth,
+  ogImageHeight,
+  article,
 } = Astro.props
 
-const canonical = new URL(path, Astro.site).href
-const ogImage = new URL('/og/default.png', Astro.site).href
+// Both default from the registry, so a page owner only passes them to
+// override: stats, settings and the 404 are `indexable: false` there, and the
+// registry (or the word list) knows which pages have a Markdown copy.
+const noindex = Astro.props.noindex ?? findPage(path)?.indexable === false
+const markdown = Astro.props.markdown === undefined ? markdownPathFor(path) : Astro.props.markdown
+
+const head = headMeta(
+  {
+    path,
+    private: isPrivate,
+    noindex,
+    ogType,
+    ogImage,
+    ogImageAlt,
+    ogImageWidth,
+    ogImageHeight,
+    article,
+  },
+  Astro.site?.href,
+)
 
 /**
  * Site-wide identity graph, emitted on every page.
@@ -73,6 +142,9 @@ const identityGraph = {
       description: SITE.description,
       inLanguage: SITE.locale,
       publisher: { '@id': `${SITE.url}/#author` },
+      // Says which "Morse code" this is: the encoding (Wikidata Q79897), not a
+      // person called Morse.
+      about: MORSE_CODE_ABOUT,
     },
     {
       '@type': 'WebApplication',
@@ -85,6 +157,10 @@ const identityGraph = {
       operatingSystem: 'Any',
       browserRequirements: 'Requires JavaScript and Web Audio support',
       author: { '@id': `${SITE.url}/#author` },
+      about: MORSE_CODE_ABOUT,
+      inLanguage: SITE.locale,
+      image: new URL(DEFAULT_OG_IMAGE.path, SITE.url).href,
+      sameAs: [SITE.repo],
       isAccessibleForFree: true,
       // A free product still needs an Offer, or rich results treat the price
       // as unknown rather than as zero.
@@ -108,31 +184,57 @@ const identityGraph = {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    {
-      isPrivate ? (
-        <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
-      ) : (
-        <link rel="canonical" href={canonical} />
-      )
-    }
+    {head.robots && <meta name="robots" content={head.robots} />}
+    {head.canonical && <link rel="canonical" href={head.canonical} />}
+
+    {/* Before the script below, which sets it to match the theme it picks. */}
+    <meta name="theme-color" content={THEME_COLOR.dark} />
 
     {
       /* Blocking on purpose, and tiny. Deferring this is what causes the flash
-        of the wrong theme that every site with a dark mode gets wrong once. */
+        of the wrong theme that every site with a dark mode gets wrong once.
+
+        It also carries Settings → Motion to CSS as `html[data-motion]`. The
+        React hook already honoured that setting, but CSS only ever saw the OS
+        preference, so an animation in a stylesheet ignored the app's own
+        switch. Same timing as the theme, for the same reason: an animation
+        that starts before the setting arrives has already moved. */
     }
-    <script is:inline>
-      ;(() => {
-        try {
-          const choice = localStorage.getItem('morseforge_theme') ?? 'system'
-          const light =
-            choice === 'light' ||
-            (choice === 'system' && window.matchMedia('(prefers-color-scheme: light)').matches)
-          document.documentElement.dataset.theme = light ? 'light' : 'dark'
-          document.documentElement.dataset.themeChoice = choice
-        } catch {
-          document.documentElement.dataset.theme = 'dark'
-        }
-      })()
+    <script
+      is:inline
+      define:vars={{ themeKey: THEME_KEY, settingsKey: SETTINGS_KEY, themeColor: THEME_COLOR }}
+    >
+      const root = document.documentElement
+      // Only the three known choices count. Blocked storage, a missing key or
+      // junk left by an older build all mean "system", which asks the OS, so an
+      // OS-light visitor never gets a dark first paint that ThemeToggle then
+      // flips (and a bare page, which has no toggle, never stays wrong).
+      let choice = 'system'
+      try {
+        const stored = localStorage.getItem(themeKey)
+        if (stored === 'light' || stored === 'dark') choice = stored
+      } catch {
+        // Storage blocked: fall through to the OS preference.
+      }
+      let osLight = false
+      try {
+        osLight = window.matchMedia('(prefers-color-scheme: light)').matches
+      } catch {
+        // No matchMedia: dark is the house default.
+      }
+      root.dataset.theme = choice === 'system' ? (osLight ? 'light' : 'dark') : choice
+      root.dataset.themeChoice = choice
+      document
+        .querySelector('meta[name="theme-color"]')
+        ?.setAttribute('content', themeColor[root.dataset.theme])
+
+      try {
+        const motion = JSON.parse(localStorage.getItem(settingsKey) ?? 'null')?.data?.motion
+        root.dataset.motion = motion === 'reduce' || motion === 'full' ? motion : 'system'
+      } catch {
+        // 'system' defers to the OS media query, which is the right default.
+        root.dataset.motion = 'system'
+      }
     </script>
 
     {
@@ -150,23 +252,31 @@ const identityGraph = {
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="theme-color" content="#080B10" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="MorseForge" />
 
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={head.ogType} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:url" content={canonical} />
-    <meta property="og:image" content={ogImage} />
+    <meta property="og:url" content={head.url} />
+    <meta property="og:image" content={head.ogImage.url} />
+    {head.ogImage.width && <meta property="og:image:width" content={String(head.ogImage.width)} />}
+    {
+      head.ogImage.height && (
+        <meta property="og:image:height" content={String(head.ogImage.height)} />
+      )
+    }
+    <meta property="og:image:alt" content={head.ogImage.alt} />
     <meta property="og:site_name" content={SITE.name} />
-    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale" content={OG_LOCALE} />
+    {head.articleMeta.map((entry) => <meta property={entry.property} content={entry.content} />)}
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
-    <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:image" content={head.ogImage.url} />
+    <meta name="twitter:image:alt" content={head.ogImage.alt} />
     <meta name="twitter:creator" content={`@${AUTHOR.x}`} />
     <meta name="twitter:site" content={`@${AUTHOR.x}`} />
 
@@ -183,6 +293,7 @@ const identityGraph = {
     }
     <link rel="author" href={AUTHOR.url} />
     <link rel="me" href={AUTHOR_X_URL} />
+    <link rel="me" href={AUTHOR_GITHUB_URL} />
     <link rel="sitemap" href="/sitemap-index.xml" />
 
     {
@@ -190,19 +301,21 @@ const identityGraph = {
         indexed, and there is nothing here to index. */
     }
     {
-      !isPrivate && (
-        <script is:inline type="application/ld+json" set:html={JSON.stringify(identityGraph)} />
+      head.structuredData && (
+        <script is:inline type="application/ld+json" set:html={jsonLd(identityGraph)} />
       )
     }
     {
-      !isPrivate &&
+      head.structuredData &&
         schema.map((entry) => (
-          <script is:inline type="application/ld+json" set:html={JSON.stringify(entry)} />
+          <script is:inline type="application/ld+json" set:html={jsonLd(entry)} />
         ))
     }
 
     {
-      CF_ANALYTICS_TOKEN && (
+      /* Production builds only: in `astro dev` the beacon would report local
+         browsing into the live site's numbers (and fail CORS from localhost). */
+      import.meta.env.PROD && analytics && CF_ANALYTICS_TOKEN && (
         /* `type="module"` matches the snippet Cloudflare currently issues.
            Module scripts already defer, so this does not block rendering. */
         <script
@@ -214,13 +327,27 @@ const identityGraph = {
       )
     }
   </head>
-  <body class="flex min-h-dvh flex-col bg-void text-ink antialiased">
+  <body class="flex min-h-dvh flex-col text-ink antialiased">
+    {
+      /* No bg-void on body: html paints the background, and body::before lays
+        the office texture over it. A body background would hide that layer. */
+    }
     {
       /* Registered after load so it never competes with the first render for
         bandwidth. The app works fully without it; the worker only adds offline. */
     }
-    <script is:inline>
-      if ('serviceWorker' in navigator) {
+    <script
+      is:inline
+      define:vars={{
+        handleName: INSTALL_HANDLE,
+        installableEvent: INSTALLABLE_EVENT,
+        goneEvent: INSTALL_GONE_EVENT,
+        settingsKey: SETTINGS_KEY,
+        // sw.js is generated at build time; under `astro dev` it does not exist.
+        registerWorker: import.meta.env.PROD,
+      }}
+    >
+      if (registerWorker && 'serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js').catch(() => {
             // Unsupported, blocked by policy, or a private window. Offline is
@@ -239,24 +366,75 @@ const identityGraph = {
       // The consent rules are duplicated rather than shared, so they are
       // written to fail closed: anything unexpected means no beacon. If they
       // ever drift from track.ts they drift toward sending less.
-      window.addEventListener('appinstalled', () => {
+      const count = (query) => {
         try {
-          if (navigator.doNotTrack === '1' || window.doNotTrack === '1') return
-          const raw = localStorage.getItem('morseforge_settings')
+          if (
+            navigator.doNotTrack === '1' ||
+            window.doNotTrack === '1' ||
+            navigator.msDoNotTrack === '1'
+          )
+            return
+          const raw = localStorage.getItem(settingsKey)
           if (raw && JSON.parse(raw)?.data?.counters === false) return
-          navigator.sendBeacon?.('/e/?n=install')
+          navigator.sendBeacon?.(`/e/?${query}`)
         } catch {
           // No storage, no beacon. Nothing here is worth an error.
         }
+      }
+
+      // The install affordance. The browser offers installation once, early,
+      // with an event a later-hydrating island would miss — so it is caught
+      // here, on every page, and parked as a handle for a page to use when it
+      // has earned the right to ask (src/components/ui/install.ts). Nothing is
+      // shown from here: the mini-infobar is suppressed, and no page nags.
+      let offer = null
+      const gone = () => {
+        offer = null
+        window[handleName] = null
+        window.dispatchEvent(new Event(goneEvent))
+      }
+      window.addEventListener('beforeinstallprompt', (event) => {
+        event.preventDefault()
+        offer = event
+        window[handleName] = {
+          async prompt() {
+            const shown = offer
+            if (!shown) return 'unavailable'
+            // Single use, as the browser's own event is.
+            gone()
+            try {
+              await shown.prompt()
+              const { outcome } = await shown.userChoice
+              if (outcome === 'accepted' || outcome === 'dismissed') {
+                count(`n=install_prompt&v=${outcome}`)
+                return outcome
+              }
+            } catch {
+              // Refused outside a user gesture, or already used.
+            }
+            return 'unavailable'
+          },
+        }
+        window.dispatchEvent(new Event(installableEvent))
+      })
+
+      window.addEventListener('appinstalled', () => {
+        gone()
+        count('n=install')
       })
     </script>
     <a
       href="#main"
-      class="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:rounded focus:bg-panel focus:px-4 focus:py-2 focus:text-signal"
+      class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-3 focus:z-50 focus:rounded-control focus:border focus:border-line-strong focus:bg-panel focus:px-4 focus:py-2.5 focus:text-signal"
       >Skip to content</a
     >
     {!bare && <Header />}
-    <div id="main" class="flex-1">
+    {
+      /* Focusable (A-24), so "Skip to content" moves a screen reader's cursor
+         as well as the Tab start point. The ring is suppressed for this one
+         element in global.css; the scroll padding keeps it below the header. */
+    }
+    <div id="main" tabindex="-1" class="flex-1 outline-none">
       <slot />
     </div>
     {!bare && <Footer />}

@@ -1,0 +1,95 @@
+---
+/**
+ * The mini tree path: the walk from the root of the Morse tree to one code,
+ * drawn as static SVG. Both branches are drawn at every step, the taken one
+ * lit, so the character one element away at the last step is right there next
+ * to the target. Other characters link to their own pages.
+ *
+ * Geometry comes from `treePath()`; nothing here knows a code.
+ */
+import { treePath } from './reference'
+
+export interface Props {
+  code: string
+  /** Prefix for the SVG's title id, unique on the page. */
+  id?: string
+}
+
+const { code, id = 'tree-path' } = Astro.props
+const layout = treePath(code)
+const radius = 15
+
+/** Where to put the dot or dash glyph: beside the edge's midpoint, outwards. */
+function glyphAt(edge: (typeof layout.edges)[number]) {
+  const mx = (edge.x1 + edge.x2) / 2
+  const my = (edge.y1 + edge.y2) / 2
+  const side = edge.x2 < edge.x1 ? -1 : 1
+  return { x: mx + side * 12, y: my - 4 }
+}
+---
+
+<svg
+  class="pkg-n-tree"
+  viewBox={`0 0 ${layout.width} ${layout.height}`}
+  width={layout.width}
+  height={layout.height}
+  role="group"
+  aria-labelledby={`${id}-title`}
+>
+  <title id={`${id}-title`}>{layout.description}</title>
+  <g aria-hidden="true">
+    {
+      layout.edges.map((edge) => (
+        <line
+          x1={edge.x1}
+          y1={edge.y1}
+          x2={edge.x2}
+          y2={edge.y2}
+          class:list={['pkg-n-tree-edge', edge.taken && 'is-taken']}
+        />
+      ))
+    }
+    {
+      layout.edges.map((edge) => {
+        const at = glyphAt(edge)
+        return (
+          <text
+            x={at.x}
+            y={at.y}
+            text-anchor="middle"
+            class:list={['pkg-n-tree-glyph', edge.taken && 'is-taken']}
+          >
+            {edge.glyph}
+          </text>
+        )
+      })
+    }
+  </g>
+  {
+    layout.nodes.map((node) => {
+      const classes = [
+        'pkg-n-tree-node',
+        node.taken && 'is-taken',
+        node.target && 'is-target',
+        node.element === null && 'is-root',
+      ]
+      const body = (
+        <g class:list={classes}>
+          <circle cx={node.x} cy={node.y} r={node.element === null ? 6 : radius} />
+          {node.character && (
+            <text x={node.x} y={node.y} dy="0.36em" text-anchor="middle">
+              {node.character}
+            </text>
+          )}
+        </g>
+      )
+      return node.href ? (
+        <a href={node.href} aria-label={`${node.character} in Morse code`}>
+          {body}
+        </a>
+      ) : (
+        <g aria-hidden="true">{body}</g>
+      )
+    })
+  }
+</svg>

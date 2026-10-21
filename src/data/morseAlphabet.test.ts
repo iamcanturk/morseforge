@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   ALL_LETTERS,
   DIGITS,
+  ITU_PUNCTUATION,
+  NON_ITU_PUNCTUATION,
   PUNCTUATION,
+  PUNCTUATION_NAMES,
+  PROSIGN_MEANINGS,
   CODE_TO_CHARACTER,
   LEARNING_ORDER,
   LEARNING_STAGES,
@@ -54,6 +58,19 @@ describe('MORSE_ALPHABET', () => {
 })
 
 describe('PROSIGNS', () => {
+  it('adds the ITU starting signal, which is not a letter', () => {
+    // The SOS post quotes it; it has to exist in the data to be checkable.
+    expect(PROSIGNS.CT).toBe(LETTERS.K + LETTERS.A)
+    expect(CODE_TO_CHARACTER.get(PROSIGNS.CT)).toBeUndefined()
+  })
+
+  it('explains every prosign, and only the prosigns', () => {
+    expect(Object.keys(PROSIGN_MEANINGS).sort()).toEqual(Object.keys(PROSIGNS).sort())
+    for (const [name, meaning] of Object.entries(PROSIGN_MEANINGS)) {
+      expect(meaning.length, name).toBeGreaterThan(3)
+    }
+  })
+
   it('keeps SOS out of the main alphabet so S-O-S still decodes to SOS', () => {
     // If '...---...' were in MORSE_ALPHABET, the reverse map would let a
     // correctly-spaced "... --- ..." decode inconsistently.
@@ -99,6 +116,26 @@ describe('helpers', () => {
   })
 })
 
+describe('punctuation groups (DEC-012)', () => {
+  it('splits the marks into the 13 in ITU-R M.1677-1 and the 5 that are not', () => {
+    expect(Object.keys(ITU_PUNCTUATION)).toHaveLength(13)
+    expect(Object.keys(NON_ITU_PUNCTUATION).join('')).toBe('!&;_$')
+  })
+
+  it('keeps PUNCTUATION as the union, so encode and decode are unchanged', () => {
+    expect(Object.keys(PUNCTUATION)).toHaveLength(18)
+    expect({ ...ITU_PUNCTUATION, ...NON_ITU_PUNCTUATION }).toEqual(PUNCTUATION)
+    for (const mark of Object.keys(NON_ITU_PUNCTUATION)) {
+      expect(mark in ITU_PUNCTUATION, mark).toBe(false)
+    }
+  })
+
+  it('names every mark, so a heading or slug never has to say "?"', () => {
+    expect(Object.keys(PUNCTUATION_NAMES).sort()).toEqual(Object.keys(PUNCTUATION).sort())
+    expect(new Set(Object.values(PUNCTUATION_NAMES)).size).toBe(18)
+  })
+})
+
 /**
  * Claims made in prose on the public pages, asserted here so they cannot
  * quietly become false. Every one of these sentences appears on
@@ -123,6 +160,30 @@ describe('claims made on the public pages', () => {
     const lengths = Object.values(PUNCTUATION).map((code) => code.length)
     expect(Math.min(...lengths)).toBe(5)
     expect(Math.max(...lengths)).toBe(7)
+  })
+
+  it('ITU punctuation runs from five to six elements', () => {
+    // The seven-element mark is the dollar sign, which is not in the standard.
+    // A page that quotes the ITU range must not borrow it.
+    const lengths = Object.values(ITU_PUNCTUATION).map((code) => code.length)
+    expect(Math.min(...lengths)).toBe(5)
+    expect(Math.max(...lengths)).toBe(6)
+    expect(NON_ITU_PUNCTUATION.$.length).toBe(7)
+  })
+
+  it('H is the only letter made of four dots, and no letter is four dashes', () => {
+    const fourDots = Object.entries(LETTERS).filter(([, code]) => code === '....')
+    expect(fourDots.map(([character]) => character)).toEqual(['H'])
+    for (const [character, code] of Object.entries(LETTERS)) {
+      expect(code, character).not.toBe('----')
+    }
+  })
+
+  it('twelve letters are four elements long, and they are the last tree layer', () => {
+    const four = Object.entries(LETTERS)
+      .filter(([, code]) => code.length === 4)
+      .map(([character]) => character)
+    expect(four.join('')).toBe('BCFHJLPQVXYZ')
   })
 
   it('the digits follow the dots-in-then-out rule', () => {

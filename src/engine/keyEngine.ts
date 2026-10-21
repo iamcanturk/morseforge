@@ -45,6 +45,12 @@ export interface KeyEngineCallbacks {
   onWordGap?: () => void
   onKeyDown?: () => void
   onKeyUp?: (heldMs: number) => void
+  /**
+   * A hold was dropped without a release: `reset()` while the key was down,
+   * e.g. the window lost focus mid-hold. No element is emitted, but whatever
+   * `onKeyDown` started (the sidetone, the pressed look) has to stop.
+   */
+  onCancel?: () => void
 }
 
 export interface ResolvedThresholds {
@@ -76,6 +82,29 @@ export interface KeyEngineClock {
   now: () => number
   setTimeout: (fn: () => void, ms: number) => number
   clearTimeout: (handle: number) => void
+}
+
+/**
+ * How far an event's `timeStamp` may sit from the clock and still be trusted.
+ * Generous for a page that was busy; far below the gap between clock domains.
+ */
+export const TIMESTAMP_TOLERANCE_MS = 60_000
+
+/**
+ * Whether an event's `timeStamp` is on the clock's timeline.
+ *
+ * Native events are stamped on the `performance.now()` timeline, but React's
+ * synthetic events fall back to `Date.now()` when the native stamp is 0, an
+ * epoch value decades away. Mixing the two would read a hold as 0 ms or as
+ * years, so a stamp is only used when it is within a minute of the clock.
+ */
+export function isOnClock(timeStamp: number | undefined, now: number): timeStamp is number {
+  return (
+    typeof timeStamp === 'number' &&
+    Number.isFinite(timeStamp) &&
+    timeStamp > 0 &&
+    Math.abs(timeStamp - now) <= TIMESTAMP_TOLERANCE_MS
+  )
 }
 
 const systemClock: KeyEngineClock = {
@@ -115,23 +144,43 @@ export class KeyEngine {
     this.#thresholds = resolveThresholds(options)
   }
 
-  /** Key down. Repeat events must be filtered by the caller (see `bindKeyboard`). */
-  press(): void {
+  /**
+   * The moment an input happened: the event's own `timeStamp` when the caller
+   * has one, else the clock.
+   *
+   * The first press creates the AudioContext inside `onKeyDown`, which can
+   * block the main thread. Timed when the handlers run, the release of a quick
+   * first tap is read late and the dot becomes a dash. An event's timeStamp is
+   * on the same timeline as `performance.now()` and records when the input
+   * arrived, so a dot stays a dot however busy the page was.
+   */
+  #at(timeStamp: number | undefined): number {
+    const now = this.#clock.now()
+    return isOnClock(timeStamp, now) ? timeStamp : now
+  }
+
+  /**
+   * Key down. Repeat events must be filtered by the caller (see `bindKeyboard`).
+   * Pass the input event's `timeStamp` when there is one (see `#at`).
+   */
+  press(timeStamp?: number): void {
     if (this.#pressedAt !== null) return
     this.#cancelTimers()
-    this.#pressedAt = this.#clock.now()
+    this.#pressedAt = this.#at(timeStamp)
     this.#callbacks.onKeyDown?.()
   }
 
   /**
    * Key up. Emits the element, then arms the character/word gap timers —
    * unless auto-commit is off, in which case the caller decides when a
-   * character ends.
+   * character ends. Pass the input event's `timeStamp` when there is one.
    */
-  release(): void {
+  release(timeStamp?: number): void {
     if (this.#pressedAt === null) return
 
-    const heldMs = this.#clock.now() - this.#pressedAt
+    // Never negative: a press timed by the clock and a release by an event
+    // stamped a moment earlier would otherwise give a hold below zero.
+    const heldMs = Math.max(this.#at(timeStamp) - this.#pressedAt, 0)
     this.#pressedAt = null
     this.#callbacks.onKeyUp?.(heldMs)
 
@@ -151,10 +200,15 @@ export class KeyEngine {
     }, this.#thresholds.wordGapMs)
   }
 
-  /** Drop any pending gap timers without emitting them (§10 Cancel). */
+  /**
+   * Drop any pending gap timers without emitting them (§10 Cancel). A hold in
+   * progress is dropped too, and reported through `onCancel`.
+   */
   reset(): void {
     this.#cancelTimers()
+    const wasPressed = this.#pressedAt !== null
     this.#pressedAt = null
+    if (wasPressed) this.#callbacks.onCancel?.()
   }
 
   #cancelTimers(): void {
@@ -198,6 +252,10 @@ export const DEFAULT_KEY_BINDINGS: KeyBindings = {
  *
  * Focus on the page background still keys, which is the normal case: nothing
  * on these screens takes focus unless you tab to it.
+ *
+ * A focusable scroll region (`role="region"` with a `tabindex`, such as the
+ * tree board when it is wider than its frame) counts as interactive too: Space
+ * on it has to pan it, as it pans any focused scroller, not key a dot.
  */
 function isInteractive(target: EventTarget | null): boolean {
   // Duck-typed rather than `instanceof HTMLElement`, so this is testable
@@ -211,6 +269,7 @@ function isInteractive(target: EventTarget | null): boolean {
 
   const withRole = target as { getAttribute?: (name: string) => string | null }
   const role = withRole.getAttribute?.('role') ?? null
+  if (role === 'region' && withRole.getAttribute?.('tabindex') != null) return true
   return ['button', 'link', 'checkbox', 'radio', 'switch', 'textbox', 'menuitem'].includes(
     role ?? '',
   )
@@ -225,6 +284,10 @@ function isInteractive(target: EventTarget | null): boolean {
  * - Space is `preventDefault`ed while bound, or every hold also scrolls the page.
  * - Events aimed at a button, a link or a field are left entirely alone. See
  *   `isInteractive`.
+ * - The `cancel` binding (Esc by default) drops the hold and the gap timers,
+ *   then calls `onCancel`, which is where the caller throws away the elements
+ *   already keyed. Resetting the engine alone stopped the auto-commit and left
+ *   the half-keyed character in place, so the next element was glued onto it.
  */
 export function bindKeyboard(
   engine: KeyEngine,
@@ -232,6 +295,8 @@ export function bindKeyboard(
   target: Pick<Window, 'addEventListener' | 'removeEventListener'> = window,
   /** Fired by the `submit` binding — the manual "this character is finished". */
   onSubmit?: () => void,
+  /** Fired by the `cancel` binding, after the engine is reset: abandon the pending character. */
+  onCancel?: () => void,
 ): () => void {
   const isKeyingKey = (key: string) => key === bindings.key || key === bindings.alternative
 
@@ -242,12 +307,13 @@ export function bindKeyboard(
 
     if (isKeyingKey(e.key)) {
       e.preventDefault()
-      engine.press()
+      engine.press(e.timeStamp)
       return
     }
     if (bindings.cancel && e.key === bindings.cancel) {
       e.preventDefault()
       engine.reset()
+      onCancel?.()
       return
     }
     if (onSubmit && bindings.submit && e.key === bindings.submit) {
@@ -267,11 +333,12 @@ export function bindKeyboard(
       return
     }
     e.preventDefault()
-    engine.release()
+    engine.release(e.timeStamp)
   }
 
   // Releasing the key after the tab loses focus never fires keyup, which would
-  // leave the tone hanging and the timers unarmed.
+  // leave the tone hanging and the timers unarmed. The reset reports a hold it
+  // drops through `onCancel`, which is what stops the tone.
   const onBlur = () => engine.reset()
 
   target.addEventListener('keydown', onKeyDown)

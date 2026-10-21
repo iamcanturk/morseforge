@@ -1,55 +1,101 @@
 ---
+import { Logo } from './brand/Logo'
+import { NAV_GROUPS } from './ui/siteNav'
 import { AUTHOR, AUTHOR_X_URL, SITE } from '../config/site'
+import { encode, prettify } from '../engine/morseEncoder'
 
 /**
+ * The station plate.
+ *
+ * The link groups repeat the header's on purpose: a reader who reaches the
+ * bottom of an article has finished with it and is deciding where to go, and
+ * for a crawler this is a sitemap on every page.
+ *
  * `rel="me"` marks the links that are the *same person* — the author's own site
  * and X profile — which is what IndieAuth and Mastodon read to verify identity.
  * The repository link is a project, not an identity, so it deliberately does
  * not carry it.
  */
+
+// "73" is the operator's sign-off: best regards. Encoded here rather than
+// typed, so it is whatever the alphabet says it is.
+const signOff = prettify(encode('73'))
+
+/** The project row: engraved plate labels, each a 32px row, 44px under a finger (A-12). */
+const projectLink =
+  'mf-engraved inline-flex min-h-8 items-center hover:text-ink pointer-coarse:min-h-11'
 ---
 
-<footer class="mt-24 border-t border-line">
+<footer class="mt-24 border-t border-line bg-panel/60">
   <div
-    class="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10 sm:flex-row sm:items-center sm:justify-between"
+    class="mx-auto grid max-w-7xl gap-12 px-5 py-14 sm:px-6 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)]"
   >
-    <p class="text-sm text-muted">
-      {
-        /* Explicit entities: the newlines the formatter introduces around the
-          link collapse to nothing, so the words run together. */
-      }
-      Built by&#32;<a
-        href={AUTHOR.url}
-        rel="me"
-        class="text-ink underline decoration-signal/40 underline-offset-4 hover:decoration-signal"
-        >{AUTHOR.name}</a
-      >&#32;— your progress stays on your device.
-    </p>
+    <div class="max-w-sm">
+      <a
+        href="/"
+        class="inline-flex items-center rounded-control pointer-coarse:min-h-11"
+        aria-label={`${SITE.name} home`}
+      >
+        <Logo size={32} decorative />
+      </a>
+      <p class="mt-5 text-sm leading-relaxed text-muted">
+        {
+          /* Explicit entities: the newlines the formatter introduces around the
+            link collapse to nothing, so the words run together. */
+        }
+        Built by&#32;<a
+          href={AUTHOR.url}
+          rel="me"
+          class="text-ink underline decoration-signal/50 decoration-1 underline-offset-4 hover:decoration-signal"
+          >{AUTHOR.name}</a
+        >&#32;— your progress stays on your device.
+      </p>
+      <p class="mf-engraved mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span class="font-mono tracking-code text-signal-dim" aria-hidden="true">{signOff}</span>
+        <span>73 — best regards</span>
+      </p>
+    </div>
 
-    <nav aria-label="Project and author links" class="flex flex-wrap items-center gap-5">
-      <a
-        href="/privacy/"
-        class="font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:text-signal"
-        >PRIVACY</a
-      >
-      <a
-        href={SITE.repo}
-        rel="noopener"
-        class="font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:text-signal"
-        >SOURCE ON GITHUB</a
-      >
-      <a
-        href={AUTHOR_X_URL}
-        rel="me noopener"
-        class="font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:text-signal"
-        >@{AUTHOR.x}</a
-      >
-      <a
-        href={AUTHOR.url}
-        rel="me noopener"
-        class="font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:text-signal"
-        >IAMCANTURK.DEV</a
-      >
+    <nav aria-label="All pages" class="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4">
+      {
+        NAV_GROUPS.map((group) => (
+          <div>
+            <p class="mf-engraved text-brass">{group.title}</p>
+            <ul class="mt-2">
+              {group.links.map(({ href, label }) => (
+                <li>
+                  <a
+                    href={href}
+                    class="inline-flex min-h-8 items-center text-[15px] text-ink hover:text-signal pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+                  >
+                    {label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
+      }
     </nav>
+  </div>
+
+  <div class="border-t border-line">
+    <div
+      class="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-6"
+    >
+      <nav
+        aria-label="Project and author links"
+        class="flex flex-wrap items-center gap-x-6 gap-y-1"
+      >
+        <a href="/settings/" class={projectLink}>Settings</a>
+        <a href="/privacy/" class={projectLink}>Privacy</a>
+        <a href={SITE.repo} rel="noopener" class={projectLink}>Source on GitHub</a>
+        <a href={AUTHOR_X_URL} rel="me noopener" class={projectLink}>@{AUTHOR.x}</a>
+        <a href={AUTHOR.url} rel="me noopener" class={projectLink}>
+          {new URL(AUTHOR.url).host}
+        </a>
+      </nav>
+      <p class="mf-engraved">No account · No ads · Works offline</p>
+    </div>
   </div>
 </footer>

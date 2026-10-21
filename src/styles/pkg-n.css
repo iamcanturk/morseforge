@@ -1,0 +1,666 @@
+/*
+ * Package N: the SEO-D reference pages (character plates, numbers, speed,
+ * how-to). Only what the shared classes in global.css do not already cover.
+ *
+ * Tokens only, no new colours. Nothing animates except `transform` and
+ * `opacity`, and those only through the shared card hover. Text is never
+ * below 12px. Unlayered on purpose: these class names are this package's own,
+ * so they never compete with a utility on the same property.
+ */
+
+/* == Running text == */
+
+.pkg-n-link,
+.pkg-n-prose a,
+.pkg-n-spec a {
+  color: var(--color-signal);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-color: color-mix(in srgb, var(--color-signal) 45%, transparent);
+  text-underline-offset: 4px;
+}
+
+.pkg-n-link:hover,
+.pkg-n-prose a:hover,
+.pkg-n-spec a:hover {
+  text-decoration-color: var(--color-signal);
+}
+
+/* A link that stands on its own line rather than inside a sentence: a 44px
+   row under a finger (A-12). Inline links in running text are exempt. */
+.pkg-n-link-solo {
+  display: inline-block;
+}
+
+@media (pointer: coarse) {
+  .pkg-n-link-solo {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 2.75rem;
+  }
+}
+
+/* == Section heads: a plate number above the H2 == */
+
+.pkg-n-plate-no {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 2.25rem;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-chip);
+  color: var(--color-brass);
+  font-variant-numeric: tabular-nums;
+}
+
+/* == The glyph on the CRT == */
+
+.pkg-n-glyph {
+  font-size: var(--text-glyph);
+  line-height: 1;
+}
+
+/* == Specification plate: a ruled grid of label/value cells == */
+
+.pkg-n-spec {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  background: linear-gradient(180deg, var(--color-elevated), var(--color-panel));
+  box-shadow: var(--shadow-bezel);
+}
+
+@media (min-width: 48rem) {
+  .pkg-n-spec {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 64rem) {
+  .pkg-n-spec {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* Rules drawn by each cell (right and bottom), clipped at the plate's edge,
+   so a short last row leaves no filled hole. */
+.pkg-n-spec-row {
+  padding: 1.1rem 1.25rem 1.25rem;
+  box-shadow:
+    1px 0 0 var(--color-line),
+    0 1px 0 var(--color-line);
+}
+
+.pkg-n-spec dd {
+  font-size: 1.0625rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+/* == Tree path == */
+
+.pkg-n-tree-screen {
+  min-block-size: 15rem;
+}
+
+.pkg-n-tree {
+  position: relative;
+  z-index: 3; /* above the screen's scanlines and vignette */
+  inline-size: 100%;
+  max-inline-size: 26rem;
+  block-size: auto;
+  max-block-size: 22rem;
+  overflow: visible;
+}
+
+.pkg-n-tree-edge {
+  stroke: var(--color-line-strong);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 4;
+}
+
+.pkg-n-tree-edge.is-taken {
+  stroke: var(--color-signal);
+  stroke-width: 2.5;
+  stroke-dasharray: none;
+}
+
+.pkg-n-tree-glyph {
+  fill: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.pkg-n-tree-glyph.is-taken {
+  fill: var(--color-signal);
+}
+
+.pkg-n-tree-node circle {
+  fill: var(--color-screen);
+  stroke: var(--color-line-strong);
+  stroke-width: 1.5;
+}
+
+.pkg-n-tree-node text {
+  fill: var(--color-muted);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.pkg-n-tree-node.is-taken circle {
+  stroke: var(--color-signal);
+  stroke-width: 2;
+}
+
+.pkg-n-tree-node.is-taken text {
+  fill: var(--color-ink);
+}
+
+.pkg-n-tree-node.is-target circle {
+  fill: var(--color-signal);
+  stroke: var(--color-signal);
+}
+
+.pkg-n-tree-node.is-target text {
+  fill: var(--color-screen);
+}
+
+.pkg-n-tree-node.is-root circle {
+  fill: var(--color-signal-dim);
+  stroke: none;
+}
+
+.pkg-n-tree a:hover circle,
+.pkg-n-tree a:focus-visible circle {
+  stroke: var(--color-cyan);
+}
+
+.pkg-n-tree a:hover text,
+.pkg-n-tree a:focus-visible text {
+  fill: var(--color-cyan);
+}
+
+.pkg-n-tree a:focus-visible {
+  outline: 2px solid var(--color-amber);
+  outline-offset: 2px;
+}
+
+/* == Keycap tiles and the alphabet strip == */
+
+.pkg-n-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr));
+  gap: 0.75rem;
+}
+
+.pkg-n-tile {
+  gap: 0.4rem;
+  align-items: flex-start;
+  block-size: 100%;
+}
+
+.pkg-n-tile-char {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.pkg-n-tile-lg .pkg-n-tile-char {
+  font-size: 3.25rem;
+}
+
+.pkg-n-key {
+  min-inline-size: 2.5rem;
+  min-block-size: 2.5rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* A finger needs 44px; the 40px keycap is for a mouse (A-12). */
+@media (pointer: coarse) {
+  .pkg-n-key {
+    min-inline-size: 2.75rem;
+    min-block-size: 2.75rem;
+  }
+}
+
+.pkg-n-key:hover,
+.pkg-n-key:focus-visible {
+  border-color: var(--color-signal);
+  color: var(--color-signal);
+}
+
+.pkg-n-key[aria-current='page'] {
+  border-color: var(--color-signal);
+  background: var(--color-signal);
+  color: var(--color-void);
+}
+
+.pkg-n-step {
+  display: grid;
+  gap: 0.25rem;
+  min-inline-size: 4rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-control);
+  text-decoration: none;
+}
+
+.pkg-n-step:hover .font-display,
+.pkg-n-step:focus-visible .font-display {
+  color: var(--color-signal);
+}
+
+/* == Tables == */
+
+.pkg-n-table-wrap {
+  /* Positioned so the `sr-only` labels inside the cells (position: absolute)
+     are clipped by this scroller; otherwise they escape it and widen the
+     whole page on a phone. */
+  position: relative;
+  overflow-x: auto;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  background: linear-gradient(180deg, var(--color-elevated), var(--color-panel));
+  box-shadow: var(--shadow-bezel);
+}
+
+.pkg-n-table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+
+.pkg-n-table caption {
+  padding: 1rem 1.25rem 0.25rem;
+  caption-side: top;
+  text-align: left;
+}
+
+.pkg-n-table th,
+.pkg-n-table td {
+  padding: 0.7rem 1.25rem;
+  border-block-end: 1px solid color-mix(in srgb, var(--color-line) 70%, transparent);
+  white-space: nowrap;
+}
+
+.pkg-n-table thead th {
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  font-weight: 400;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-muted);
+  border-block-end-color: var(--color-line-strong);
+}
+
+.pkg-n-table tbody tr:last-child > * {
+  border-block-end: 0;
+}
+
+.pkg-n-table td {
+  font-family: var(--font-mono);
+  color: var(--color-ink);
+}
+
+.pkg-n-table tbody th {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+/* The whole row-header cell is the link, so a digit is a cell-sized target,
+   not a 10px glyph. */
+.pkg-n-table tbody th a {
+  display: block;
+  margin: -0.7rem -1.25rem;
+  padding: 0.7rem 1.25rem;
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--color-signal) 45%, transparent);
+  text-underline-offset: 4px;
+}
+
+.pkg-n-table tbody th a:hover {
+  color: var(--color-signal);
+}
+
+.pkg-n-table .is-code {
+  color: var(--color-cyan);
+  letter-spacing: var(--tracking-code);
+}
+
+.pkg-n-table tr.is-marked > * {
+  background: color-mix(in srgb, var(--color-signal) 8%, transparent);
+}
+
+.pkg-n-table tr.is-marked th::after {
+  content: '';
+  display: inline-block;
+  inline-size: 6px;
+  block-size: 6px;
+  margin-inline-start: 0.5rem;
+  border-radius: 999px;
+  background: var(--color-amber);
+  vertical-align: middle;
+}
+
+/* == Element cells: a dot is a square unit, a dash three units wide == */
+
+.pkg-n-elements {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pkg-n-unit, 8px);
+}
+
+.pkg-n-el {
+  display: inline-block;
+  block-size: var(--pkg-n-unit, 8px);
+  inline-size: var(--pkg-n-unit, 8px);
+  border-radius: 999px;
+  background: var(--color-signal);
+}
+
+.pkg-n-el.is-dash {
+  inline-size: calc(var(--pkg-n-unit, 8px) * 3);
+  border-radius: 3px;
+}
+
+/* The glyph plate's code row. The longest code with a page is a digit, 19
+   units wide (five dashes, four gaps), so on a phone the unit is whatever
+   lets 19 of them fit the screen inside the page, instrument and CRT padding
+   (8.5rem together); at 18px that row needed 342px of a 258px CRT. */
+.pkg-n-elements-lg {
+  position: relative;
+  z-index: 3;
+  --pkg-n-unit: clamp(8px, calc((100vw - 8.5rem) / 19), 18px);
+}
+
+.pkg-n-elements-lg .pkg-n-el {
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-signal) 50%, transparent);
+}
+
+.pkg-n-readout-code {
+  letter-spacing: var(--tracking-code);
+  overflow-wrap: anywhere;
+}
+
+/* A digit is five elements, and at the phone readout size five dashes with the
+   full code tracking ran past their plate (V-10). */
+@media (max-width: 39.99rem) {
+  .pkg-n-readout-code {
+    letter-spacing: 0.08em;
+  }
+}
+
+/* "ms" and "units" after a readout value: never under the 12px floor (V-07). */
+.pkg-n-unit {
+  margin-inline-start: 0.2em;
+  font-size: max(12px, 0.45em);
+  color: var(--color-muted);
+}
+
+/* The digit rule on the CRT: ten rows, the diagonal of dots moving in.
+   On a phone the unit is whatever lets 0's five dashes and four gaps (19
+   units) fit beside the digit, inside the page, instrument and CRT padding
+   (11.75rem together, measured): a fixed 12px unit needed 296px in a 268px CRT
+   and cut the last dash in half (V-04). It still fits at 320px (400 % zoom). */
+.pkg-n-digits {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  gap: 0.6rem;
+  --pkg-n-unit: clamp(6px, calc((100vw - 11.75rem) / 19), 12px);
+}
+
+.pkg-n-digit-row {
+  display: grid;
+  grid-template-columns: 2.25rem 1fr;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.15rem 0.25rem;
+  border-radius: var(--radius-chip);
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.pkg-n-digit-row:hover,
+.pkg-n-digit-row:focus-visible {
+  background: color-mix(in srgb, var(--color-signal) 12%, transparent);
+}
+
+.pkg-n-digit-row .pkg-n-digit {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-signal);
+}
+
+@media (min-width: 40rem) {
+  .pkg-n-digits {
+    --pkg-n-unit: 14px;
+  }
+
+  .pkg-n-digit-row {
+    gap: 1rem;
+    padding-inline: 0.5rem;
+  }
+}
+
+/* == PARIS, unit by unit == */
+
+.pkg-n-paris {
+  display: grid;
+  grid-template-columns: repeat(var(--pkg-n-units), minmax(0, 1fr));
+  gap: 2px;
+  padding-block: 0.25rem;
+}
+
+.pkg-n-cell {
+  block-size: 2.25rem;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--color-line) 45%, transparent);
+}
+
+.pkg-n-paris {
+  /* One faint tick per unit under the segments, so a dash reads as three. */
+  background: repeating-linear-gradient(
+      90deg,
+      transparent 0 calc((100% + 2px) / var(--pkg-n-units) - 1px),
+      color-mix(in srgb, var(--color-line-strong) 50%, transparent)
+        calc((100% + 2px) / var(--pkg-n-units) - 1px) calc((100% + 2px) / var(--pkg-n-units))
+    )
+    0 100% / 100% 4px no-repeat;
+  padding-block-end: 8px;
+}
+
+.pkg-n-cell.is-on {
+  background: var(--color-signal);
+}
+
+.pkg-n-cell.is-space {
+  background: color-mix(in srgb, var(--color-amber) 22%, transparent);
+}
+
+.pkg-n-paris-letters {
+  display: grid;
+  grid-template-columns: repeat(var(--pkg-n-units), minmax(0, 1fr));
+  gap: 2px;
+  margin-block-start: 0.5rem;
+}
+
+.pkg-n-paris-letters > span {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-ink);
+  border-inline-start: 1px solid var(--color-line-strong);
+  padding-inline-start: 0.35rem;
+}
+
+.pkg-n-swatch {
+  display: inline-block;
+  inline-size: 0.875rem;
+  block-size: 0.875rem;
+  border-radius: 2px;
+  vertical-align: -2px;
+}
+
+/* == Unit bars (the 1:3:7 rule) == */
+
+.pkg-n-bar {
+  display: block;
+  block-size: 0.875rem;
+  inline-size: calc(var(--pkg-n-span) * 1.25rem);
+  border-radius: 3px;
+  background: var(--color-signal);
+}
+
+.pkg-n-bar.is-gap {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--color-line-strong) 0 calc(1.25rem - 2px),
+    transparent calc(1.25rem - 2px) 1.25rem
+  );
+  opacity: 0.7;
+}
+
+/* A horizontal meter: a recessed track and a lit fill of --pkg-n-span. */
+.pkg-n-meter {
+  display: block;
+  block-size: 0.75rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-line) 60%, transparent);
+  box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.4);
+  overflow: hidden;
+}
+
+.pkg-n-meter > span {
+  display: block;
+  block-size: 100%;
+  inline-size: var(--pkg-n-span);
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--color-signal-dim), var(--color-signal));
+}
+
+/* == How-to steps == */
+
+.pkg-n-steps {
+  counter-reset: none;
+  display: grid;
+  gap: 1.25rem;
+}
+
+/* No scroll-margin: the global scroll-padding already clears the header, and
+   both together would double the offset (FIX2 C-7). */
+.pkg-n-step-card {
+  display: grid;
+  gap: 1.25rem;
+}
+
+@media (min-width: 48rem) {
+  .pkg-n-step-card {
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    gap: 2rem;
+  }
+}
+
+.pkg-n-step-no {
+  font-family: var(--font-mono);
+  font-size: var(--text-readout);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-brass);
+}
+
+.pkg-n-quote {
+  border-inline-start: 2px solid var(--color-signal-dim);
+  padding-inline-start: 1.25rem;
+}
+
+.pkg-n-toc a {
+  display: grid;
+  grid-template-columns: 2.25rem 1fr;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.6rem 0.25rem;
+  border-block-end: 1px solid color-mix(in srgb, var(--color-line) 70%, transparent);
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.pkg-n-toc li:last-child a {
+  border-block-end: 0;
+}
+
+.pkg-n-toc a:hover,
+.pkg-n-toc a:focus-visible {
+  color: var(--color-signal);
+}
+
+.pkg-n-toc .mf-engraved {
+  color: var(--color-brass);
+}
+
+/* The how-to index under the page's intro: two columns of steps from 48rem,
+   read across, so six steps take three rows instead of six. */
+@media (min-width: 48rem) {
+  .pkg-n-toc-cols {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 2.5rem;
+  }
+
+  .pkg-n-toc-cols li:nth-last-child(2):nth-child(odd) a {
+    border-block-end: 0;
+  }
+}
+
+/* == Print: the reference plates are worth printing ==
+   Scoped to the page shell, and this file is only loaded by the reference
+   pages, so it never hides a control on another page. */
+
+@media print {
+  .mf-page .mf-btn,
+  .mf-page [data-morse-player] {
+    display: none;
+  }
+
+  .pkg-n-table th,
+  .pkg-n-table td {
+    white-space: normal;
+  }
+}
+
+.pkg-n-formula {
+  font-size: clamp(1.5rem, 1rem + 2vw, 2rem);
+  line-height: 1.2;
+}
+
+.pkg-n-formula > span,
+.pkg-n-readouts .mf-readout-value {
+  white-space: nowrap;
+}
+
+/* Three readouts share a row down to 360px; at 400 % zoom (320px) the third
+   drops to a second row instead of its label running out of the plate. */
+.pkg-n-readouts {
+  grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr));
+}
+
+/* == Readout rows on a phone: three plates share 390px == */
+
+@media (max-width: 39.99rem) {
+  .pkg-n-readouts .mf-readout {
+    padding: 0.75rem;
+  }
+
+  .pkg-n-readouts .mf-readout-value {
+    font-size: 1.5rem;
+  }
+}

@@ -1,0 +1,838 @@
+/* ---------------------------------------------------------------------------
+   Package B — the landing page.
+
+   Only what the shared classes in global.css cannot express: the hero grid,
+   the station's insides, the brass key drawing, and the network tree's one
+   lighting-up. Tokens only; no new colours. Transform and opacity are the only
+   things that move, and every animation here has a still fallback under
+   reduced motion from either source (the OS, or html[data-motion]).
+--------------------------------------------------------------------------- */
+
+/* ---- Hero layout -------------------------------------------------------- */
+
+.hero {
+  padding-block: 1rem 3.5rem;
+}
+
+/* Phones and tablets: H1, then the station, then the lead (DEC-044, J-11), so
+   the key is in the first screenful. The DOM keeps H1, lead, station: the lead
+   is plain text, so the tab order still matches the screen. One column that
+   may shrink below its content (A-07): the nowrap tape and the long CTA used
+   to widen the page to 335 px at 320. */
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'title' 'station' 'lead' 'actions';
+  gap: 1.25rem;
+}
+
+.hero-head {
+  grid-area: title;
+}
+
+.hero-lead {
+  grid-area: lead;
+}
+
+.hero-station {
+  grid-area: station;
+}
+
+.hero-actions {
+  grid-area: actions;
+}
+
+.hero-actions .mf-btn {
+  max-inline-size: 100%;
+  white-space: normal;
+  text-align: center;
+}
+
+@media (min-width: 64rem) {
+  .hero {
+    display: grid;
+    align-items: center;
+    min-height: min(calc(100svh - 56px), 860px);
+    padding-block: 2.5rem 4rem;
+  }
+
+  /* Two columns: the words on the left, centred as one block against the
+     station. The outer rows take the slack, so the lead stays tight under
+     the H1 and the actions tight under the lead. */
+  .hero-grid {
+    inline-size: 100%;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-areas: 'title station' 'lead station' 'actions station';
+    column-gap: 3.5rem;
+    row-gap: 0;
+  }
+
+  .hero-head {
+    align-self: end;
+  }
+
+  .hero-lead {
+    margin-block-start: 1.5rem;
+  }
+
+  .hero-actions {
+    align-self: start;
+    margin-block-start: 2.25rem;
+  }
+}
+
+/* The primary CTA speaks to whoever is here (J-07): the first-timer's label by
+   default, the returning learner's once the station is in its welcome view.
+   Without :has() support it simply keeps the first-timer's label. */
+[data-cta-back] {
+  display: none;
+}
+
+.hero:has(.station[data-view='welcome']) [data-cta-first] {
+  display: none;
+}
+
+.hero:has(.station[data-view='welcome']) [data-cta-back] {
+  display: inline;
+}
+
+/* Between the display and H1 steps: a long sentence, not a two-word slogan. */
+.hero-title {
+  font-size: clamp(2.25rem, 1.35rem + 3.1vw, 4.5rem);
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+/* ---- The station -------------------------------------------------------- */
+
+.station {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.station:focus {
+  outline: none;
+}
+
+@media (min-width: 40rem) {
+  .station {
+    gap: 0.875rem;
+    padding: 1.5rem;
+  }
+}
+
+.station-plate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-inline: 0.75rem;
+}
+
+.station-sound-off {
+  color: var(--color-amber);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* CRT. A fixed height on a phone so the key stays in the first screenful;
+   an aspect ratio above that. Either way the space is reserved before any
+   script runs, so nothing shifts when the station wakes up. */
+.station-screen {
+  block-size: 13.5rem;
+}
+
+/* The done and welcome views say more than one big letter. On a phone they
+   may grow past the drill's height rather than spill over the bezel (J-01);
+   their copy is kept short enough that at 360 and 390 they normally fit, so
+   the key below does not move. The welcome view is set before first paint. */
+@media (width < 40rem) {
+  .station:not([data-view='drill']) .station-screen {
+    block-size: auto;
+    min-block-size: 13.5rem;
+  }
+
+  .station:not([data-view='drill']) .screen-foot {
+    display: none;
+  }
+}
+
+@media (min-width: 40rem) {
+  .station-screen {
+    block-size: auto;
+    aspect-ratio: 2 / 1;
+  }
+}
+
+.screen-face {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  block-size: 100%;
+  padding: 0.875rem 1.125rem;
+}
+
+@media (min-width: 40rem) {
+  .screen-face {
+    padding: 1.125rem 1.5rem;
+  }
+}
+
+.screen-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.screen-steps {
+  display: flex;
+  gap: 0.875rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+
+.screen-steps li {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+/* E · T · A are the first-timer's steps; a returning learner has none. */
+.station[data-view='welcome'] .screen-steps {
+  display: none;
+}
+
+/* The plate heading and the E/T hint speak to a first-timer only (J-07). The
+   welcome view is set before first paint, so its hint can go; the done view
+   arrives mid-visit, so its hint keeps its room and nothing below it moves. */
+.station-heading-back,
+.station:not([data-view='drill']) .station-heading-first,
+.station[data-view='welcome'] .station-hint {
+  display: none;
+}
+
+.station[data-view='done'] .station-hint {
+  visibility: hidden;
+}
+
+.station:not([data-view='drill']) .station-heading-back {
+  display: inline;
+}
+
+/* One view at a time, chosen by data-view. Set before first paint for a
+   returning visitor by the inline script, so there is no flash of step one. */
+.station [data-show] {
+  display: none;
+}
+
+.station[data-view='drill'] [data-show='drill'] {
+  display: flex;
+}
+
+.station[data-view='done'] [data-show='done'],
+.station[data-view='welcome'] [data-show='welcome'] {
+  display: flex;
+}
+
+.screen-drill {
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1.25rem, 5vw, 3rem);
+  min-block-size: 0;
+}
+
+.screen-glyph-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.screen-glyph {
+  display: inline-block;
+  min-inline-size: 0.7em;
+  font-size: clamp(4.5rem, 2.6rem + 6vw, 8rem);
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+}
+
+.screen-halo {
+  position: absolute;
+  inset: -12%;
+  border-radius: 999px;
+  border: 2px solid var(--color-signal);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.screen-halo.is-lit {
+  animation: mf-halo var(--duration-word) var(--ease-signal) both;
+}
+
+.screen-code {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.screen-code-target {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  min-block-size: 2.5rem;
+}
+
+.screen-equals {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+/* A code, drawn to scale: a dot is one unit, a dash three, one unit apart —
+   the proportions of the timing itself (PROJECT.md §8). --u is the unit. */
+.code-els {
+  --u: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--u);
+}
+
+.code-el {
+  display: block;
+  block-size: var(--u);
+  inline-size: var(--u);
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.code-el[data-el='dash'] {
+  inline-size: calc(var(--u) * 3);
+}
+
+.screen-code-target .code-els {
+  --u: clamp(0.75rem, 0.5rem + 0.8vw, 1.125rem);
+  color: var(--color-cyan);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--color-cyan) 45%, transparent));
+}
+
+.station[data-phase='detected'] .screen-code-target .code-els {
+  color: var(--color-signal);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--color-signal) 45%, transparent));
+}
+
+.screen-code-sent {
+  --u: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: var(--u);
+  min-block-size: 1.75rem;
+  color: var(--color-signal-dim);
+}
+
+.screen-message {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.625rem;
+  max-inline-size: 34rem;
+}
+
+.screen-message .mf-btn {
+  min-height: 40px;
+}
+
+.screen-tape-word {
+  font-size: clamp(2.25rem, 1.5rem + 3vw, 3.5rem);
+  line-height: 1;
+  letter-spacing: 0.2em;
+}
+
+.screen-foot {
+  display: grid;
+  gap: 0.25rem;
+  min-block-size: 2.75rem;
+  align-content: end;
+}
+
+.screen-note {
+  min-block-size: 1.25rem;
+  color: var(--color-amber);
+}
+
+/* The "signal detected" band takes the foot's place for the moment. */
+.screen-detected {
+  position: absolute;
+  inset-inline: 1.125rem;
+  inset-block-end: 0.875rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0.75rem;
+  row-gap: 0.25rem;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.screen-detected > .font-display {
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.screen-xp {
+  margin-inline-start: auto;
+  font-size: 1rem;
+  white-space: nowrap;
+}
+
+@media (min-width: 40rem) {
+  .screen-detected > .font-display {
+    font-size: 1.125rem;
+    letter-spacing: 0.14em;
+  }
+
+  .screen-xp {
+    margin-inline-start: 0;
+  }
+}
+
+.screen-award {
+  flex-basis: 100%;
+}
+
+.screen-award:empty {
+  display: none;
+}
+
+.station[data-phase='detected'] .screen-detected {
+  opacity: 1;
+  animation: mf-strike 120ms var(--ease-signal) both;
+}
+
+.station[data-phase='detected'] .screen-foot {
+  opacity: 0;
+}
+
+@media (min-width: 40rem) {
+  .screen-detected {
+    inset-inline: 1.5rem;
+    inset-block-end: 1.125rem;
+  }
+}
+
+.screen-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+}
+
+/* ---- Tape and fuse ------------------------------------------------------ */
+
+.station-tape {
+  display: flex;
+  align-items: center;
+  /* Fixed, so printing a letter never nudges the key below it. */
+  block-size: 3.625rem;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 1.375rem;
+  line-height: 1.2;
+}
+
+.tape-text {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.32em;
+}
+
+.tape-text > span {
+  display: inline-block;
+}
+
+.tape-pending {
+  --u: 0.4375rem;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--u);
+  margin-inline-start: 0.5rem;
+  color: var(--color-paper-muted);
+}
+
+/* An empty tape says it is waiting, rather than looking unprinted. */
+.tape-text:empty + .tape-pending:empty::before {
+  content: 'Tape ready';
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.station-fuse {
+  block-size: 3px;
+  margin-inline: 0.25rem;
+  overflow: hidden;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--color-line) 80%, transparent);
+}
+
+.station-fuse-bar {
+  display: block;
+  block-size: 100%;
+  background: var(--color-amber);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.station-fuse-bar.is-burning {
+  animation: hero-fuse var(--fuse-ms, 1600ms) linear both;
+}
+
+@keyframes hero-fuse {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* Still: the fuse is simply lit while a character waits, then goes out. */
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion='full']) .station-fuse-bar.is-burning {
+    animation: none;
+    transform: none;
+  }
+}
+
+html[data-motion='reduce'] .station-fuse-bar.is-burning {
+  animation: none;
+  transform: none;
+}
+
+/* ---- The brass key (TASK-001 §3.7) -------------------------------------- */
+
+.station-key {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0.375rem;
+  inline-size: 100%;
+  min-block-size: 9.5rem;
+  padding: 0.75rem 1rem 0.875rem;
+  border-radius: var(--radius-panel);
+  border: 1px solid var(--color-line-strong);
+  background:
+    radial-gradient(
+      ellipse 70% 90% at 50% 0%,
+      color-mix(in srgb, var(--color-amber) 7%, transparent),
+      transparent 70%
+    ),
+    color-mix(in srgb, var(--color-void) 60%, transparent);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.station[data-down='true'] .station-key {
+  border-color: var(--color-signal-dim);
+}
+
+.station-key-art {
+  inline-size: 100%;
+  max-inline-size: 30rem;
+  block-size: auto;
+  overflow: visible;
+}
+
+.station-key-plate {
+  block-size: 1.75rem;
+  display: flex;
+  align-items: center;
+}
+
+/* The plate under the key says what works right now: the step's instruction
+   in the drill, tap or hold on the free key; once the station has focus on a
+   keyboard device, Space; while down, transmitting. */
+.station:not([data-view='drill']) [data-plate-drill],
+.station[data-view='drill'] [data-plate-free],
+[data-key-plate-focus],
+[data-key-plate-down],
+.station[data-down='true'] [data-key-plate-idle],
+.station[data-down='true'] [data-key-plate-focus] {
+  display: none;
+}
+
+.station[data-down='true'] [data-key-plate-down] {
+  display: inline;
+}
+
+@media (pointer: fine) {
+  .station[data-focused='true']:not([data-down='true']) [data-key-plate-idle] {
+    display: none;
+  }
+
+  .station[data-focused='true']:not([data-down='true']) [data-key-plate-focus] {
+    display: inline;
+  }
+}
+
+.station-hint {
+  padding-inline: 0.25rem;
+}
+
+/* Metal and wood, from the tokens. In light the brass pair is inverted (the
+   text-safe brass is the dark one), so the stops swap to stay lit from above. */
+.hk-wood-top {
+  stop-color: var(--color-wood);
+}
+
+.hk-wood-bottom {
+  stop-color: var(--color-wood-deep);
+}
+
+.hk-brass-hi {
+  stop-color: color-mix(in srgb, var(--color-brass) 70%, white);
+}
+
+.hk-brass-mid {
+  stop-color: var(--color-brass);
+}
+
+.hk-brass-lo {
+  stop-color: var(--color-brass-deep);
+}
+
+[data-theme='light'] .hk-brass-hi {
+  stop-color: color-mix(in srgb, var(--color-brass-deep) 60%, white);
+}
+
+[data-theme='light'] .hk-brass-mid {
+  stop-color: var(--color-brass-deep);
+}
+
+[data-theme='light'] .hk-brass-lo {
+  stop-color: var(--color-brass);
+}
+
+.hk-knob-hi {
+  stop-color: color-mix(in srgb, var(--color-paper-ink) 80%, white);
+}
+
+.hk-knob-lo {
+  stop-color: color-mix(in srgb, var(--color-paper-ink) 60%, black);
+}
+
+.hk-spark-core {
+  stop-color: var(--color-amber);
+}
+
+.hk-spark-edge {
+  stop-color: var(--color-amber);
+  stop-opacity: 0;
+}
+
+.hk-spark {
+  opacity: 0;
+}
+
+.hk-shadow {
+  fill: rgb(0 0 0 / 0.3);
+}
+
+.hk-grain {
+  fill: none;
+  stroke: var(--color-brass-deep);
+  stroke-opacity: 0.3;
+  stroke-width: 1.25;
+}
+
+.hk-bevel {
+  fill: rgb(255 255 255 / 0.12);
+}
+
+.hk-screw {
+  fill: var(--color-brass-deep);
+}
+
+.hk-glint {
+  fill: rgb(255 255 255 / 0.35);
+}
+
+.hk-knob-glint {
+  fill: none;
+  stroke: rgb(255 255 255 / 0.28);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.hk-pivot {
+  fill: var(--color-brass-deep);
+  stroke: var(--color-brass);
+  stroke-width: 1.5;
+}
+
+/* Up or down, never in between: no transition (README rule). */
+.hk-lever {
+  transform-box: view-box;
+  transform-origin: 116px 64px;
+}
+
+.station[data-down='true'] .hk-lever {
+  transform: rotate(2deg);
+}
+
+.station[data-down='true'] .hk-spark {
+  opacity: 1;
+}
+
+/* ---- The network (section 4) -------------------------------------------- */
+
+.network-figure svg {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+}
+
+.nt-edge {
+  fill: none;
+  stroke: var(--color-signal-dim);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.nt-edge[data-element='.'] {
+  stroke-dasharray: 0.5 7;
+}
+
+.nt-edge[data-element='-'] {
+  stroke-dasharray: 14 8;
+  stroke-linecap: butt;
+}
+
+.nt-node circle {
+  fill: var(--color-screen);
+  stroke: var(--color-signal);
+  stroke-width: 2;
+}
+
+.nt-node text {
+  fill: var(--color-signal);
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.nt-root circle {
+  fill: var(--color-signal);
+  stroke: none;
+}
+
+.nt-root-ring {
+  fill: none;
+  stroke: var(--color-signal-dim);
+  stroke-width: 1.5;
+}
+
+.nt-lit {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Edges only fade: a line scaled about its own centre reads as a glitch. */
+.nt-edge.nt-lit {
+  --nt-anim: nt-fade;
+}
+
+/* Armed by the inline script (so with no JavaScript every node is simply lit),
+   held dark until the figure scrolls into view, then lit one tree layer at a
+   time. Only when motion is allowed by both sources; otherwise all lit, still. */
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-motion='reduce']) .network[data-armed] .nt-lit {
+    opacity: 0;
+  }
+
+  html:not([data-motion='reduce']) .network[data-inview] .nt-lit {
+    animation: var(--nt-anim, nt-on) 600ms var(--ease-signal) calc(var(--stage, 0) * 700ms + 200ms)
+      both;
+  }
+}
+
+html[data-motion='full'] .network[data-armed] .nt-lit {
+  opacity: 0;
+}
+
+html[data-motion='full'] .network[data-inview] .nt-lit {
+  animation: var(--nt-anim, nt-on) 600ms var(--ease-signal) calc(var(--stage, 0) * 700ms + 200ms)
+    both;
+}
+
+@keyframes nt-on {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Power lamps under the screen, one per layer, lit with their layer. */
+.nt-power .mf-lamp::after {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-motion='reduce']) .network[data-armed] .nt-power .mf-lamp::after {
+    opacity: 0;
+  }
+
+  html:not([data-motion='reduce']) .network[data-inview] .nt-power .mf-lamp::after {
+    animation: nt-lamp 1ms linear calc(var(--stage, 0) * 700ms + 500ms) both;
+  }
+}
+
+html[data-motion='full'] .network[data-armed] .nt-power .mf-lamp::after {
+  opacity: 0;
+}
+
+html[data-motion='full'] .network[data-inview] .nt-power .mf-lamp::after {
+  animation: nt-lamp 1ms linear calc(var(--stage, 0) * 700ms + 500ms) both;
+}
+
+@keyframes nt-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes nt-lamp {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---- Closing band -------------------------------------------------------- */
+
+.closing-code {
+  font-size: clamp(1.75rem, 1rem + 3vw, 3rem);
+  letter-spacing: var(--tracking-code);
+  line-height: 1.2;
+}

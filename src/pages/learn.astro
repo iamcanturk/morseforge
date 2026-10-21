@@ -1,36 +1,132 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro'
-import { LessonScreen } from '../components/Lesson/LessonScreen'
+import PageShell from '../components/PageShell.astro'
+import { LessonScreen, type NextStep } from '../components/Lesson/LessonScreen'
+import { LESSON_ORDER, LESSON_STAGES, drillLength } from '../components/Lesson/lesson'
+import { hasPage } from '../components/ui/siteNav'
+import { breadcrumbTrail, getPage } from '../config/pages'
+import { FACTS } from '../config/facts'
+import { CURRICULUM } from '../data/curriculum'
+import { METHODS, DEFAULT_METHOD } from '../data/methods'
+import { joinList } from '../data/format'
+import { prettify } from '../engine/morseEncoder'
+import { MORSE_ALPHABET } from '../data/morseAlphabet'
+import { breadcrumbs, webPage } from '../seo/schema'
 
-const title = 'Learn Morse Code — Guided, Hands-On Lessons | MorseForge'
-const description =
-  'Learn Morse code one character at a time: see it, hear it, send it, then drill everything so far. Free, no account, and you send your first signal in under a minute.'
+const page = getPage('/learn/')
+const plan = getPage('/learn-morse-code-in-7-days/')
+const trail = breadcrumbTrail(page.path)
+
+const schema = [
+  webPage({ path: page.path, name: page.h1, description: page.description }),
+  breadcrumbs(trail),
+]
+
+/** Where the course-complete screen sends a finished learner, from the registry. */
+const nextSteps: NextStep[] = ['/daily/', '/challenge/', '/copy/', '/message/']
+  .filter((path) => hasPage(path))
+  .map((path) => {
+    const entry = getPage(path)
+    return { href: entry.path, label: entry.navLabel, hint: entry.hint }
+  })
+
+const chartPost = '/blog/why-a-morse-code-chart-does-not-work/'
+const howTo = '/how-to-learn-morse-code/'
+const stageCount = LESSON_STAGES.length
+const method = METHODS[DEFAULT_METHOD]
+const first = FACTS.planFirstDayCharacters
+/** "Stage 3: three elements, dot-first (S, U, R and W)", one per plan day. */
+const stageLines = CURRICULUM.map(
+  (day, index) =>
+    `Stage ${index + 1}: ${day.title.charAt(0).toLowerCase()}${day.title.slice(1)} (${joinList(day.characters)})`,
+)
+const minDrill = Math.min(...LESSON_STAGES.map((_, index) => drillLength(index)))
 ---
 
-<BaseLayout title={title} description={description} path="/learn/">
-  <main class="mx-auto max-w-3xl px-6 py-14">
-    <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Learn</h1>
-    <p class="mt-3 leading-relaxed text-muted">
-      Every character three ways — see it, hear it, send it — then a drill on everything taught so
-      far. It picks up wherever you left off, because the lesson reads your progress rather than
-      keeping its own count of it.
-    </p>
+<BaseLayout title={page.title} description={page.description} path={page.path} schema={schema}>
+  {
+    /*
+      The shell (C-1): on a phone the lesson comes straight under the H1 and the
+      intro under the lesson (DEC-044); the HTML keeps H1, intro, lesson.
+    */
+  }
+  <PageShell
+    width="tool"
+    instrumentFirst
+    instrumentClass="max-w-4xl"
+    trail={trail}
+    h1={page.h1}
+    intro={page.intro}
+  >
+    <LessonScreen client:load nextSteps={nextSteps} />
 
-    <div class="mt-10">
-      <LessonScreen client:load />
-    </div>
-
-    <section class="mt-14 border-t border-line pt-8">
-      <h2 class="font-display text-xl font-bold tracking-tight">Prefer to read the whole plan?</h2>
-      <p class="mt-3 leading-relaxed text-muted">
-        The seven-day plan lays out every stage, why the characters come in that order, and what to
-        practise on each day.
+    <section slot="more" aria-labelledby="how-heading" class="mf-prose">
+      <h2 id="how-heading" class="font-display text-h2 font-bold text-ink">How the lessons work</h2>
+      <p>
+        <strong>See it.</strong> Every character starts on the screen with its dots and dashes, and with
+        where it sits on the <a href="/tree/">Morse code tree</a>: a dot branches one way, a dash
+        the other, so the code stops looking arbitrary. Read it once. Learning a picture of the code
+        is the habit that caps most learners' speed, which is{' '}
+        <a href={chartPost}>why you can't learn Morse code from a chart</a>.
       </p>
-      <a
-        href="/learn-morse-code-in-7-days/"
-        class="mt-5 inline-block rounded-lg border border-line px-5 py-2.5 font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:border-signal hover:text-signal"
-        >SEE THE 7-DAY PLAN</a
-      >
+      <p>
+        <strong>Hear it.</strong> Then it plays as a real tone at your own speed, with a lamp that flashes
+        in time, so the step still works with the sound off. This is the version you will actually be
+        reading, so listen for the rhythm rather than counting the beeps.
+      </p>
+      <p>
+        <strong>Send it.</strong> Last, you key it yourself: hold Space, or press and hold the on-screen
+        key on a phone. The moment your code matches, the lesson accepts it, and a wrong code tells you
+        what you sent. With no keyboard or no sound you can skip sending; the drill still checks every
+        character by ear.
+      </p>
     </section>
-  </main>
+
+    <section slot="more" aria-labelledby="covers-heading" class="mf-prose">
+      <h2 id="covers-heading" class="font-display text-h2 font-bold text-ink">
+        What the course covers
+      </h2>
+      <p>
+        There are {stageCount} stages, one for each day of the plan, and together they teach all {
+          FACTS.letterCount
+        } letters and {FACTS.digitCount} digits ({LESSON_ORDER.length} characters). The first teaches{
+          ' '
+        }
+        {joinList(first)}: {
+          first.map((c) => `${c} is ${prettify(MORSE_ALPHABET[c] ?? '')}`).join(', ')
+        }.
+      </p>
+      <ol>
+        {stageLines.map((line) => <li>{line}</li>)}
+      </ol>
+      <p>
+        After each stage comes a short listening drill, at least {minDrill} prompts, over everything taught
+        so far. Finishing a stage also adds its characters to practice under the default {
+          method.name
+        } method, and every send you get right earns XP and counts toward your streak. Your progress stays
+        in this browser, and the lesson picks up at the first stage you have not finished.
+      </p>
+    </section>
+
+    <section slot="more" aria-labelledby="plan-heading" class="mf-prose">
+      <h2 id="plan-heading" class="font-display text-h2 font-bold text-ink">
+        Prefer to read the whole plan?
+      </h2>
+      <p>
+        The plan lays out every day: which characters, why they come in that order, what to
+        practise, and the words you can send by the end of it. It is the same order as these
+        lessons, about {FACTS.planTime} in total.
+      </p>
+      <p>
+        <a href={plan.path}>{plan.h1}</a>{
+          hasPage(howTo) && (
+            <>
+              {' '}
+              · <a href={howTo}>How to learn Morse code</a>
+            </>
+          )
+        }
+      </p>
+    </section>
+  </PageShell>
 </BaseLayout>

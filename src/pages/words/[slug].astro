@@ -1,21 +1,36 @@
 ---
+import '../../styles/pkg-i.css'
 import type { GetStaticPaths } from 'astro'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import MorsePlayer from '../../components/MorsePlayer/MorsePlayer.astro'
-import { WORDS, WORD_CATEGORIES, breakdown, morseFor, type MorseWord } from '../../data/words'
-import { prettify } from '../../engine/morseEncoder'
+import PageShell from '../../components/PageShell.astro'
+import Pips from '../../components/Alphabet/Pips.astro'
+import Faq from '../../components/Faq.astro'
+import { characterHref, characterPageSlugs } from '../../components/Alphabet/characterLinks'
+import { breadcrumbTrail, wordPage } from '../../config/pages'
+import { FACTS, prosignNote, wordFacts } from '../../config/facts'
+import { CHARACTERS } from '../../data/characters'
 import { CURRICULUM, charactersThroughDay } from '../../data/curriculum'
-import { SITE } from '../../config/site'
+import { wordFaq } from '../../data/faq'
+import { numberWord } from '../../data/format'
+import {
+  WORDS,
+  WORD_CATEGORIES,
+  moreWords,
+  morseFor,
+  wordLabel,
+  type MorseWord,
+} from '../../data/words'
+import { WORD_SEPARATOR, prettify } from '../../engine/morseEncoder'
+import { breadcrumbs, webPage } from '../../seo/schema'
 
 /**
- * One prerendered page per word. Nothing is generated at request time — the
- * whole point of these pages is that a crawler with JavaScript disabled sees
- * the full breakdown, and only the player hydrates.
+ * One prerendered page per word, drawn as a telegram on the operator's desk.
  *
- * The player uses `client:idle` rather than `client:visible`: it sits above the
- * fold and is the main reason anyone opens the page, so deferring it until an
- * IntersectionObserver fires buys nothing and risks it never hydrating at all
- * in an unusual viewport.
+ * Nothing is generated at request time: a crawler with JavaScript disabled
+ * sees the answer, the breakdown and the FAQ, and only the player wakes up.
+ * The player is plain HTML plus a small script (MorsePlayer.astro), not a
+ * React island.
  */
 export const getStaticPaths = (() =>
   WORDS.map((word) => ({ params: { slug: word.slug }, props: { word } }))) satisfies GetStaticPaths
@@ -26,174 +41,283 @@ interface Props {
 
 const { word } = Astro.props
 
-const morse = morseFor(word)
-const rows = breakdown(word)
-const path = `/words/${word.slug}/`
-const title = `${word.text} in Morse Code — ${morse} | MorseForge`
-const description = `${word.text} in Morse code is ${morse}. Hear it, see the character-by-character breakdown, and learn to send it yourself.`
+const meta = wordPage(word)
+const facts = wordFacts(word)
+const label = wordLabel(word)
+const faq = wordFaq(word)
+const trail = breadcrumbTrail(meta.path, { name: meta.answer.label, parent: meta.parent })
+const category = WORD_CATEGORIES[word.category]
 
-/** The earliest day of the 7-day plan by which every letter is known. */
+/** The earliest day of the plan by which every letter is known. */
 const readyOnDay =
   CURRICULUM.find((day) => {
     const known = new Set(charactersThroughDay(day.day))
     return [...word.text.replace(/\s/g, '')].every((character) => known.has(character))
   })?.day ?? null
 
-const related = WORDS.filter(
-  (other) => other.category === word.category && other.slug !== word.slug,
-)
+// Each word of the entry as its own group of keys, so the breakdown shows
+// where the slash falls.
+const slugs = await characterPageSlugs()
+const groups = word.text
+  .trim()
+  .split(/\s+/)
+  .map((part) =>
+    [...part]
+      .filter((character) => CHARACTERS[character])
+      .map((character) => {
+        const known = CHARACTERS[character]!
+        return {
+          character,
+          code: known.code,
+          spoken: known.spoken,
+          kind: known.kind,
+          href: characterHref(character, slugs) ?? `/morse-code-alphabet/#char-${known.slug}`,
+        }
+      }),
+  )
+  .filter((group) => group.length > 0)
+/** Each group's own word, for the list that holds its keys. */
+const groupWord = (group: (typeof groups)[number]): string =>
+  group.map((key) => key.character).join('')
+
+// Words from other categories only top the list up, so they get their own
+// heading: "More in Emergency" must never list Hello.
+const { sameCategory, otherCategories } = moreWords(word)
+const moreGroups = [
+  { heading: `More in ${category.label}`, items: sameCategory },
+  { heading: sameCategory.length > 0 ? 'Other words' : 'More words', items: otherCategories },
+].filter((group) => group.items.length > 0)
+const prosignSentence = prosignNote(word)
+/** The answer sentence as plain text: the shell's intro, and its fallback. */
+const answerText = `${meta.answer.label} in Morse code is ${prettify(meta.answer.morse)}. ${meta.answer.detail}`
 
 const schema = [
-  {
-    '@context': 'https://schema.org',
-    '@type': 'Article',
-    headline: `${word.text} in Morse code`,
-    description,
-    url: new URL(path, SITE.url).href,
-    author: { '@id': `${SITE.url}/#author` },
-    publisher: { '@id': `${SITE.url}/#author` },
-    isPartOf: { '@id': `${SITE.url}/#website` },
-    inLanguage: 'en',
-    // The answer, restated as a machine-readable claim. This is the sentence
-    // an assistant lifts when asked "what is X in Morse code".
-    about: { '@type': 'Thing', name: `${word.text} in Morse code`, description: morse },
-  },
-  {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Home', item: SITE.url },
-      { '@type': 'ListItem', position: 2, name: 'Words', item: `${SITE.url}/words/` },
-      { '@type': 'ListItem', position: 3, name: word.text },
-    ],
-  },
-  {
-    '@context': 'https://schema.org',
-    '@type': 'FAQPage',
-    mainEntity: [
-      {
-        '@type': 'Question',
-        name: `What is ${word.text} in Morse code?`,
-        acceptedAnswer: {
-          '@type': 'Answer',
-          text: `${word.text} in Morse code is ${morse}. ${word.note}`,
-        },
-      },
-    ],
-  },
+  webPage({ path: meta.path, name: meta.h1, description: meta.description }),
+  breadcrumbs(trail),
 ]
 ---
 
-<BaseLayout title={title} description={description} path={path} schema={schema}>
-  <main class="mx-auto max-w-2xl px-6 py-14">
-    <nav aria-label="Breadcrumb" class="font-mono text-[10px] tracking-[0.16em] text-muted">
-      <a href="/words/" class="hover:text-signal">WORDS</a>
-      <span aria-hidden="true"> / </span>
-      <span class="text-signal-dim">{WORD_CATEGORIES[word.category].label.toUpperCase()}</span>
-    </nav>
+<BaseLayout title={meta.title} description={meta.description} path={meta.path} schema={schema}>
+  {/* Answer first: the whole answer in one sentence, straight under the H1. */}
+  <PageShell
+    width="tool"
+    trail={trail}
+    eyebrow={`Words in Morse · ${category.label}`}
+    h1={meta.h1}
+    intro={answerText}
+  >
+    {
+      /* The same sentence with the word and its code set off, where the shell
+        offers an intro slot; the plain `intro` above is the fallback. */
+    }
+    <Fragment slot="intro">
+      <strong class="text-ink">{meta.answer.label}</strong> in Morse code is{' '}
+      <strong class="pi-code font-mono font-normal text-signal"
+        >{prettify(meta.answer.morse)}</strong
+      >.{' '}
+      {meta.answer.detail}
+    </Fragment>
 
-    <article class="mt-5">
-      <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">
-        {word.text} in Morse code
-      </h1>
+    <div class="grid gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-start">
+      <article class="pi-telegram mf-slip p-5 sm:p-7" aria-label={`Telegram: ${label}`}>
+        <div class="pi-telegram-band flex items-end justify-between gap-4 pb-3">
+          <p class="font-display text-h3 font-bold tracking-label uppercase">Telegram</p>
+          <p class="pi-form-label">{category.label}</p>
+        </div>
 
-      {/* Answer-first: the entire answer, in one sentence, above everything. */}
-      <p class="mt-5 text-lg leading-relaxed">
-        <strong class="text-ink">{word.text}</strong> in Morse code is
-        <strong class="font-mono break-all text-signal">{prettify(morse)}</strong>.
-      </p>
+        <dl class="mt-6 grid gap-6">
+          <div>
+            <dt class="pi-form-label">Message</dt>
+            <dd class="pi-balance mt-1 font-display text-h2 font-bold uppercase">{word.text}</dd>
+          </div>
+          <div>
+            <dt class="pi-form-label">In Morse code</dt>
+            <dd class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-4">
+              <span class="sr-only">{facts.morse}</span>
+              {
+                groups.map((group, index) => (
+                  <>
+                    {index > 0 && (
+                      <span aria-hidden="true" class="font-mono text-h3">
+                        {WORD_SEPARATOR}
+                      </span>
+                    )}
+                    {group.map((key) => (
+                      <Pips code={key.code} size="lg" />
+                    ))}
+                  </>
+                ))
+              }
+            </dd>
+          </div>
+          <div class="pi-telegram-rule grid grid-cols-2 gap-x-4 gap-y-4 pt-5 sm:grid-cols-4">
+            <div>
+              <dt class="pi-form-label">Characters</dt>
+              <dd class="mt-1 font-mono text-h3 tabular-nums">{facts.characters}</dd>
+            </div>
+            <div>
+              <dt class="pi-form-label">Dots</dt>
+              <dd class="mt-1 font-mono text-h3 tabular-nums">{facts.dots}</dd>
+            </div>
+            <div>
+              <dt class="pi-form-label">Dashes</dt>
+              <dd class="mt-1 font-mono text-h3 tabular-nums">{facts.dashes}</dd>
+            </div>
+            <div>
+              <dt class="pi-form-label">At {FACTS.exampleWpm} WPM</dt>
+              <dd class="mt-1 font-mono text-h3 tabular-nums">{facts.sendSeconds}s</dd>
+            </div>
+          </div>
+        </dl>
+      </article>
 
-      <div class="mt-6">
-        <MorsePlayer morse={morse} label={word.text} />
+      {/* First on a phone: hearing it is why most people opened the page. */}
+      <div class="order-first lg:sticky lg:top-20 lg:order-none">
+        <MorsePlayer
+          morse={facts.morse}
+          label={`${label} · ${category.label}`}
+          initialWpm={FACTS.exampleWpm}
+        />
       </div>
+    </div>
 
-      <h2 class="mt-12 font-display text-xl font-bold tracking-tight">
-        Why {word.text} is worth knowing
-      </h2>
-      <p class="mt-3 leading-relaxed text-muted">{word.note}</p>
+    <div slot="more" class="grid gap-14 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div class="min-w-0">
+        <section aria-labelledby="why-heading" class="max-w-[68ch]">
+          <h2 id="why-heading" class="pi-balance font-display text-h2 font-bold text-ink">
+            Why {label} is worth knowing
+          </h2>
+          <p class="pi-pretty mt-4 leading-relaxed text-muted">{word.note}</p>
+          {
+            prosignSentence && (
+              <p class="pi-pretty mt-4 leading-relaxed text-muted">{prosignSentence}</p>
+            )
+          }
+          {
+            word.slug === 'sos' && (
+              <p class="mt-4 leading-relaxed text-muted">
+                The longer story is in the note{' '}
+                <a href="/blog/sos-does-not-stand-for-anything/" class="pi-link">
+                  What does SOS stand for?
+                </a>
+              </p>
+            )
+          }
+        </section>
 
-      <h2 class="mt-12 font-display text-xl font-bold tracking-tight">
-        {word.text} letter by letter
-      </h2>
-      <div class="mt-4 overflow-hidden rounded-xl border border-line">
-        <table class="w-full text-left">
-          <caption class="sr-only">Each character of {word.text} and its Morse code</caption>
-          <thead>
-            <tr class="border-b border-line bg-panel">
-              <th scope="col" class="px-4 py-2.5 font-mono text-[10px] tracking-[0.16em] text-muted"
-                >CHARACTER</th
-              >
-              <th scope="col" class="px-4 py-2.5 font-mono text-[10px] tracking-[0.16em] text-muted"
-                >MORSE</th
-              >
-            </tr>
-          </thead>
-          <tbody>
+        <section aria-labelledby="letters-heading" class="mt-14">
+          <h2 id="letters-heading" class="pi-balance font-display text-h2 font-bold text-ink">
+            {label} letter by letter
+          </h2>
+          <p class="pi-pretty mt-4 max-w-[68ch] leading-relaxed text-muted">
             {
-              rows.map((row) => (
-                <tr class="border-b border-line/60 last:border-0">
-                  <th scope="row" class="px-4 py-2.5 font-display text-lg font-bold text-signal">
-                    {row.character}
-                  </th>
-                  <td class="px-4 py-2.5 font-mono tracking-[0.2em] text-cyan">
-                    {prettify(row.code)}
-                  </td>
-                </tr>
+              groups.length > 1
+                ? `Each key is one character. A space separates letters and a slash separates the ${numberWord(groups.length)} words.`
+                : 'Each key is one character, sent with a short silence between them.'
+            } Open any key to hear it on its own.
+          </p>
+
+          {
+            /* One row of keys per word, so a word never splits across rows on a
+              phone; the slash between words is a labelled divider (V-16). */
+          }
+          <div class="mt-6 flex flex-col gap-4">
+            {
+              groups.map((group, index) => (
+                <>
+                  {index > 0 && (
+                    <p class="flex items-center gap-3" aria-hidden="true">
+                      <span class="font-mono text-h3 leading-none text-muted">
+                        {WORD_SEPARATOR}
+                      </span>
+                      <span class="mf-engraved">Word gap</span>
+                      <span class="h-px flex-1 bg-line" />
+                    </p>
+                  )}
+                  <ol
+                    class="flex flex-wrap items-stretch gap-3"
+                    aria-label={groups.length > 1 ? groupWord(group) : undefined}
+                  >
+                    {group.map((key) => (
+                      <li class="pi-key-cell w-[8.5rem]">
+                        <a href={key.href} class="pi-key h-full">
+                          <span class="pi-key-glyph">{key.character}</span>
+                          <Pips code={key.code} />
+                          <span class="pi-key-spoken" data-kind={key.kind}>
+                            {key.spoken}
+                          </span>
+                          <span class="sr-only">{key.code}</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ol>
+                </>
               ))
             }
-          </tbody>
-        </table>
+          </div>
+        </section>
+
+        {
+          readyOnDay && (
+            <p class="mf-panel mt-10 flex max-w-[68ch] items-start gap-4 p-5 leading-relaxed text-muted">
+              <span class="mf-lamp mt-2" data-tone="amber" data-on="true" aria-hidden="true" />
+              <span>
+                You can send {label} yourself by{' '}
+                <a href={`/learn-morse-code-in-7-days/#day-${readyOnDay}`} class="pi-link">
+                  day {readyOnDay} of the {numberWord(FACTS.planDays)}-day plan
+                </a>
+                : that is when the last of its letters is taught.
+              </span>
+            </p>
+          )
+        }
+
+        <div class="mt-10 flex flex-wrap gap-3">
+          <a
+            href="/telegraph/"
+            class="mf-btn mf-btn-primary max-w-full whitespace-normal py-2 text-center leading-snug"
+            >Send it on the key</a
+          >
+          <a
+            href="/morse-code-translator/"
+            class="mf-btn mf-btn-secondary max-w-full whitespace-normal py-2 text-center leading-snug"
+            >Translate your own text</a
+          >
+          <a
+            href="/tree/"
+            class="mf-btn mf-btn-ghost max-w-full whitespace-normal py-2 text-center leading-snug"
+            >See the Morse code tree</a
+          >
+        </div>
       </div>
 
-      {
-        readyOnDay && (
-          <p class="mt-6 rounded-xl border border-line bg-panel p-5 leading-relaxed text-muted">
-            You can send {word.text} yourself by
-            <a
-              href={`/learn-morse-code-in-7-days/#day-${readyOnDay}`}
-              class="text-signal underline decoration-signal/40 underline-offset-4"
-            >
-              day {readyOnDay} of the seven-day plan
-            </a>
-            — that is when the last of its letters is taught.
-          </p>
-        )
-      }
+      <aside class="lg:pt-2" aria-label="More words">
+        {
+          moreGroups.map((group, index) => (
+            <section class={index > 0 ? 'mt-8' : undefined}>
+              <h2 class="mf-engraved">{group.heading}</h2>
+              <ul class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                {group.items.map((other) => (
+                  <li>
+                    <a href={`/words/${other.slug}/`} class="pi-telegram block px-4 py-3">
+                      <span class="block font-display text-h3 font-bold">{wordLabel(other)}</span>{' '}
+                      <span class="pi-code mt-1 block font-mono text-sm">
+                        {prettify(morseFor(other))}
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))
+        }
+        <ul class="mt-6 space-y-2">
+          <li><a href="/words/" class="pi-link">All {FACTS.wordCount} words in Morse code</a></li>
+          <li><a href="/morse-code-alphabet/" class="pi-link">The Morse code alphabet</a></li>
+        </ul>
+      </aside>
+    </div>
 
-      <div class="mt-8 flex flex-wrap gap-3">
-        <a
-          href="/telegraph/"
-          class="rounded-lg px-5 py-2.5 font-mono text-xs tracking-[0.14em] text-void"
-          style="background: var(--color-signal)">SEND IT YOURSELF</a
-        >
-        <a
-          href="/tree/"
-          class="rounded-lg border border-line px-5 py-2.5 font-mono text-xs tracking-[0.14em] text-muted transition-colors hover:border-signal hover:text-signal"
-          >SEE THE TREE</a
-        >
-      </div>
-
-      {
-        related.length > 0 && (
-          <section class="mt-14 border-t border-line pt-8">
-            <h2 class="font-display text-lg font-semibold">
-              More {WORD_CATEGORIES[word.category].label.toLowerCase()} words
-            </h2>
-            <ul class="mt-4 flex flex-wrap gap-2">
-              {related.map((other) => (
-                <li>
-                  <a
-                    href={`/words/${other.slug}/`}
-                    class="inline-block rounded-lg border border-line bg-panel px-3 py-1.5 font-mono text-sm text-muted transition-colors hover:border-signal hover:text-signal"
-                  >
-                    {other.text}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )
-      }
-    </article>
-  </main>
+    <Faq slot="more" items={faq} />
+  </PageShell>
 </BaseLayout>

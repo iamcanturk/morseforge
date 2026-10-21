@@ -8,7 +8,16 @@
 
 import { DEFAULT_AUDIO_SETTINGS } from '../engine/audioEngine'
 import { DEFAULT_KEY_BINDINGS, type KeyBindings } from '../engine/keyEngine'
-import { Store, type StorageDriver, bool, isRecord, num, oneOf, str } from './store'
+import {
+  type Store,
+  type StorageDriver,
+  sharedStore,
+  bool,
+  isRecord,
+  num,
+  oneOf,
+  str,
+} from './store'
 
 export const SETTINGS_KEY = 'morseforge_settings'
 export const SETTINGS_VERSION = 1
@@ -22,6 +31,16 @@ export const WPM_PRESETS = {
 } as const
 
 export const FREQUENCY_PRESETS = [400, 500, 600, 700, 800] as const
+
+/**
+ * The speed range the playback sliders and the translator offer, in WPM.
+ *
+ * Deliberately narrower than `LIMITS.wpm`: that is what a stored value is
+ * clamped to, while this is what the interface lets someone pick and what the
+ * page copy quotes ("from 5 to 40 WPM"). Copy and sliders read this one
+ * constant, so they cannot disagree.
+ */
+export const WPM_RANGE = { min: 5, max: 40 } as const
 
 /** Bounds every setting is clamped to, on write and on read. */
 export const LIMITS = {
@@ -69,9 +88,36 @@ export function matchKeyerPreset(timing: SettingsRecord['timing']): KeyerPreset 
 
 export type MotionPreference = 'system' | 'reduce' | 'full'
 
+/**
+ * How a listening signal reaches the learner (DEC-045).
+ *
+ * - `sound`: the CW tone only, as the site always did.
+ * - `lamp`: a lamp flashes each element with the tone's exact timing, in
+ *   silence. For deaf and hard-of-hearing learners, a library, a classroom, or
+ *   anyone training to read signal lamps.
+ * - `both`: tone and lamp together, from one timeline.
+ *
+ * Reading Morse by light is the same decoding task at the same speed, so a
+ * lamp answer counts as the listening skill.
+ */
+export type SignalMode = 'sound' | 'lamp' | 'both'
+
+export const SIGNAL_MODES = ['sound', 'lamp', 'both'] as const satisfies readonly SignalMode[]
+
+export const SIGNAL_LABELS: Readonly<Record<SignalMode, string>> = {
+  sound: 'Sound',
+  lamp: 'Lamp',
+  both: 'Both',
+}
+
 export interface SettingsRecord {
   audio: {
-    /** Master switch. Off means the app is fully usable in silence (§28). */
+    /**
+     * Whether tones are audible at all. Always equal to `signal !== 'lamp'`:
+     * the validator derives it, and `withSignal` sets both together. The
+     * readers that predate `signal` keep working; new code asks
+     * `hasSound` / `hasLamp` instead.
+     */
     enabled: boolean
     frequency: number
     volume: number
@@ -111,6 +157,25 @@ export interface SettingsRecord {
    * asks not to be tracked.
    */
   counters: boolean
+  /** How a listening signal reaches the learner (DEC-045). Default 'sound'. */
+  signal: SignalMode
+}
+
+/** Tones are audible. The same truth as `audio.enabled`. */
+export const hasSound = (settings: Pick<SettingsRecord, 'signal'>): boolean =>
+  settings.signal !== 'lamp'
+
+/** Listening prompts also flash a lamp, element by element. */
+export const hasLamp = (settings: Pick<SettingsRecord, 'signal'>): boolean =>
+  settings.signal !== 'sound'
+
+/**
+ * The only way to change the signal: sets `signal` and `audio.enabled`
+ * together, so the invariant the validator keeps also holds in the cache
+ * between a write and the next read.
+ */
+export function withSignal(settings: SettingsRecord, signal: SignalMode): SettingsRecord {
+  return { ...settings, signal, audio: { ...settings.audio, enabled: signal !== 'lamp' } }
 }
 
 export function defaultSettings(): SettingsRecord {
@@ -137,6 +202,7 @@ export function defaultSettings(): SettingsRecord {
     keys: { ...DEFAULT_KEY_BINDINGS },
     motion: 'system',
     counters: true,
+    signal: 'sound',
   }
 }
 
@@ -150,9 +216,16 @@ function validateSettings(value: unknown): SettingsRecord | null {
 
   const wpm = num(timing['wpm'], fallback.timing.wpm, LIMITS.wpm.min, LIMITS.wpm.max)
 
+  // A record from before the Signal setting only had the sound switch. Off
+  // meant "I cannot or will not hear this", so it becomes the lamp rather
+  // than silence. Once `signal` is stored it wins, and the switch is derived
+  // from it: no version bump, because nothing a record held is lost.
+  const legacyEnabled = bool(audio['enabled'], fallback.audio.enabled)
+  const signal = oneOf(value['signal'], SIGNAL_MODES, legacyEnabled ? 'sound' : 'lamp')
+
   return {
     audio: {
-      enabled: bool(audio['enabled'], fallback.audio.enabled),
+      enabled: signal !== 'lamp',
       frequency: num(
         audio['frequency'],
         fallback.audio.frequency,
@@ -209,11 +282,12 @@ function validateSettings(value: unknown): SettingsRecord | null {
     },
     motion: oneOf(value['motion'], ['system', 'reduce', 'full'] as const, fallback.motion),
     counters: bool(value['counters'], fallback.counters),
+    signal,
   }
 }
 
 export function createSettingsStore(driver?: StorageDriver): Store<SettingsRecord> {
-  return new Store<SettingsRecord>(
+  return sharedStore<SettingsRecord>(
     {
       key: SETTINGS_KEY,
       version: SETTINGS_VERSION,

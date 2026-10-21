@@ -5,10 +5,14 @@
  * Nothing here makes a decision — it takes a layout and some numbers and puts
  * pixels down.
  *
- * Colours are read from the page's own custom properties rather than hardcoded,
- * so the exported video uses the real brand green rather than a copy of it that
- * can drift.
+ * Colours come from palette.ts, which palette.test.ts holds to global.css, so
+ * the exported video uses the real brand green rather than a copy of it that
+ * can drift. The logo is drawn from the mark's own geometry for the same
+ * reason.
  */
+
+import { drawLockup, horizontalLockup } from '../brand/mark'
+import { DARK, SCREEN } from '../../styles/palette'
 
 import {
   barHeights,
@@ -30,60 +34,37 @@ export interface Palette {
   ink: string
 }
 
-/** Read the live theme. Falls back to the dark palette if a variable is unset. */
-export function readPalette(element: Element): Palette {
-  const styles = getComputedStyle(element)
-  const read = (name: string, fallback: string) => styles.getPropertyValue(name).trim() || fallback
-
-  return {
-    // Always the dark void, whatever theme the page is in: a video is not a
-    // page, and a white background with a green trace reads as a spreadsheet.
-    background: '#080b10',
-    signal: read('--color-signal', '#00e88f'),
-    dim: read('--color-signal-dim', '#00a868'),
-    cyan: read('--color-cyan', '#22d3ee'),
-    ink: '#f0f4f8',
-  }
-}
-
-/** A rounded rectangle, for the logo bars. */
-function bar(
-  context: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  fill: string,
-) {
-  const radius = height / 2
-  context.fillStyle = fill
-  context.beginPath()
-  context.roundRect(x, y, width, height, radius)
-  context.fill()
+/**
+ * The studio's colours: the CRT screen tokens, in every theme.
+ *
+ * Not read from the page. The page's `--color-signal` is the light theme's
+ * ink green when the site is in light mode, which nearly vanishes on a dark
+ * frame — and the frame is always dark: a video is not a page, and a white
+ * background with a green trace reads as a spreadsheet. A scope's glass is
+ * the same glass in both themes (DEC-008), so the video is too.
+ */
+export const STUDIO_PALETTE: Palette = {
+  background: DARK.screen,
+  signal: SCREEN.signal,
+  dim: SCREEN['signal-dim'],
+  cyan: SCREEN.cyan,
+  ink: SCREEN.ink,
 }
 
 /**
- * The mark and wordmark.
- *
- * The mark is the letter M in Morse — dash dash — with the second bar shorter.
- * Equal bars read as an "=" sign; the staggered pair reads as a transmission
- * decaying, which is the whole idea.
+ * The logo, from the mark's own geometry: the Split M in phosphor and the
+ * traced wordmark beside it, in the header's compact lockup, fitted to the
+ * square the scene reserves for it. Path data, not text, so the video carries
+ * the same logo as the site whatever fonts the browser has loaded.
  */
 export function drawLogo(context: CanvasRenderingContext2D, frame: Layout, palette: Palette) {
   const { x, y, size } = frame.logo
-  const barHeight = size * 0.19
-  const gap = size * 0.13
-
-  bar(context, x, y + size * 0.25, size * 0.81, barHeight, palette.signal)
-  bar(context, x, y + size * 0.25 + barHeight + gap, size * 0.59, barHeight, palette.dim)
-
-  context.fillStyle = palette.ink
-  context.font = `700 ${Math.round(size * 0.58)}px "Space Grotesk", system-ui, sans-serif`
-  context.textBaseline = 'middle'
-  context.textAlign = 'left'
-  context.letterSpacing = `${Math.round(size * 0.09)}px`
-  context.fillText('MORSEFORGE', x + size * 1.05, y + size * 0.52)
-  context.letterSpacing = '0px'
+  const markHeight = size * 0.72
+  const lockup = horizontalLockup(markHeight, true)
+  drawLockup(context, x, y + (size - markHeight) / 2, lockup, {
+    mark: palette.signal,
+    word: palette.ink,
+  })
 }
 
 /** The message, under the visualiser. */

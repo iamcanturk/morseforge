@@ -1,0 +1,167 @@
+---
+/**
+ * /how-to-learn-morse-code/: the hub. Six short steps, each ending in the deep
+ * page that owns its topic, so this page owns "how to" without competing with
+ * the 7-day plan or the notes. Steps backed by a note quote that note's
+ * `answer` from the content collection rather than retyping it; the others
+ * are computed from the plan in `reference.ts`.
+ */
+import { getEntry } from 'astro:content'
+import BaseLayout from '../layouts/BaseLayout.astro'
+import Faq from '../components/Faq.astro'
+import PageShell from '../components/PageShell.astro'
+import {
+  HOW_TO_INTRO_LINKS,
+  howToSchema,
+  howToSteps,
+  linkParts,
+  type ResolvedStep,
+} from '../components/Reference/reference'
+import { FACTS } from '../config/facts'
+import { breadcrumbTrail, getPage } from '../config/pages'
+import { faqFor } from '../data/faq'
+import { absoluteUrl, breadcrumbs, webPage } from '../seo/schema'
+import '../styles/pkg-n.css'
+
+const page = getPage('/how-to-learn-morse-code/')
+const trail = breadcrumbTrail(page.path)
+const faq = faqFor(page.path)
+
+const steps = await Promise.all(
+  howToSteps().map(async (step) => {
+    if ('text' in step.body) return { ...step, text: step.body.text, source: null }
+    const post = await getEntry('blog', step.body.post)
+    if (!post) throw new Error(`how-to step "${step.id}" quotes a missing post: ${step.body.post}`)
+    return {
+      ...step,
+      text: post.data.answer,
+      source: { title: post.data.title, href: `/blog/${post.id}/` },
+    }
+  }),
+)
+
+const resolved: ResolvedStep[] = steps.map(({ id, title, text }) => ({ id, title, text }))
+
+const schema = [
+  webPage({ path: page.path, name: page.h1, description: page.description }),
+  breadcrumbs(trail),
+  howToSchema({
+    url: absoluteUrl(page.path),
+    name: page.h1,
+    description: page.description,
+    steps: resolved,
+  }),
+]
+---
+
+<BaseLayout title={page.title} description={page.description} path={page.path} schema={schema}>
+  <PageShell
+    width="tool"
+    trail={trail}
+    eyebrow="Field guide · The method"
+    h1={page.h1}
+    intro={page.intro}
+    instrumentClass="max-w-4xl"
+  >
+    {
+      /* The intro with its links to the notes, where the shell offers an intro
+        slot; the plain `intro` above is the fallback. */
+    }
+    <Fragment slot="intro">
+      {
+        linkParts(page.intro, HOW_TO_INTRO_LINKS).map((part) =>
+          part.href ? (
+            <a href={part.href} class="pkg-n-link">
+              {part.text}
+            </a>
+          ) : (
+            part.text
+          ),
+        )
+      }
+    </Fragment>
+
+    <div class="flex flex-wrap gap-3">
+      <a href="/learn/" class="mf-btn mf-btn-primary">Start the first lesson</a>
+      <a href="/learn-morse-code-in-7-days/" class="mf-btn mf-btn-secondary">
+        {`The ${FACTS.planDays}-day plan`}
+      </a>
+    </div>
+
+    <nav class="mf-instrument mt-8 p-5 sm:p-6" aria-labelledby="steps-heading">
+      <p id="steps-heading" class="mf-engraved">{`${steps.length} steps`}</p>
+      <ol class="pkg-n-toc pkg-n-toc-cols mt-4">
+        {
+          steps.map((step, index) => (
+            <li>
+              <a href={`#step-${step.id}`}>
+                <span class="mf-engraved">{String(index + 1).padStart(2, '0')}</span>{' '}
+                <span class="font-display text-h3 font-semibold">{step.title}</span>
+              </a>
+            </li>
+          ))
+        }
+      </ol>
+    </nav>
+
+    <ol slot="more" class="pkg-n-steps">
+      {
+        steps.map((step, index) => (
+          <li id={`step-${step.id}`} class="mf-panel pkg-n-step-card p-6 sm:p-8">
+            <div>
+              <p class="mf-engraved">Step</p>
+              <p class="pkg-n-step-no mt-2">{String(index + 1).padStart(2, '0')}</p>
+            </div>
+            <div class="min-w-0">
+              <h2 class="font-display text-h2 font-bold text-ink">{step.title}</h2>
+              {step.source ? (
+                <figure class="pkg-n-quote mt-5 max-w-[64ch]">
+                  <blockquote class="leading-relaxed text-ink">
+                    <p>{step.text}</p>
+                  </blockquote>
+                  <figcaption class="mt-3 text-sm text-muted">
+                    From the note{' '}
+                    <a href={step.source.href} class="pkg-n-link">
+                      {step.source.title}
+                    </a>
+                  </figcaption>
+                </figure>
+              ) : (
+                <p class="mt-5 max-w-[64ch] leading-relaxed text-muted">{step.text}</p>
+              )}
+              <div class="mt-6 flex flex-wrap gap-3">
+                {step.links.map((link, linkIndex) => (
+                  <a
+                    href={link.href}
+                    class:list={[
+                      'mf-btn mf-btn-sm',
+                      linkIndex === 0 ? 'mf-btn-secondary' : 'mf-btn-ghost',
+                    ]}
+                  >
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+            </div>
+          </li>
+        ))
+      }
+    </ol>
+
+    <Faq slot="more" items={faq} heading="Questions about learning Morse code" />
+
+    <div slot="more" class="mf-panel flex flex-wrap items-center justify-between gap-6 p-6 sm:p-8">
+      <div>
+        <p class="mf-engraved">Reference</p>
+        <p class="mt-2 max-w-[48ch] text-muted">
+          Every character, the digits and the timing, each with sound.
+        </p>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <a href="/morse-code-alphabet/" class="mf-btn mf-btn-secondary mf-btn-sm">Alphabet</a>
+        <a href="/morse-code-numbers/" class="mf-btn mf-btn-secondary mf-btn-sm">Numbers</a>
+        <a href="/morse-code-speed/" class="mf-btn mf-btn-secondary mf-btn-sm">Speed and timing</a>
+      </div>
+    </div>
+  </PageShell>
+</BaseLayout>

@@ -1,23 +1,164 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro'
+import Faq from '../components/Faq.astro'
+import PageShell from '../components/PageShell.astro'
 import { SignalTreeScreen } from '../components/SignalTree/SignalTreeScreen'
+import { breadcrumbTrail, getPage } from '../config/pages'
+import { FACTS } from '../config/facts'
+import { CHARACTERS } from '../data/characters'
+import { CURRICULUM } from '../data/curriculum'
+import { faqFor } from '../data/faq'
+import { joinList, numberWord } from '../data/format'
+import { ALL_LETTERS, MORSE_ALPHABET } from '../data/morseAlphabet'
+import { MORSE_TREE, treeDepth } from '../data/tree'
+import { prettify } from '../engine/morseEncoder'
+import { LEVEL_REQUIREMENTS, SKILLS } from '../game/mastery'
+import { breadcrumbs, webPage } from '../seo/schema'
 
-const title = 'Morse Code Tree — See How Every Letter Is Built | MorseForge'
-const description =
-  'An interactive Morse code binary tree. A dot branches left, a dash branches right, and every letter sits where its code spells it out. Click any letter to hear it.'
+const page = getPage('/tree/')
+const plan = getPage('/learn-morse-code-in-7-days/')
+const lessons = getPage('/learn/')
+const alphabet = getPage('/morse-code-alphabet/')
+const trail = breadcrumbTrail(page.path)
+const faq = faqFor(page.path)
+
+const schema = [
+  webPage({ path: page.path, name: page.h1, description: page.description }),
+  breadcrumbs(trail),
+]
+
+/* ---- Every figure below is computed from the alphabet and the plan. ---- */
+
+const depth = treeDepth(MORSE_TREE)
+const byLength = FACTS.lettersByLength
+const rows = Array.from({ length: depth }, (_, index) => byLength[index + 1] ?? [])
+const lastRowSlots = 2 ** depth
+const lastRow = rows.at(-1) ?? []
+
+/** The letter one element away: same code with the last element flipped. */
+function sibling(letter: string): string | null {
+  const code = MORSE_ALPHABET[letter] ?? ''
+  const flipped = code.slice(0, -1) + (code.endsWith('.') ? '-' : '.')
+  return ALL_LETTERS.find((other) => MORSE_ALPHABET[other] === flipped) ?? null
+}
+
+// Worked examples, chosen by rule rather than by hand: the first two-element
+// letter that is dot-then-dash, and the first three-element dot-first letter.
+const example = (byLength[2] ?? []).find((letter) => MORSE_ALPHABET[letter]?.startsWith('.-'))
+const exampleFacts = example ? CHARACTERS[example] : undefined
+const pairs = [byLength[2]?.[0], byLength[3]?.[0]]
+  .filter((letter): letter is string => Boolean(letter))
+  .map((letter) => [letter, sibling(letter)] as const)
+  .filter((pair): pair is readonly [string, string] => pair[1] !== null)
+
+// The plan's claim, checked at build time: every day teaches characters of
+// one length, and no day teaches longer characters before shorter ones. If
+// the curriculum ever stops following the tree, this page must stop saying so.
+const lengths = CURRICULUM.map((day) => [
+  ...new Set(day.characters.map((character) => MORSE_ALPHABET[character]?.length ?? 0)),
+])
+const followsTree =
+  lengths.every((set) => set.length === 1) &&
+  lengths.every((set, index) => index === 0 || set[0]! >= lengths[index - 1]![0]!)
+if (!followsTree) throw new Error('tree.astro: the 7-day plan no longer follows the tree rows')
+const isKind = (kind: string) => (character: string) => CHARACTERS[character]?.kind === kind
+const letterDays = CURRICULUM.filter((day) => day.characters.every(isKind('letter')))
+const lastDay = CURRICULUM.at(-1)!
+const lastDayIsDigits = lastDay.characters.every(isKind('digit'))
+// Four-element patterns that are not letters but are something else in the data.
+const otherFours = Object.entries(MORSE_ALPHABET).filter(
+  ([character, code]) => code.length === depth && !ALL_LETTERS.includes(character as never),
+).length
+const firstDay = CURRICULUM[0]!
+const mastery = LEVEL_REQUIREMENTS[5]
 ---
 
-<BaseLayout title={title} description={description} path="/tree/">
-  <main class="mx-auto max-w-6xl px-6 py-14">
-    <header class="mb-10">
-      <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Morse Code Tree</h1>
-      <p class="mt-3 max-w-2xl leading-relaxed text-muted">
-        Morse code is a binary tree. From the centre, a dot branches left and a dash branches right
-        — so every letter sits exactly where its code spells it out. E is one dot from the core, T
-        is one dash, and A is a dot then a dash.
-      </p>
-    </header>
+<BaseLayout title={page.title} description={page.description} path={page.path} schema={schema}>
+  <PageShell width="tool" trail={trail} h1={page.h1} intro={page.intro} instrumentFirst>
+    <SignalTreeScreen client:idle />
 
-    <SignalTreeScreen client:load />
-  </main>
+    <div slot="more" class="mf-prose">
+      <h2>How to read the Morse code tree</h2>
+      <p>
+        Start at the root, the ring at the top of the board. Every dot you hear is one step down and
+        to the left, and every dash is one step down and to the right. Wherever you are standing
+        when the character ends is the letter.
+        {
+          exampleFacts && (
+            <>
+              {' '}
+              So {exampleFacts.character}, {exampleFacts.spelled} (
+              <code>{exampleFacts.display}</code>), is one step left and then one step right.
+            </>
+          )
+        }
+      </p>
+      <p>
+        How deep a letter sits is how long its code is. {joinList(rows[0] ?? [])} are one step down because
+        each is a single element. The second row holds {numberWord(rows[1]?.length ?? 0)} letters of two
+        elements, the third row {numberWord(rows[2]?.length ?? 0)} of three, and the fourth
+        {' '}{numberWord(lastRow.length)} of four. The {ALL_LETTERS.length} letters fill {depth} rows,
+        and the last row has room for {lastRowSlots} but uses only {lastRow.length}, which is why it
+        has gaps{
+          otherFours === 0
+            ? `: the other ${numberWord(lastRowSlots - lastRow.length)} four-element patterns are not used by any character in international Morse code.`
+            : '.'
+        }
+      </p>
+      <p>
+        Two letters side by side under the same parent differ only in their last element.
+        {
+          pairs.length > 0 && (
+            <>
+              {' '}
+              That is why{' '}
+              {pairs.map(([a, b], index) => (
+                <>
+                  {index > 0 && ', or '}
+                  {a} (<code>{prettify(MORSE_ALPHABET[a] ?? '')}</code>) and {b} (
+                  <code>{prettify(MORSE_ALPHABET[b] ?? '')}</code>)
+                </>
+              ))}
+              {pairs.length > 1 ? ',' : ''} are easy to mix up at first: they share everything but
+              the ending.
+            </>
+          )
+        }{' '}
+        Pick any pad on the board to hear it at your own speed and tone, see its path from the root, and
+        drill it on the spot, either by keying it or by naming it by ear.
+      </p>
+
+      <h2>Why it is also the best order to learn in</h2>
+      <p>
+        Learning the tree from the top down means the shortest characters come first, and each new
+        row only adds one element to patterns you already know. You never meet a four-element letter
+        before you can tell a dot from a dash.
+      </p>
+      <p>
+        That is the order the <a href={lessons.path}>guided lessons</a> and the <a href={plan.path}
+          >{plan.navLabel}</a
+        > follow. Day 1 is the top row, {joinList(firstDay.characters)}. Each following day takes
+        the next row, and a row too wide for one sitting is split across days. After {
+          numberWord(letterDays.length)
+        } days you have all {ALL_LETTERS.length} letters, {
+          lastDayIsDigits ? `and the last day adds the ${numberWord(FACTS.digitCount)} digits` : ''
+        }: about {FACTS.planTime} of practice in total.
+      </p>
+      <p>
+        Each pad shows how far along you are with that letter. A dashed pad is one you have not met.
+        A thin ring means you have met it, an amber ring means you are learning it, and a lit pad
+        means it is mastered. Mastered is a high bar on purpose: at least {
+          mastery.minAttemptsPerSkill
+        } answers in each of the{' '}
+        {numberWord(SKILLS.length)} skills, reading the code, hearing it and sending it, and an average
+        of {Math.round(mastery.minScore * 100)}% or better across them. The network power gauge
+        under the board averages that progress over the whole alphabet, so it moves every time you
+        practise. For the full list of codes, letters, digits and punctuation, see <a
+          href={alphabet.path}>the Morse code alphabet</a
+        >.
+      </p>
+    </div>
+
+    <Faq slot="more" items={faq} />
+  </PageShell>
 </BaseLayout>

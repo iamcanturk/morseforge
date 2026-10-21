@@ -1,0 +1,41 @@
+---
+/**
+ * Every character page as a row of keycaps, with the current one marked. It
+ * is the cross-link between all of them: a reader can walk the alphabet, and a
+ * crawler reaches every page from every other in one hop.
+ */
+import { characterHref, characterPages } from './reference'
+
+export interface Props {
+  /** The character whose page this is, if any. */
+  current?: string
+  heading?: string
+}
+
+const { current, heading = 'Every letter and number' } = Astro.props
+const pages = characterPages()
+const letters = pages.filter((facts) => facts.kind === 'letter')
+const digits = pages.filter((facts) => facts.kind === 'digit')
+---
+
+<nav aria-labelledby="pkg-n-strip-heading" class="pkg-n-strip">
+  <h2 id="pkg-n-strip-heading" class="mf-engraved">{heading}</h2>
+  {
+    [letters, digits].map((group) => (
+      <ul class="mt-3 flex flex-wrap gap-1.5">
+        {group.map((facts) => (
+          <li>
+            <a
+              href={characterHref(facts.character)!}
+              class="mf-kbd pkg-n-key"
+              aria-current={facts.character === current ? 'page' : undefined}
+              aria-label={`${facts.character} in Morse code`}
+            >
+              {facts.character}
+            </a>
+          </li>
+        ))}
+      </ul>
+    ))
+  }
+</nav>

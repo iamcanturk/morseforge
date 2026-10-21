@@ -1,0 +1,28 @@
+---
+/**
+ * A section heading on a reference plate: a small engraved plate number above
+ * a sentence-case H2. The number is the section's position, passed in by the
+ * page, so it is never typed out of order.
+ */
+export interface Props {
+  /** Anchor for the section heading. */
+  id: string
+  /** Position on the page, 1-based. */
+  index: number
+  /** Engraved label beside the number: "Timing", "The rule". */
+  label: string
+}
+
+const { id, index, label } = Astro.props
+const number = String(index).padStart(2, '0')
+---
+
+<div class="pkg-n-section-head">
+  <p class="mf-engraved flex items-center gap-3" aria-hidden="true">
+    <span class="pkg-n-plate-no">{number}</span>
+    <span>{label}</span>
+  </p>
+  <h2 id={id} class="mt-3 font-display text-h2 font-bold text-ink">
+    <slot />
+  </h2>
+</div>

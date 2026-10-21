@@ -5,15 +5,17 @@ posting the same paragraph five times is the fastest way to be ignored on all
 five, because each audience is checking for something different.
 
 Every number below is real and checked against the build. Do not round any of
-them up.
+them up. The test count is `npx vitest run`; the JavaScript figures follow each
+page's script imports through `dist/_astro` and gzip them, layout inline scripts
+included. Re-measure both before posting; they move with every release.
 
 | Claim                  | Value                                  |
 | ---------------------- | -------------------------------------- |
-| Tests                  | 641                                    |
+| Tests                  | 1,936 (`npx vitest run`, 100 files)    |
 | Seven-day plan         | 135 minutes total                      |
 | Coverage               | 26 letters, 10 digits                  |
-| JS on a word page      | ~3 KB                                  |
-| JS on the practice app | ~186 KB (React)                        |
+| JS on a word page      | ~13 KB gzipped, no React               |
+| JS on the practice app | ~120 KB gzipped (React)                |
 | Licence                | MIT                                    |
 | Offline                | Yes, PWA                               |
 | Account required       | No                                     |
@@ -50,9 +52,9 @@ card.
 > Slowing the characters down is what gives people a hard ceiling near 10 WPM.
 > • Three skills tracked separately per character. A letter is only mastered
 > with evidence in all three.
-> • Word pages ship ~3 KB of JavaScript. The app pages ship React because they
-> earn it.
-> • 641 tests, including one asserting that sending PARIS once takes exactly
+> • Word pages ship about 13 KB of JavaScript, none of it React. The app pages
+> ship React because they earn it.
+> • 1,936 tests, including one asserting that sending PARIS once takes exactly
 > 60/WPM seconds.
 
 **Reply 2 — the visual one, attach the GIF**
@@ -318,7 +320,7 @@ Tag `v1.0.0`.
 > - Real CW audio from the Web Audio API with envelope shaping
 > - PARIS-standard timing with ARRL Farnsworth spacing
 > - Installable PWA, works offline
-> - 641 tests
+> - 1,936 tests
 > - No account, no server, no tracking beyond an anonymous counter you can turn
 >   off
 

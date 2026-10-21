@@ -1,0 +1,247 @@
+/* ---------------------------------------------------------------------------
+   Package E: practice, the timed challenge, the result and the share sheet.
+
+   Only what the shared Signal Office classes do not already cover. Colours
+   are tokens, never hex; motion is transform and opacity only, and the
+   global reduced-motion rules (OS or html[data-motion]) shorten all of it.
+   Imported by the components that use it, so /learn/ (which mounts the
+   practice screen for its drill) gets it too.
+--------------------------------------------------------------------------- */
+
+/* The prompt screen: the one thing on the page while a session runs. */
+.pe-prompt {
+  min-height: clamp(240px, 38vh, 340px);
+}
+
+/* A second, identical shake. An animation restarts only when its name
+   changes, so two misses in a row alternate between this and mf-shake and
+   each one shakes, without remounting the answer field (which used to throw
+   focus out of it, A-01). */
+@keyframes pe-shake {
+  0%,
+  100% {
+    transform: none;
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+.pe-shake-alt {
+  animation: pe-shake var(--duration-dah) linear 2;
+}
+
+/* Below the pass bar the accuracy is amber (still learning), and its glow
+   follows, rather than a green halo round an amber number. */
+.pe-accuracy[data-tone='amber'] .mf-readout-value {
+  text-shadow:
+    0 0 8px color-mix(in srgb, var(--color-amber) 55%, transparent),
+    0 0 1px var(--color-amber);
+}
+
+/* D2: a correct answer nudges the glyph by one dit. */
+@keyframes pe-pulse {
+  from {
+    transform: scale(0.94);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.pe-pulse {
+  animation: pe-pulse var(--duration-dah) var(--ease-signal) both;
+}
+
+/* The signal strip: one mark per answer, in order. A hit is a lit lamp; a
+   miss is a ring with a cross, so the difference survives greyscale. */
+.pe-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pe-mark {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  inline-size: 10px;
+  block-size: 10px;
+  border-radius: 999px;
+}
+
+.pe-mark[data-state='hit'] {
+  background: var(--color-signal);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--color-signal) 70%, transparent);
+}
+
+.pe-mark[data-state='miss'] {
+  box-shadow: inset 0 0 0 1.5px var(--color-danger);
+}
+
+.pe-mark[data-state='miss'] svg {
+  position: absolute;
+  inset: 2px;
+  inline-size: 6px;
+  block-size: 6px;
+  color: var(--color-danger);
+}
+
+/* The result's readouts: a value is one reading, so "1m 00s" or "5 days"
+   never breaks over two lines. On a phone, two plates share the row, so the
+   values step down to the running HUD's size to keep the longest one on it. */
+.pe-readouts .mf-readout-value {
+  white-space: nowrap;
+  font-size: 1.5rem;
+}
+
+@media (min-width: 40rem) {
+  .pe-readouts .mf-readout-value {
+    font-size: var(--text-readout);
+  }
+}
+
+/* A telegram slip: an earned moment, printed on tape stock. */
+.pe-slip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding-block: 1.25rem 0.875rem;
+  letter-spacing: normal;
+  font-family: var(--font-body);
+}
+
+/* On a phone the stamp drops under the text instead of squeezing it. */
+.pe-slip > .mf-stamp {
+  grid-column: 1 / -1;
+  justify-self: end;
+  margin-block-start: -0.25rem;
+}
+
+@media (min-width: 40rem) {
+  .pe-slip {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .pe-slip > .mf-stamp {
+    grid-column: auto;
+    margin-block-start: 0;
+  }
+}
+
+/* The stamp on paper: the theme's red lamp, inked down until it reads on
+   cream as normal text (A-15). On a phone the stamp is 16px, which is not
+   "large" text, so it needs 4.5:1, measured with the stamp at full opacity:
+   40% red in paper-ink is 6.3:1 on dark-theme paper and 10.5:1 on light
+   (60% was 3.6:1 at the stamp's base 0.9 opacity). */
+.pe-paper-stamp {
+  color: color-mix(in srgb, var(--color-danger) 40%, var(--color-paper-ink));
+  /* Also the stamp-in animation's last frame (global.css), which outlives it. */
+  --mf-stamp-rest: 1;
+  opacity: 1;
+  box-shadow:
+    inset 0 0 0 2px var(--color-paper),
+    inset 0 0 0 3px currentColor;
+}
+
+.pe-paper-muted {
+  color: var(--color-paper-muted);
+}
+
+/* Keycap tags for "practise these": paper, letter over code. */
+.pe-keycap {
+  display: grid;
+  justify-items: center;
+  gap: 0.125rem;
+  min-inline-size: 3.25rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: var(--radius-chip);
+  border: 1px solid var(--color-line-strong);
+  border-block-end-width: 3px;
+  background: var(--color-paper);
+  color: var(--color-paper-ink);
+}
+
+/* The incoming wire: a telegram form the recipient holds before they start. */
+.pe-telegram {
+  position: relative;
+  border-radius: 6px;
+  background-color: var(--color-paper);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0 31px,
+    color-mix(in srgb, var(--color-paper-ink) 7%, transparent) 31px 32px
+  );
+  color: var(--color-paper-ink);
+  box-shadow:
+    inset 0 0 0 2px var(--color-paper),
+    inset 0 0 0 3px color-mix(in srgb, var(--color-paper-muted) 70%, transparent),
+    0 18px 40px -26px rgb(0 0 0 / 0.6);
+}
+
+/* The receipt slips in; under reduced motion it is simply there. */
+.pe-telegram.mf-slip {
+  transform-origin: 50% 0;
+}
+
+.pe-telegram .mf-engraved {
+  color: var(--color-paper-muted);
+  text-shadow: none;
+}
+
+/* Versus: their number, labelled as a claim, beside yours. */
+.pe-versus {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: 1rem;
+  container-type: inline-size;
+}
+
+/* Each number fits its half of the plate: the half's width (the plate less
+   the slash and the two gaps, about 3rem) over the digit count, at about
+   0.62em per monospaced digit. Never larger than the XL readout. */
+.pe-versus-value {
+  font-size: min(var(--text-readout-xl), calc((100cqi - 3rem) / 2 / (var(--pe-digits, 3) * 0.62)));
+  white-space: nowrap;
+}
+
+/* The share sheet's link field: one line, scrolls rather than wraps. */
+.pe-link {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow-x: auto;
+  text-overflow: ellipsis;
+}
+
+/* The disclosure triangle is replaced by a lamp-coloured chevron. */
+.pe-details > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.pe-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.pe-details > summary .pe-chevron {
+  transition: transform var(--duration-dah) var(--ease-signal);
+}
+
+.pe-details[open] > summary .pe-chevron {
+  transform: rotate(180deg);
+}
+
+/* An audio button on the CRT glass: a cyan outline rather than a slab.
+   (global.css gives primary labels on glass the screen colour.) */
+.pe-screen-btn {
+  background: transparent;
+  color: var(--color-cyan);
+  border-color: color-mix(in srgb, var(--color-cyan) 55%, transparent);
+}

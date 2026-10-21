@@ -8,7 +8,7 @@
  * site not knowing the field.
  */
 
-import { ALL_LETTERS, ALL_DIGITS, LEARNING_ORDER } from './morseAlphabet'
+import { ALL_LETTERS, ALL_DIGITS, LEARNING_ORDER, LEARNING_STAGES } from './morseAlphabet'
 
 export type MethodId = 'signal' | 'koch' | 'alphabetical'
 
@@ -22,15 +22,37 @@ export interface LearningMethod {
   /** Characters in teaching order. */
   order: readonly string[]
   /**
-   * Characters to start with. Koch is famously two; the others build up from
-   * one layer of the tree.
+   * Characters to start with. Koch is famously two; the others start with
+   * their first stage, which is also two.
    */
   startingCount: number
   /**
-   * Accuracy at which the next character is added, 0..1. Koch's defining rule
-   * is 90%; the others unlock by stage rather than by score.
+   * Accuracy at which more characters are added, 0..1, or null for a method
+   * that never unlocks on score. Every built-in method uses Koch's 90%; what
+   * differs is how much one unlock adds, which is what `stages` decides.
    */
   unlockAccuracy: number | null
+  /**
+   * Cumulative pool sizes, one per stage, from `startingCount` up to
+   * `order.length`. An unlock jumps to the next boundary, so a learner always
+   * holds whole stages.
+   *
+   * Absent for Koch, whose defining rule is one character at a time.
+   */
+  stages?: readonly number[]
+}
+
+/** `total` split into groups of `size`, the last holding whatever is left. */
+function groupsOf(size: number, total: number): number[] {
+  const groups: number[] = []
+  for (let left = total; left > 0; left -= size) groups.push(Math.min(size, left))
+  return groups
+}
+
+/** Running totals of group sizes: [2, 4, 8] becomes [2, 6, 14]. */
+function cumulative(sizes: readonly number[]): number[] {
+  let total = 0
+  return sizes.map((size) => (total += size))
 }
 
 /**
@@ -90,7 +112,12 @@ export const METHODS: Record<MethodId, LearningMethod> = {
       'Follows the structure of the code itself: E and T, then every two-element character, then every three. You finish each stage having completed a whole layer of the Morse tree, which is why the tree lights up in rings rather than at random. Best if you want the alphabet to make sense rather than just be memorised.',
     order: [...LEARNING_ORDER, ...ALL_DIGITS],
     startingCount: 2,
-    unlockAccuracy: null,
+    unlockAccuracy: 0.9,
+    // One layer of the tree per stage, exactly as the lesson teaches them, then
+    // the digits as the five-element layer. Splitting a layer would undo the
+    // point of the order: the learner would hold half a ring of the tree and be
+    // drilled against neighbours they have not met yet.
+    stages: cumulative([...LEARNING_STAGES.map((stage) => stage.length), ALL_DIGITS.length]),
   },
   koch: {
     id: 'koch',
@@ -110,7 +137,16 @@ export const METHODS: Record<MethodId, LearningMethod> = {
       'The order you already know, which makes it easy to track what you have covered. It is the weakest of the three for actually learning: A, B and C sound nothing alike in difficulty, so the load jumps around unpredictably. Included because people ask for it.',
     order: [...ALL_LETTERS, ...ALL_DIGITS],
     startingCount: 2,
-    unlockAccuracy: null,
+    unlockAccuracy: 0.9,
+    // Four letters at a time, then the digits in two halves. The alphabet has
+    // no layers to follow, and a dozen unrelated letters at once (the size of
+    // the Signal order's four-element stage) would be a wall here, because
+    // these do not share a length the way a tree layer does.
+    stages: cumulative([
+      2,
+      ...groupsOf(4, ALL_LETTERS.length - 2),
+      ...groupsOf(Math.ceil(ALL_DIGITS.length / 2), ALL_DIGITS.length),
+    ]),
   },
 }
 
@@ -134,18 +170,54 @@ export function activeCharacters(method: LearningMethod, unlocked: number): stri
 }
 
 /**
- * Whether the next character should be unlocked.
+ * The fewest answers a session needs before it can unlock anything. Every
+ * place that states the rule interpolates this rather than retyping it.
+ */
+export const MIN_UNLOCK_ATTEMPTS = 25
+
+/**
+ * Whether the next unlock is earned: one character for Koch, the next whole
+ * stage for the staged methods (see `nextUnlockCount`).
  *
- * Only meaningful for methods with an accuracy rule. A minimum number of
- * attempts is required as well: 100% over three answers is luck, and unlocking
- * on it would hand someone the whole alphabet in a minute.
+ * A minimum number of attempts is required as well: 100% over three answers is
+ * luck, and unlocking on it would hand someone the whole alphabet in a minute.
  */
 export function shouldUnlock(
   method: LearningMethod,
   accuracy: number,
   attempts: number,
-  minimumAttempts = 25,
+  minimumAttempts = MIN_UNLOCK_ATTEMPTS,
 ): boolean {
   if (method.unlockAccuracy === null) return false
   return attempts >= minimumAttempts && accuracy >= method.unlockAccuracy
+}
+
+/**
+ * The `unlocked` count after one more unlock, never past the end of the order.
+ *
+ * Koch adds a character. A staged method moves to the next stage boundary. A
+ * count that sits between boundaries (an old import, say) is rounded up to the
+ * end of its own stage rather than past the next one, so nobody skips a stage
+ * they were never given whole.
+ */
+export function nextUnlockCount(method: LearningMethod, unlocked: number): number {
+  const limit = method.order.length - method.startingCount
+  // NaN would fail open: every comparison with it is false, so a staged method
+  // would find no boundary and unlock everything. Treat it as nothing earned.
+  const safe = Number.isFinite(unlocked) ? unlocked : unlocked > 0 ? limit : 0
+  const current = Math.min(Math.max(Math.floor(safe), 0), limit)
+  if (current >= limit) return limit
+  if (!method.stages) return current + 1
+
+  const active = method.startingCount + current
+  const boundary = method.stages.find((size) => size > active) ?? method.order.length
+  return Math.min(boundary, method.order.length) - method.startingCount
+}
+
+/** Which stage, from 0, a pool of `unlocked` extra characters is in. */
+export function stageIndex(method: LearningMethod, unlocked: number): number {
+  const active = activeCharacters(method, unlocked).length
+  if (!method.stages) return active - method.startingCount
+  const index = method.stages.findIndex((size) => size >= active)
+  return index === -1 ? method.stages.length - 1 : index
 }

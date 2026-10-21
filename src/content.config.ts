@@ -15,11 +15,21 @@ const blog = defineCollection({
   loader: glob({ base: './src/content/blog', pattern: '**/*.md' }),
   schema: z.object({
     title: z.string().max(70, 'Titles over 70 characters get truncated in search results'),
+    /**
+     * The `<title>` when it should differ from the H1. The H1 stays in the
+     * author's voice; this is the version written for a results page ("What Does
+     * SOS Stand For? ..."). Without the " | MorseForge" suffix, which the
+     * template appends only while the whole title stays within 60 characters.
+     */
+    seoTitle: z
+      .string()
+      .max(60, 'Titles over 60 characters get truncated in search results')
+      .optional(),
     /** Used as the meta description and the og:description. */
     description: z
       .string()
       .min(70, 'Too short to be a useful search snippet')
-      .max(165, 'Over 165 characters gets truncated in search results'),
+      .max(155, 'Over 155 characters gets truncated in search results'),
     published: z.coerce.date(),
     updated: z.coerce.date().optional(),
     /**

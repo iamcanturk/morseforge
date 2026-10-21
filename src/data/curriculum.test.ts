@@ -97,6 +97,44 @@ describe('CURRICULUM', () => {
   })
 })
 
+/**
+ * Sentences in the plan's own prose that are claims about the plan, asserted so
+ * they cannot drift. "The longest day" was once written under day five while
+ * day six asks for exactly as long.
+ */
+describe('claims the plan makes about itself', () => {
+  const longest = Math.max(...CURRICULUM.map((day) => day.minutes))
+  const longestDays = CURRICULUM.filter((day) => day.minutes === longest).map((day) => day.day)
+
+  it('shares the longest day between days five and six', () => {
+    expect(longestDays).toEqual([5, 6])
+  })
+
+  it('says so on day five, rather than claiming the title outright', () => {
+    const summary = CURRICULUM[4]!.summary
+    expect(summary).toContain('longest day of the plan')
+    expect(summary).toContain('Together with day six')
+  })
+
+  it('teaches the most characters on day seven', () => {
+    const counts = CURRICULUM.map((day) => day.characters.length)
+    expect(counts.indexOf(Math.max(...counts))).toBe(6)
+  })
+
+  it('has taught fourteen of the twenty-six letters by the end of day four', () => {
+    // Day four's summary says exactly this.
+    expect(CURRICULUM[3]!.summary).toContain('fourteen of the twenty-six letters')
+    const letters = charactersThroughDay(4).filter((character) => /[A-Z]/.test(character))
+    expect(letters).toHaveLength(14)
+  })
+
+  it('asks for between ten and twenty-five minutes a day', () => {
+    // The how-long post quotes this range; blogClaims.test.ts reads it too.
+    expect(Math.min(...CURRICULUM.map((day) => day.minutes))).toBe(10)
+    expect(longest).toBe(25)
+  })
+})
+
 describe('charactersThroughDay', () => {
   it('accumulates', () => {
     expect(charactersThroughDay(1)).toEqual(['E', 'T'])

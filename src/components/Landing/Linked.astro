@@ -1,0 +1,62 @@
+---
+/**
+ * A registry paragraph with its link phrases turned into links.
+ *
+ * `LANDING` keeps each quotable paragraph as plain text plus the phrases to
+ * link, so the words can be checked by tests and quoted by an answer engine
+ * without markup in the way. This puts the links back — on plain strings,
+ * never by parsing HTML.
+ */
+import type { LandingParagraph } from '../../config/landing'
+
+export interface Props {
+  paragraph: LandingParagraph
+  class?: string
+}
+
+const { paragraph, class: className } = Astro.props
+
+type Part = { text: string; href?: string }
+
+function parts(text: string, links: LandingParagraph['links'] = []): Part[] {
+  let out: Part[] = [{ text }]
+  for (const link of links) {
+    const next: Part[] = []
+    let done = false
+    for (const part of out) {
+      const at = done || part.href ? -1 : part.text.indexOf(link.text)
+      if (at < 0) {
+        next.push(part)
+        continue
+      }
+      done = true
+      if (at > 0) next.push({ text: part.text.slice(0, at) })
+      next.push({ text: link.text, href: link.href })
+      const rest = part.text.slice(at + link.text.length)
+      if (rest) next.push({ text: rest })
+    }
+    out = next
+  }
+  return out
+}
+
+const external = (href: string) => /^https?:\/\//.test(href)
+---
+
+<p class={className}>
+  {
+    parts(paragraph.text, paragraph.links).map((part) =>
+      part.href ? (
+        <a
+          href={part.href}
+          class="text-signal underline decoration-signal/40 underline-offset-4 hover:decoration-signal"
+          {...(external(part.href) ? { rel: 'noopener' } : {})}
+        >
+          {part.text}
+        </a>
+      ) : (
+        part.text
+      ),
+    )
+  }
+</p>

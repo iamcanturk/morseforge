@@ -1,9 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AnswerKey } from './AnswerKey'
+import { bringIntoView } from './bringIntoView'
+import { Screen } from '../ui/Screen'
+import { Lamp } from '../ui/Lamp'
+import { SignalLamp } from '../ui/SignalLamp'
+import { useTransmitter } from '../ui/transmitter'
 import type { UseCopySessionResult } from './useCopySession'
-import { AudioEngine } from '../../engine/audioEngine'
 import { encode } from '../../engine/morseEncoder'
 import { estimateDuration } from '../../engine/timingEngine'
+import { type SettingsRecord, hasLamp, hasSound } from '../../storage/settings'
 
 /**
  * One line of copy practice: send it, take an answer, show the answer key.
@@ -15,63 +20,64 @@ import { estimateDuration } from '../../engine/timingEngine'
  */
 
 export interface RoundAudio {
+  /** The learner's settings: the Signal mode, tone and volume come from here. */
+  settings: SettingsRecord
+  /** The speed of the line. The daily sets its own; free copy uses the settings'. */
   wpm: number
   farnsworthWpm: number
-  enabled: boolean
-  frequency: number
-  volume: number
 }
 
 export function useCopyRound(session: UseCopySessionResult, audio: RoundAudio) {
   const { status, current } = session
 
   const [typed, setTyped] = useState('')
-  const [sending, setSending] = useState(false)
   const [plays, setPlays] = useState(0)
 
-  const engine = useRef<AudioEngine | null>(null)
-  const stopPlayback = useRef<(() => void) | null>(null)
+  // One timeline for the tone and the lamp, from the Signal setting
+  // (DEC-045). With Signal = Lamp the line flashes in silence instead of
+  // being "sent" to nobody.
+  const transmitter = useTransmitter(audio.settings)
+  const { transmit, stop: halt } = transmitter
   const input = useRef<HTMLInputElement>(null)
   const advance = useRef<HTMLButtonElement>(null)
 
   // Held in a ref so the play callback keeps a stable identity: it is called
   // from an effect keyed on the prompt, and re-sending a line because the
   // volume slider moved would be maddening.
-  const settings = useRef(audio)
-  settings.current = audio
+  const timing = useRef({ wpm: audio.wpm, farnsworthWpm: audio.farnsworthWpm })
+  timing.current = { wpm: audio.wpm, farnsworthWpm: audio.farnsworthWpm }
 
-  useEffect(() => () => void engine.current?.dispose(), [])
+  // A second press restarts rather than overlapping: two copies of the same
+  // line a beat apart are unreadable. The transmitter restarts by itself.
+  const play = useCallback(
+    (text: string) => {
+      setPlays((count) => count + 1)
+      return transmit(encode(text), timing.current)
+    },
+    [transmit],
+  )
 
-  const play = useCallback(async (text: string) => {
-    const { enabled, frequency, volume, wpm, farnsworthWpm } = settings.current
-    if (!enabled) return
+  /** Whether this line is the first of its run, read when the line appears. */
+  const firstLine = useRef(true)
+  firstLine.current = session.results.length === 0
 
-    engine.current ??= new AudioEngine({ frequency, volume })
-    engine.current.update({ frequency, volume })
-
-    // A second press restarts rather than overlapping — two copies of the same
-    // line playing a beat apart is unreadable.
-    stopPlayback.current?.()
-    setSending(true)
-    setPlays((count) => count + 1)
-    try {
-      const playback = await engine.current.play(encode(text), { wpm, farnsworthWpm })
-      stopPlayback.current = playback.stop
-      await playback.finished
-    } finally {
-      stopPlayback.current = null
-      setSending(false)
-    }
-  }, [])
+  // The line stops sounding once it is answered, given up or ended: the
+  // answer key on screen and the tail of the line still playing do not mix.
+  useEffect(() => {
+    if (status !== 'running') halt()
+  }, [status, halt])
 
   // Send each line as it appears. The AudioContext is unlocked by then, since
-  // a session only starts from a press.
+  // a session only starts from a press. The first line of a run brings the
+  // whole instrument into view (V-01); later lines leave the page where the
+  // learner put it, since the field is already in view.
   useEffect(() => {
     if (status !== 'running' || current === null) return
     setPlays(0)
     setTyped('')
     void play(current)
-    input.current?.focus()
+    if (firstLine.current) bringIntoView(input.current?.closest('section') ?? null, input.current)
+    else input.current?.focus()
   }, [current, status, play])
 
   // Move focus to the continue button while the answer key is up, so a whole
@@ -93,7 +99,19 @@ export function useCopyRound(session: UseCopySessionResult, audio: RoundAudio) {
     [current, audio.wpm, audio.farnsworthWpm],
   )
 
-  return { typed, setTyped, sending, plays, estimate, play, input, advance }
+  return {
+    typed,
+    setTyped,
+    sending: transmitter.busy,
+    lit: transmitter.lit,
+    sound: hasSound(audio.settings),
+    lamp: hasLamp(audio.settings),
+    plays,
+    estimate,
+    play,
+    input,
+    advance,
+  }
 }
 
 export type CopyRound = ReturnType<typeof useCopyRound>
@@ -109,109 +127,135 @@ export function CopyRound({
   nextLabel: string
 }) {
   const { status, current, lastGrade } = session
-  const { typed, setTyped, sending, plays, estimate, play, input, advance } = round
+  const { typed, setTyped, sending, lit, sound, lamp, plays, estimate, play, input, advance } =
+    round
 
-  if (status === 'reviewing' && lastGrade) {
-    return (
-      <div className="mt-8">
-        {/* Focus moves to the continue button below, which meant the grade
-            itself was skipped silently — the one thing worth hearing. */}
-        <div
-          aria-live="polite"
-          className="rounded-xl border p-5"
-          style={{
-            borderColor: lastGrade.perfect ? 'var(--color-signal)' : 'var(--color-danger)',
-          }}
-        >
-          <p className="font-mono text-[10px] tracking-[0.18em] text-muted">SENT</p>
+  const helpId = useId()
+  const reviewing = status === 'reviewing' && lastGrade !== null
+  const lost = reviewing ? [...new Set(lastGrade.missed)] : []
+
+  return (
+    <div className="mt-6">
+      {/* Focus moves to the continue button once a line is graded, which
+          would skip the grade itself — the one thing worth hearing. A live
+          region only announces changes to itself, so this one is mounted for
+          the whole round and its text changes, rather than mounting with it. */}
+      <p className="sr-only" aria-live="polite">
+        {reviewing ? gradeAnnouncement(lastGrade, lost) : ''}
+      </p>
+      {reviewing ? (
+        <div>
+          <div className="flex min-h-14 flex-wrap items-center justify-between gap-3">
+            <span className="mf-engraved">Answer key</span>
+            {lastGrade.perfect ? (
+              <span className="mf-stamp mf-stamp-in text-signal">Clean copy</span>
+            ) : (
+              <span className="font-mono text-control text-ink tabular-nums">
+                {lastGrade.hits} of {lastGrade.total} characters
+              </span>
+            )}
+          </div>
+
           <div className="mt-3">
             <AnswerKey grade={lastGrade} />
           </div>
 
-          <p
-            className="mt-4 font-mono text-xs tracking-[0.14em]"
-            style={{ color: lastGrade.perfect ? 'var(--color-signal)' : 'var(--color-danger)' }}
-          >
-            {lastGrade.perfect ? 'CLEAN COPY' : `${lastGrade.hits} / ${lastGrade.total} CHARACTERS`}
-          </p>
-
-          {!lastGrade.perfect && lastGrade.missed.length > 0 && (
-            <p className="mt-2 text-xs leading-relaxed text-muted">
-              Lost: {[...new Set(lastGrade.missed)].join(', ')}
+          {!lastGrade.perfect && lost.length > 0 && (
+            <p className="mt-4 text-sm leading-relaxed text-muted">
+              Got past you: <span className="font-mono text-ink">{lost.join(' ')}</span>
             </p>
           )}
+
+          <button
+            ref={advance}
+            type="button"
+            onClick={session.next}
+            className="mf-btn mf-btn-primary mf-btn-lg mf-btn-block mt-6"
+          >
+            {nextLabel}
+          </button>
         </div>
-
-        <button
-          ref={advance}
-          type="button"
-          onClick={session.next}
-          className="mt-6 w-full rounded-lg px-6 py-3.5 font-mono text-sm tracking-[0.16em] text-void"
-          style={{ background: 'var(--color-signal)' }}
-        >
-          {nextLabel}
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <>
-      <div className="mt-8 flex flex-col items-center gap-3">
-        <button
-          type="button"
-          onClick={() => current && void play(current)}
-          className="rounded-lg border px-6 py-3 font-mono text-xs tracking-[0.14em] transition-colors"
-          style={{
-            borderColor: sending
-              ? 'var(--color-cyan)'
-              : 'color-mix(in srgb, var(--color-cyan) 40%, transparent)',
-            color: sending ? 'var(--color-void)' : 'var(--color-cyan)',
-            background: sending ? 'var(--color-cyan)' : 'transparent',
+      ) : (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            session.submit(typed)
           }}
         >
-          {sending ? '♪ SENDING' : '▶ SEND IT AGAIN'}
-        </button>
+          <Screen grid className="p-5 sm:p-7">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="mf-engraved flex items-center gap-2">
+                <Lamp on={sending} tone="cyan" />
+                {sending ? (sound ? 'Receiving' : 'Receiving · watch') : 'Line received'}
+              </span>
+              <span className="font-mono text-label tracking-label text-muted uppercase">
+                {plays <= 1 ? `About ${estimate}s` : `${sound ? 'Heard' : 'Seen'} ${plays} times`}
+              </span>
+            </div>
 
-        <p className="font-mono text-[10px] tracking-[0.14em] text-muted">
-          {plays <= 1 ? `ABOUT ${estimate}s` : `HEARD IT ${plays}×`}
-        </p>
-      </div>
+            {lamp && (
+              <div className="relative z-[3] mt-5 flex justify-center">
+                <SignalLamp lit={lit} />
+              </div>
+            )}
 
-      <form
-        className="mt-8"
-        onSubmit={(event) => {
-          event.preventDefault()
-          session.submit(typed)
-        }}
-      >
-        <label htmlFor="copy-answer" className="sr-only">
-          Type what you copied
-        </label>
-        <input
-          id="copy-answer"
-          ref={input}
-          value={typed}
-          onChange={(event) => setTyped(event.target.value)}
-          autoCapitalize="characters"
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-          placeholder="what did you get?"
-          className="w-full rounded-lg border border-line bg-elevated px-4 py-4 text-center font-mono text-2xl tracking-[0.18em] uppercase outline-none placeholder:text-sm placeholder:tracking-normal placeholder:normal-case focus:border-signal"
-        />
-        <button
-          type="submit"
-          className="mt-4 w-full rounded-lg px-6 py-3 font-mono text-xs tracking-[0.14em] text-void"
-          style={{ background: 'var(--color-signal)' }}
-        >
-          CHECK IT
-        </button>
-        <p className="mt-3 text-center text-xs text-muted">
-          Submit an empty answer if you got nothing — it counts, and nothing is lost by being honest
-          about it.
-        </p>
-      </form>
-    </>
+            <label htmlFor="copy-answer" className="sr-only">
+              Type what you copied
+            </label>
+            <input
+              id="copy-answer"
+              ref={input}
+              value={typed}
+              onChange={(event) => setTyped(event.target.value)}
+              // Up sends the line again without leaving the box (AI-2): the
+              // field has one line, so the arrow has nothing else to do.
+              onKeyDown={(event) => {
+                if (event.key !== 'ArrowUp' || event.altKey || event.ctrlKey || event.metaKey)
+                  return
+                if (event.shiftKey || current === null) return
+                event.preventDefault()
+                void play(current)
+              }}
+              aria-describedby={helpId}
+              autoCapitalize="characters"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="Type what you copied"
+              className="mf-input-answer mf-f-answer relative z-[3] mt-5"
+            />
+          </Screen>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-[auto_1fr]">
+            <button
+              type="button"
+              onClick={() => current && void play(current)}
+              className="mf-btn mf-btn-audio mf-btn-lg"
+              aria-label={sending ? 'Sending, press to start the line again' : undefined}
+            >
+              <Lamp on={sending} tone="cyan" />
+              {sending ? 'Sending' : 'Send it again'}
+            </button>
+            <button type="submit" className="mf-btn mf-btn-primary mf-btn-lg">
+              Check it
+            </button>
+          </div>
+          <p id={helpId} className="mt-3 text-sm text-muted">
+            The up arrow in the box sends the line again. Got nothing? Submit it empty. It counts,
+            and nothing is lost by being honest about it.
+          </p>
+        </form>
+      )}
+    </div>
   )
+}
+
+/** What the live region says when a line is graded: the verdict, then what was missed. */
+export function gradeAnnouncement(
+  grade: { perfect: boolean; hits: number; total: number },
+  lost: readonly string[],
+): string {
+  if (grade.perfect) return 'Clean copy.'
+  const score = `${grade.hits} of ${grade.total} characters.`
+  return lost.length > 0 ? `${score} Got past you: ${lost.join(' ')}.` : score
 }

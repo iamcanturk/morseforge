@@ -1,76 +1,100 @@
 ---
+import '../../styles/pkg-i.css'
 import { getCollection } from 'astro:content'
 import BaseLayout from '../../layouts/BaseLayout.astro'
-import { AUTHOR, SITE } from '../../config/site'
+import PageShell from '../../components/PageShell.astro'
+import { breadcrumbTrail, getPage } from '../../config/pages'
+import { AUTHOR } from '../../config/site'
+import { IDS, absoluteUrl, breadcrumbs, webPage } from '../../seo/schema'
 
-const path = '/blog/'
-const title = 'Morse Code Notes — Learning, Timing and Technique | MorseForge'
-const description =
-  'Notes on learning Morse code properly: why charts fail, what Farnsworth timing is for, and how to get past the wall every beginner hits around 10 words per minute.'
+/**
+ * The notes, as the contents page of an operator's manual: numbered in the
+ * order they were written, newest first.
+ */
+const page = getPage('/blog/')
+const trail = breadcrumbTrail(page.path)
 
 // Drafts are excluded at build time, so an unfinished post never reaches the
 // index, the sitemap or a crawler.
-const posts = (await getCollection('blog', ({ data }) => !data.draft)).sort(
-  (a, b) => b.data.published.getTime() - a.data.published.getTime(),
+const published = (await getCollection('blog', ({ data }) => !data.draft)).sort(
+  (a, b) => a.data.published.getTime() - b.data.published.getTime(),
 )
+// Numbered oldest first (the same numbers the posts carry), listed newest first.
+const posts = published.map((post, index) => ({ post, number: index + 1 })).reverse()
 
 const formatDate = (date: Date) =>
   date.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })
 
 const schema = [
+  webPage({
+    path: page.path,
+    name: page.h1,
+    description: page.description,
+    type: 'CollectionPage',
+    mainEntityId: `${absoluteUrl(page.path)}#blog`,
+  }),
   {
     '@context': 'https://schema.org',
     '@type': 'Blog',
-    name: 'MorseForge Notes',
-    description,
-    url: new URL(path, SITE.url).href,
-    author: { '@id': `${SITE.url}/#author` },
-    isPartOf: { '@id': `${SITE.url}/#website` },
-    blogPost: posts.map((post) => ({
+    '@id': `${absoluteUrl(page.path)}#blog`,
+    name: `${page.h1}`,
+    description: page.description,
+    url: absoluteUrl(page.path),
+    author: { '@id': IDS.author },
+    isPartOf: { '@id': IDS.website },
+    blogPost: posts.map(({ post }) => ({
       '@type': 'BlogPosting',
       headline: post.data.title,
       description: post.data.description,
-      datePublished: post.data.published.toISOString(),
-      url: `${SITE.url}/blog/${post.id}/`,
-      author: { '@id': `${SITE.url}/#author` },
+      datePublished: post.data.published.toISOString().slice(0, 10),
+      url: absoluteUrl(`/blog/${post.id}/`),
+      author: { '@id': IDS.author },
     })),
   },
+  breadcrumbs(trail),
 ]
 ---
 
-<BaseLayout title={title} description={description} path={path} schema={schema}>
-  <main class="mx-auto max-w-3xl px-6 py-14">
-    <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Notes</h1>
-    <p class="mt-4 max-w-2xl leading-relaxed text-muted">
-      What actually works when learning Morse code, and why — written while building the trainer, by {
-        AUTHOR.name
-      }.
-    </p>
-
-    {
-      posts.length === 0 ? (
-        <p class="mt-12 font-mono text-xs tracking-[0.16em] text-muted">NOTHING PUBLISHED YET</p>
-      ) : (
-        <ul class="mt-12 space-y-4">
-          {posts.map((post) => (
-            <li>
-              <a
-                href={`/blog/${post.id}/`}
-                class="block rounded-xl border border-line bg-panel p-6 transition-colors hover:border-signal-dim"
-              >
+<BaseLayout title={page.title} description={page.description} path={page.path} schema={schema}>
+  <PageShell
+    width="tool"
+    trail={trail}
+    eyebrow={`Operator's manual · by ${AUTHOR.name}`}
+    h1={page.h1}
+    intro={page.intro}
+    instrumentClass="max-w-4xl"
+  >
+    <section aria-labelledby="contents-heading" class="mf-instrument px-5 py-6 sm:px-10 sm:py-9">
+      <h2 id="contents-heading" class="mf-engraved">Contents</h2>
+      {
+        posts.length === 0 ? (
+          <p class="mt-6 text-muted">Nothing is published yet.</p>
+        ) : (
+          <ol class="mt-5">
+            {posts.map(({ post, number }) => (
+              <li class="pi-toc-row">
+                <span class="font-mono text-h3 text-brass tabular-nums" aria-hidden="true">
+                  {String(number).padStart(2, '0')}
+                </span>
+                <div class="min-w-0">
+                  <h3 class="pi-balance font-display text-h3 font-bold text-ink">
+                    <a href={`/blog/${post.id}/`} class="pi-toc-title">
+                      {post.data.title}
+                    </a>
+                  </h3>
+                  <p class="pi-pretty mt-2 leading-relaxed text-muted">{post.data.description}</p>
+                </div>
                 <time
                   datetime={post.data.published.toISOString()}
-                  class="font-mono text-[10px] tracking-[0.16em] text-signal-dim"
+                  class="mf-engraved whitespace-nowrap md:text-right"
                 >
-                  {formatDate(post.data.published).toUpperCase()}
+                  {formatDate(post.data.published)}
                 </time>
-                <h2 class="mt-2 font-display text-xl font-semibold text-ink">{post.data.title}</h2>
-                <p class="mt-2 leading-relaxed text-muted">{post.data.description}</p>
-              </a>
-            </li>
-          ))}
-        </ul>
-      )
-    }
-  </main>
+              </li>
+            ))}
+          </ol>
+        )
+      }
+    </section>
+  </PageShell>
 </BaseLayout>

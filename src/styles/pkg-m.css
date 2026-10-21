@@ -1,0 +1,352 @@
+/*
+ * Package M: the wire-office desk on /message/.
+ *
+ * Only what the shared Signal Office classes lack: the telegram form, the
+ * tape cells, the receiver lamp, and the paper slips. Colours come from the
+ * global tokens; nothing here animates anything but transform and opacity
+ * (the shared moment classes do the moving).
+ *
+ * Paper is the same stock in both themes, so everything printed on it uses
+ * the paper tokens, never the theme's ink, and the focus ring turns to ink on
+ * paper: the theme's amber ring is too pale to see on cream.
+ */
+
+/* ---- Page states ------------------------------------------------------- */
+
+/* Without JavaScript the desk cannot work, so it is not shown at all; the
+   noscript block explains instead. The inline script on the page sets
+   html[data-message] before the desk is painted. */
+html:not([data-message]) .mfm-live {
+  display: none;
+}
+
+/* Someone opening a message wants the message, not the pitch for writing one.
+   The page shell's heading, crumbs and intro stay in the document for
+   assistive technology and search; they are only taken out of the way
+   visually, and the desk moves up into their place. */
+html[data-message='incoming'] .mf-page:has(.mfm-live) > .mf-page-head,
+html[data-message='incoming'] .mf-page:has(.mfm-live) > .mf-page-intro {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+html[data-message='incoming'] .mf-page:has(.mfm-live) > .mf-page-instrument {
+  margin-block-start: 0;
+}
+
+/* ---- Paper surfaces ----------------------------------------------------- */
+
+.mfm-form,
+.mfm-slip {
+  position: relative;
+  border-radius: 6px;
+  background-color: var(--color-paper);
+  color: var(--color-paper-ink);
+  box-shadow:
+    0 1px 0 rgb(0 0 0 / 0.35),
+    0 18px 30px -22px rgb(0 0 0 / 0.8),
+    inset 0 0 0 1px color-mix(in srgb, var(--color-paper-ink) 16%, transparent);
+}
+
+[data-theme='light'] .mfm-form,
+[data-theme='light'] .mfm-slip {
+  box-shadow:
+    inset 0 0 0 1px var(--color-line-strong),
+    0 14px 24px -20px rgb(60 40 10 / 0.5);
+}
+
+.mfm-slip {
+  padding: 1.25rem 1.25rem 1.5rem;
+}
+
+/* The slip's header band: title and stamp over a printed rule. On a phone the
+   stamp drops under the title rather than squeezing it. */
+.mfm-slip-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+  padding-bottom: 0.875rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-paper-ink) 22%, transparent);
+}
+
+@media (min-width: 640px) {
+  .mfm-slip {
+    padding: 1.5rem 1.75rem 1.75rem;
+  }
+}
+
+.mfm-form {
+  padding: 1rem 1.25rem 0.75rem;
+}
+
+.mfm-form :focus-visible,
+.mfm-slip :focus-visible,
+.mfm-tape :focus-visible,
+.mfm-slip:focus-visible {
+  outline-color: var(--color-paper-ink);
+}
+
+.mfm-form:focus-within {
+  outline: 2px solid var(--color-amber);
+  outline-offset: 3px;
+}
+
+.mfm-form-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  line-height: var(--text-label--line-height);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-paper-muted);
+}
+
+/* The message field: typed onto ruled telegram stock. */
+.mfm-form-field {
+  display: block;
+  inline-size: 100%;
+  margin-top: 0.5rem;
+  padding: 0;
+  border: 0;
+  resize: none;
+  background-color: transparent;
+  background-image: linear-gradient(
+    to bottom,
+    transparent calc(2.25rem - 1px),
+    color-mix(in srgb, var(--color-paper-ink) 22%, transparent) calc(2.25rem - 1px)
+  );
+  background-size: 100% 2.25rem;
+  background-attachment: local;
+  color: var(--color-paper-ink);
+  caret-color: var(--color-paper-ink);
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  line-height: 2.25rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mfm-form-field:focus,
+.mfm-form-field:focus-visible {
+  /* The ring is on the whole form (:focus-within above). */
+  outline: none;
+}
+
+.mfm-form-field::placeholder {
+  color: var(--color-paper-muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.mfm-form-note {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+}
+
+/* A red that still reads on cream in the dark theme, where the lamp red is
+   too light for paper. */
+.mfm-paper-danger {
+  color: color-mix(in srgb, var(--color-danger) 55%, var(--color-paper-ink));
+}
+
+/* ---- Tape ---------------------------------------------------------------- */
+
+.mfm-tape {
+  padding: 1.75rem 1.75rem 1rem 1rem;
+}
+
+.mfm-cell {
+  display: inline-flex;
+  min-inline-size: 2.25rem;
+  min-block-size: 3.5rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+  padding: 0.25rem 0.375rem;
+  border-radius: 4px;
+  color: var(--color-paper-ink);
+}
+
+button.mfm-cell {
+  cursor: pointer;
+  /* A press sinks the cell a hair; the colour change below is instant. */
+  transition: transform var(--duration-dit) var(--ease-signal);
+}
+
+button.mfm-cell:hover {
+  background-color: color-mix(in srgb, var(--color-paper-ink) 8%, transparent);
+}
+
+button.mfm-cell:active {
+  transform: translateY(1px);
+}
+
+.mfm-cell[data-active='true'] {
+  background-color: var(--color-paper-ink);
+  color: var(--color-paper);
+}
+
+.mfm-code {
+  font-family: var(--font-mono);
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.25rem;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.mfm-slot {
+  display: grid;
+  min-block-size: 1.75rem;
+  place-items: end center;
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.mfm-blank {
+  display: block;
+  inline-size: 1.1rem;
+  block-size: 2px;
+  margin-bottom: 0.2rem;
+  background-color: currentColor;
+  opacity: 0.45;
+}
+
+/* ---- Receiver ------------------------------------------------------------ */
+
+/* The visual channel. Small on purpose: a lamp keyed at reading speed flashes
+   faster than three times a second, and WCAG 2.3.1 allows that only over a
+   small area. The glow is static; only its layer's opacity flips. */
+.mfm-receiver-lamp {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  border-radius: 999px;
+  background: radial-gradient(
+    circle at 35% 30%,
+    color-mix(in srgb, var(--color-signal) 18%, var(--color-screen)),
+    var(--color-screen) 70%
+  );
+  box-shadow:
+    inset 0 0 0 2px var(--color-line-strong),
+    inset 0 2px 4px rgb(0 0 0 / 0.7);
+}
+
+.mfm-receiver-lamp::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at 40% 35%,
+    color-mix(in srgb, var(--color-signal) 30%, var(--color-ink)),
+    var(--color-signal) 55%
+  );
+  box-shadow: 0 0 18px var(--color-signal);
+  opacity: 0;
+}
+
+.mfm-receiver-lamp[data-on='true']::after {
+  opacity: 1;
+}
+
+/* A primary button set into the CRT: the screen keeps its dark glass in the
+   light theme, so the label takes the glass colour, not the light page's. */
+.mf-screen .mfm-screen-btn {
+  color: var(--color-screen);
+}
+
+/* ---- Slip contents ------------------------------------------------------- */
+
+.mfm-stamp {
+  font-size: 0.9375rem;
+  box-shadow:
+    inset 0 0 0 2px var(--color-paper),
+    inset 0 0 0 3px currentColor;
+}
+
+.mfm-telegram {
+  font-family: var(--font-mono);
+  font-size: clamp(1.5rem, 1.1rem + 2.2vw, 2.25rem);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
+  color: var(--color-paper-ink);
+}
+
+/* "Replying to": the message being answered, quoted above the form (J-17).
+   On the desk, not on paper: it is context, not part of the new telegram. */
+.mfm-reply {
+  margin: 0;
+  padding-inline-start: 0.875rem;
+  border-inline-start: 3px solid var(--color-line-strong);
+}
+
+.mfm-reply-text {
+  margin: 0.375rem 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-control);
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+  color: var(--color-ink);
+}
+
+.mfm-link {
+  inline-size: 100%;
+  min-block-size: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-paper-muted);
+  border-radius: var(--radius-control);
+  background-color: color-mix(in srgb, var(--color-paper-ink) 6%, var(--color-paper));
+  color: var(--color-paper-ink);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  text-overflow: ellipsis;
+}
+
+/* The site-wide selection colour is tuned for the desk, not for paper. */
+.mfm-link::selection {
+  background-color: var(--color-paper-ink);
+  color: var(--color-paper);
+}
+
+.mfm-btn-paper {
+  border-color: var(--color-paper-ink);
+  background-color: transparent;
+  color: var(--color-paper-ink);
+}
+
+.mfm-earned {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px dashed color-mix(in srgb, var(--color-paper-ink) 30%, transparent);
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+
+/* ---- Standby ------------------------------------------------------------- */
+
+.mfm-standby > div:not(.mf-tape) {
+  opacity: 0.6;
+}

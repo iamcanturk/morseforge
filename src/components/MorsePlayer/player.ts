@@ -17,9 +17,18 @@
 import { AudioEngine } from '../../engine/audioEngine'
 import { buildTimeline, timelineDuration, type TimedElement } from '../../engine/timingEngine'
 import { canVibrate, stopVibration, vibrateTimeline } from '../../engine/vibrationEngine'
+import {
+  type SettingsRecord,
+  WPM_RANGE,
+  audioOptions,
+  createSettingsStore,
+  hasLamp,
+  hasSound,
+} from '../../storage/settings'
 
-export const WPM_MIN = 5
-export const WPM_MAX = 40
+/** The slider's range: the one the settings and every page quote. */
+export const WPM_MIN = WPM_RANGE.min
+export const WPM_MAX = WPM_RANGE.max
 
 export interface Playhead {
   on: boolean
@@ -41,9 +50,85 @@ export function playheadAt(timeline: readonly TimedElement[], elapsedMs: number)
   return { on: false, index: -1 }
 }
 
+/**
+ * How a player starts, from the Signal setting (A-18, DEC-045).
+ *
+ * The player's own Sound and Lamp toggles stay, but they start where the
+ * learner set the site: with Signal = Lamp, Play is silent and the lamp is
+ * on, so a muted classroom or a deaf learner is never surprised by a tone.
+ * A page that asks for the lamp keeps it whatever the setting.
+ */
+export function initialChannels(
+  settings: Pick<SettingsRecord, 'signal'>,
+  flash: boolean,
+): { sound: boolean; lamp: boolean } {
+  return { sound: hasSound(settings), lamp: flash || hasLamp(settings) }
+}
+
+/** The stored settings, or null where there is no storage to read. */
+export function storedSettings(): SettingsRecord | null {
+  try {
+    return createSettingsStore().read()
+  } catch {
+    return null
+  }
+}
+
+/** One press of Play, and whether it is still the one that counts. */
+export interface PlayTicket {
+  isCurrent: () => boolean
+}
+
+/**
+ * Which press of Play is the live one.
+ *
+ * The first press resumes a suspended AudioContext, which can take a
+ * noticeable moment (iOS). Without this, Stop pressed during that wait set the
+ * player back to idle, and then the resolved playback, its end timer and the
+ * lamp started anyway; two quick presses could also sound over each other.
+ * Every press takes a ticket and every stop cancels them all.
+ */
+export function playGate() {
+  let current = 0
+  return {
+    begin(): PlayTicket {
+      current += 1
+      const id = current
+      return { isCurrent: () => id === current }
+    },
+    cancel(): void {
+      current += 1
+    },
+  }
+}
+
+/**
+ * Start a playback for a ticket. Resolves to the playback while the ticket is
+ * still current; to null if the start failed, or if a stop came in while it
+ * was starting, in which case the late playback is silenced at once.
+ */
+export async function startGated<T extends { stop: () => void }>(
+  ticket: PlayTicket,
+  start: () => Promise<T>,
+): Promise<T | null> {
+  let playback: T
+  try {
+    playback = await start()
+  } catch {
+    return null
+  }
+  if (!ticket.isCurrent()) {
+    playback.stop()
+    return null
+  }
+  return playback
+}
+
 interface Parts {
   root: HTMLElement
   play: HTMLButtonElement
+  playLamp: HTMLElement | null
+  playLabel: HTMLElement | null
   sound: HTMLButtonElement
   buzz: HTMLButtonElement
   lamp: HTMLButtonElement
@@ -53,10 +138,11 @@ interface Parts {
   duration: HTMLElement | null
 }
 
-function press(button: HTMLButtonElement, on: boolean, colour: string) {
+/** A toggle's state is aria-pressed plus its own small lamp; the stylesheet does the rest. */
+function press(button: HTMLButtonElement, on: boolean) {
   button.setAttribute('aria-pressed', String(on))
-  button.style.borderColor = on ? colour : 'var(--color-line)'
-  button.style.color = on ? colour : 'var(--color-muted)'
+  const lamp = button.querySelector<HTMLElement>('.mf-lamp')
+  if (lamp) lamp.dataset['on'] = String(on)
 }
 
 /** Wire one player. Returns a teardown, so a page can be swapped safely. */
@@ -68,6 +154,8 @@ export function mountPlayer(root: HTMLElement): () => void {
   const parts: Parts = {
     root,
     play: query<HTMLButtonElement>('play')!,
+    playLamp: query('play-lamp'),
+    playLabel: query('play-label'),
     sound: query<HTMLButtonElement>('sound')!,
     buzz: query<HTMLButtonElement>('buzz')!,
     lamp: query<HTMLButtonElement>('lamp')!,
@@ -77,16 +165,19 @@ export function mountPlayer(root: HTMLElement): () => void {
     duration: query('duration'),
   }
 
+  const settings = storedSettings()
+  const start = initialChannels(settings ?? { signal: 'sound' }, parts.lampBox.hidden === false)
   let wpm = Number(parts.slider.value) || 15
-  let sound = true
+  let sound = start.sound
   let buzz = false
-  let showLamp = parts.lampBox.hidden === false
+  let showLamp = start.lamp
   let playing = false
 
   let audio: AudioEngine | null = null
   let stopPlayback: (() => void) | null = null
   let frame: number | null = null
   let endTimer: ReturnType<typeof setTimeout> | null = null
+  const gate = playGate()
 
   const timeline = () => buildTimeline(morse, { wpm })
 
@@ -94,12 +185,10 @@ export function mountPlayer(root: HTMLElement): () => void {
   // exist: an offer the device cannot honour is worse than no offer.
   if (!canVibrate()) parts.buzz.hidden = true
 
+  // Instant on and off: the lit layer's opacity flips with no transition, so
+  // a dot and a dash read as exactly the lengths they are.
   function setLit(on: boolean) {
-    parts.lampBox.style.borderColor = on ? 'var(--color-signal)' : 'var(--color-line)'
-    parts.lampBox.style.background = on ? 'var(--color-signal)' : 'var(--color-void)'
-    parts.lampBox.style.boxShadow = on
-      ? '0 0 60px color-mix(in srgb, var(--color-signal) 60%, transparent)'
-      : 'none'
+    parts.lampBox.dataset['on'] = String(on)
   }
 
   function stopVisuals() {
@@ -109,6 +198,8 @@ export function mountPlayer(root: HTMLElement): () => void {
   }
 
   function stop() {
+    // Any press still waiting on the audio to start is now stale.
+    gate.cancel()
     if (endTimer !== null) clearTimeout(endTimer)
     endTimer = null
     stopPlayback?.()
@@ -120,13 +211,12 @@ export function mountPlayer(root: HTMLElement): () => void {
   }
 
   function render() {
-    parts.play.textContent = playing ? '■ STOP' : '▶ PLAY'
-    parts.play.style.background = playing ? 'var(--color-line)' : 'var(--color-signal)'
-    parts.play.style.color = playing ? 'var(--color-ink)' : 'var(--color-void)'
+    if (parts.playLamp) parts.playLamp.dataset['on'] = String(playing)
+    if (parts.playLabel) parts.playLabel.textContent = playing ? 'Stop' : 'Play'
 
-    press(parts.sound, sound, 'var(--color-signal)')
-    press(parts.buzz, buzz, 'var(--color-amber)')
-    press(parts.lamp, showLamp, 'var(--color-cyan)')
+    press(parts.sound, sound)
+    press(parts.buzz, buzz)
+    press(parts.lamp, showLamp)
 
     parts.lampBox.hidden = !showLamp
     parts.wpmLabel.textContent = `${wpm} WPM`
@@ -143,6 +233,7 @@ export function mountPlayer(root: HTMLElement): () => void {
 
     const current = timeline()
     const durationMs = timelineDuration(current)
+    const ticket = gate.begin()
     playing = true
     render()
 
@@ -151,8 +242,16 @@ export function mountPlayer(root: HTMLElement): () => void {
     if (sound) {
       // Created inside the handler: a browser only allows an AudioContext to
       // start from a user gesture.
-      audio ??= new AudioEngine()
-      const playback = await audio.playTimeline(current)
+      // At the learner's own tone and volume, like every other tone on the site.
+      const engine = (audio ??= new AudioEngine(settings ? audioOptions(settings) : {}))
+      const playback = await startGated(ticket, () => engine.playTimeline(current))
+      // Stopped while the audio was starting: `stop()` already reset the
+      // player. Failed to start: reset it here, or it would read "Stop" forever.
+      if (!ticket.isCurrent()) return
+      if (!playback) {
+        stop()
+        return
+      }
       stopPlayback = playback.stop
     }
 

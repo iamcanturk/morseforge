@@ -243,3 +243,93 @@ curl -sI https://morse.iamcanturk.dev/ | grep -iE 'strict-transport|content-secu
 All four should appear. If the site breaks instead, remove the
 `Content-Security-Policy` lines first — that is the only one that can stop a
 page working.
+
+---
+
+## The redesign release: operational notes
+
+What changes for the server, and what does not.
+
+### No vhost change is required
+
+The new pages need nothing the current Content-Security-Policy refuses. Share
+cards are drawn on a canvas and handed to the browser as `blob:` URLs, which
+`img-src` already allows; the inline scripts the layout and a few pages use are
+covered by `'unsafe-inline'`; the usage counter calls `/e/` on the same origin.
+Removing `'unsafe-inline'` (hashing or nonce-ing those scripts) is a worthwhile
+hardening, but it is future work, not a condition of this release.
+
+Two optional additions follow. Neither blocks the deploy.
+
+### Optional: redirect `/index.html` to `/`
+
+`/index.html` and `/x/index.html` serve the same document as `/` and `/x/`. The
+canonical tag already tells search engines which one counts, so this is
+tidiness rather than a fix. If you want it, paste this at server level, just
+above the first `location`:
+
+```nginx
+# /index.html and /x/index.html duplicate / and /x/. 301 to the slash URL,
+# keeping any query string. Tested on $request_uri (what the client asked
+# for), so the index module's internal /x/ -> /x/index.html never matches.
+if ($request_uri ~ "^(.*/)index\.html(\?.*)?$") {
+  return 301 $1$2;
+}
+```
+
+It has to test `$request_uri`, not a `location ~ /index\.html$`: the `index`
+directive's internal redirect from `/x/` to `/x/index.html` would match such a
+location and loop. A server-level `if` that only `return`s declares no
+`add_header`, so it inherits the server block's security headers. Confirm:
+
+```bash
+curl -sI https://morse.iamcanturk.dev/index.html | grep -iE '^(HTTP|location|strict-transport)'
+curl -sI https://morse.iamcanturk.dev/words/sos/index.html | grep -iE '^(HTTP|location)'
+```
+
+Expect a `301` with `Location: /` (and `/words/sos/`), and the HSTS header on
+the first. If the headers are missing, use a `location = /index.html { … }`
+that repeats the security `add_header` lines instead, like every other location
+here does.
+
+Separately, the crawler-file location (`^/(robots\.txt|llms\.txt|sitemap.*\.xml)$`)
+does not match `/llms-full.txt`, so that file gets the generic caching rules.
+Widening it to `llms(-full)?\.txt` makes it behave like its sibling.
+
+### Regenerating the brand assets
+
+```bash
+npm run brand
+```
+
+`scripts/make-brand.mjs` redraws the favicon, the touch and PWA icons and both
+social cards (`public/og/default.png`, `public/og/github-social.png`) from
+`src/styles/palette.ts`, the logo geometry and `src/config/site.ts`. It is
+deterministic: two runs give byte-identical files. It rasterises with `sharp`,
+which is pinned as a `devDependency`.
+
+The logo is the Split M plus the wordmark. The mark is geometry in
+`src/components/brand/mark.ts`; the wordmark is Space Grotesk traced to outlines
+in `src/components/brand/wordmarkOutline.ts`, so nothing at runtime needs the
+font. That file is generated, not edited: `node scripts/trace-wordmark.mjs`
+rewrites it, and it only needs running if the name or the display font changes.
+The tracer reads the font through `fontkitten`, which arrives transitively with
+Astro and is patched in memory by `scripts/brand-type.mjs`; the script fails
+loudly if a patch stops matching after an upgrade.
+
+The README hero is `public/og/github-social.png`; GitHub's own social preview is
+set by hand under **Settings → General → Social preview**, and has to be
+re-uploaded after the card changes.
+
+### `lastmod` comes from git
+
+Every `<lastmod>` in the sitemap is the date of the last commit that touched the
+files a page is built from (blog posts use their frontmatter dates). The build
+time is never used, which is what keeps the sitemap identical across two builds
+of the same commit.
+
+So **build after committing**. A page whose sources are uncommitted gets no
+`<lastmod>` rather than a wrong one, and `scripts/check-seo.mjs` prints a
+`WARN … sources are uncommitted` line for each. `npm run deploy` does not check that
+the tree is clean, so commit first: otherwise the deploy ships undated URLs, which
+is harmless to crawlers but throws the freshness signal away.

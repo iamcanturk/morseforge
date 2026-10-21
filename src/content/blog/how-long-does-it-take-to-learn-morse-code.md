@@ -1,7 +1,8 @@
 ---
 title: How long does it take to learn Morse code?
-description: Two hours gets you every character. Copying at a useful speed takes two to three months of short daily sessions — and the second number is the one that matters.
+description: Two hours teaches every Morse character. Copying at a useful speed takes two to three months of short daily sessions, and that is the number that matters.
 published: 2026-08-23
+updated: 2026-10-21
 answer: Learning the 26 letters takes about two hours of practice, spread over a week. Being able to copy them at a useful speed takes two to three months of fifteen-minute daily sessions. Almost everyone quotes the first number and is surprised by the second, because knowing a character and recognising it in half a second are different skills that improve at very different rates.
 tags: [learning, beginners, speed]
 ---
@@ -14,8 +15,8 @@ quit in week three.
 Twenty-six letters is not much to memorise. Spread over seven days in short
 sessions, most people can name every character reliably after roughly two hours
 of total practice. The [seven-day plan](/learn-morse-code-in-7-days/) is built
-around exactly that: two to four new characters a day, fifteen minutes at a
-time.
+around exactly that: two to ten new characters a day, in sessions of ten to
+twenty-five minutes.
 
 That part is genuinely quick, and everyone who writes "learn Morse code in a
 weekend" is talking about this number.
@@ -81,7 +82,7 @@ enough for anything they actually wanted to do.
 ## A realistic first month
 
 1. **Week one** — the [seven-day plan](/learn-morse-code-in-7-days/). All 26
-   letters, fifteen minutes a day.
+   letters and 10 digits, ten to twenty-five minutes a day.
 2. **Weeks two and three** — [practice](/practice/) only, no new characters.
    This feels like standing still and is where the actual learning happens.
 3. **Week four** — start [copying whole lines](/copy/) rather than single

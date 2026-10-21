@@ -1,21 +1,31 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro'
-import { StatsScreen } from '../components/Stats/StatsScreen'
+import PageShell from '../components/PageShell.astro'
+import { StatsScreen, type StatsGame } from '../components/Stats/StatsScreen'
+import { hasPage } from '../components/ui/siteNav'
+import { breadcrumbTrail, getPage } from '../config/pages'
 
-const title = 'Your Progress | MorseForge'
-const description =
-  'Your Morse code progress: level, streak, characters mastered, accuracy, best speed and achievements. Stored in your own browser.'
+const page = getPage('/stats/')
+const trail = breadcrumbTrail(page.path)
+
+/** The games that keep a best, labelled from the registry, only if their page exists. */
+const games: StatsGame[] = (
+  [
+    { id: 'defender', path: '/games/signal-defender/' },
+    { id: 'runner', path: '/games/morse-runner/' },
+  ] as const
+)
+  .filter((game) => hasPage(game.path))
+  .map((game) => ({ id: game.id, label: getPage(game.path).navLabel, href: game.path }))
 ---
 
-<BaseLayout title={title} description={description} path="/stats/">
-  <main class="mx-auto max-w-3xl px-6 py-14">
-    <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Your progress</h1>
-    <p class="mt-3 leading-relaxed text-muted">
-      Everything you have done, kept on this device. No account, no sync, nothing sent anywhere.
-    </p>
-
-    <div class="mt-10">
-      <StatsScreen client:load />
-    </div>
-  </main>
+<BaseLayout
+  title={page.title}
+  description={page.description}
+  path={page.path}
+  noindex={!page.indexable}
+>
+  <PageShell width="tool" trail={trail} h1={page.h1} intro={page.intro}>
+    <StatsScreen client:load games={games} />
+  </PageShell>
 </BaseLayout>
