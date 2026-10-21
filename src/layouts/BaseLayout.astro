@@ -12,7 +12,10 @@ import {
   SITE,
 } from '../config/site'
 import { findPage } from '../config/pages'
-import { DEFAULT_OG_IMAGE, OG_LOCALE, headMeta, jsonLd } from '../seo/head'
+import { DEFAULT_OG_IMAGE, headMeta, jsonLd } from '../seo/head'
+import { hreflangLinks } from '../i18n/alternates'
+import { stripLocale } from '../i18n/locales'
+import { useTranslations } from '../i18n/server'
 import { markdownPathFor } from '../seo/markdown'
 import { INSTALLABLE_EVENT, INSTALL_GONE_EVENT, INSTALL_HANDLE } from '../components/ui/install'
 import { SETTINGS_KEY } from '../storage/settings'
@@ -98,8 +101,16 @@ const {
 // Both default from the registry, so a page owner only passes them to
 // override: stats, settings and the 404 are `indexable: false` there, and the
 // registry (or the word list) knows which pages have a Markdown copy.
-const noindex = Astro.props.noindex ?? findPage(path)?.indexable === false
-const markdown = Astro.props.markdown === undefined ? markdownPathFor(path) : Astro.props.markdown
+const t = useTranslations(Astro)
+const key = stripLocale(path)
+const noindex = Astro.props.noindex ?? findPage(key)?.indexable === false
+// The Markdown copies are English, so only an English page points at one.
+const markdown =
+  Astro.props.markdown === undefined
+    ? t.isDefault
+      ? markdownPathFor(path)
+      : null
+    : Astro.props.markdown
 
 const head = headMeta(
   {
@@ -115,6 +126,16 @@ const head = headMeta(
   },
   Astro.site?.href,
 )
+
+/**
+ * The same page in the other published languages. Empty while English is the
+ * only one, so nothing is emitted today. A page with no canonical (noindex,
+ * private) is not offered in other languages either.
+ */
+const alternates = head.canonical ? hreflangLinks(path, t.def) : []
+const otherOgLocales = alternates
+  .filter((entry) => entry.hreflang !== 'x-default' && entry.locale.code !== t.def.code)
+  .map((entry) => entry.locale.ogLocale)
 
 /**
  * Site-wide identity graph, emitted on every page.
@@ -140,7 +161,7 @@ const identityGraph = {
       url: SITE.url,
       name: SITE.name,
       description: SITE.description,
-      inLanguage: SITE.locale,
+      inLanguage: t.def.lang,
       publisher: { '@id': `${SITE.url}/#author` },
       // Says which "Morse code" this is: the encoding (Wikidata Q79897), not a
       // person called Morse.
@@ -155,10 +176,10 @@ const identityGraph = {
       description: SITE.description,
       applicationCategory: 'EducationalApplication',
       operatingSystem: 'Any',
-      browserRequirements: 'Requires JavaScript and Web Audio support',
+      browserRequirements: t('layout.browserRequirements'),
       author: { '@id': `${SITE.url}/#author` },
       about: MORSE_CODE_ABOUT,
-      inLanguage: SITE.locale,
+      inLanguage: t.def.lang,
       image: new URL(DEFAULT_OG_IMAGE.path, SITE.url).href,
       sameAs: [SITE.repo],
       isAccessibleForFree: true,
@@ -166,11 +187,11 @@ const identityGraph = {
       // as unknown rather than as zero.
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
       featureList: [
-        'Interactive Morse code tree',
-        'Real CW audio with adjustable WPM and Farnsworth spacing',
-        'Keyboard straight key with dot and dash detection',
-        'Spaced repetition practice',
-        'Works offline, no account required',
+        t('layout.featureTree'),
+        t('layout.featureAudio'),
+        t('layout.featureKey'),
+        t('layout.featureRepetition'),
+        t('layout.featureOffline'),
       ],
     },
   ],
@@ -178,7 +199,7 @@ const identityGraph = {
 ---
 
 <!doctype html>
-<html lang={SITE.locale}>
+<html lang={t.def.lang} dir={t.def.dir === 'rtl' ? 'rtl' : undefined}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -186,6 +207,15 @@ const identityGraph = {
     <meta name="description" content={description} />
     {head.robots && <meta name="robots" content={head.robots} />}
     {head.canonical && <link rel="canonical" href={head.canonical} />}
+    {
+      alternates.map((entry) => (
+        <link
+          rel="alternate"
+          hreflang={entry.hreflang}
+          href={new URL(entry.path, Astro.site).href}
+        />
+      ))
+    }
 
     {/* Before the script below, which sets it to match the theme it picks. */}
     <meta name="theme-color" content={THEME_COLOR.dark} />
@@ -269,7 +299,8 @@ const identityGraph = {
     }
     <meta property="og:image:alt" content={head.ogImage.alt} />
     <meta property="og:site_name" content={SITE.name} />
-    <meta property="og:locale" content={OG_LOCALE} />
+    <meta property="og:locale" content={t.def.ogLocale} />
+    {otherOgLocales.map((locale) => <meta property="og:locale:alternate" content={locale} />)}
     {head.articleMeta.map((entry) => <meta property={entry.property} content={entry.content} />)}
 
     <meta name="twitter:card" content="summary_large_image" />
@@ -426,7 +457,7 @@ const identityGraph = {
     <a
       href="#main"
       class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-3 focus:z-50 focus:rounded-control focus:border focus:border-line-strong focus:bg-panel focus:px-4 focus:py-2.5 focus:text-signal"
-      >Skip to content</a
+      >{t('layout.skipToContent')}</a
     >
     {!bare && <Header />}
     {

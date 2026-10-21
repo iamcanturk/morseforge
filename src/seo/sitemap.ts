@@ -9,6 +9,7 @@
  */
 
 import { PAGES } from '../config/pages'
+import { stripLocale } from '../i18n/locales'
 
 /**
  * Pages that must never be listed. The author tools are named explicitly as
@@ -29,8 +30,12 @@ function normalise(pathname: string): string {
   return withLead.endsWith('/') ? withLead : `${withLead}/`
 }
 
-/** True when a page URL (absolute or a path) belongs in the sitemap. */
+/**
+ * True when a page URL (absolute or a path) belongs in the sitemap. A
+ * translated page is judged by its English path, so `/de/stats/` stays out
+ * for the same reason `/stats/` does.
+ */
 export function inSitemap(page: string): boolean {
   const pathname = page.includes('://') ? new URL(page).pathname : page
-  return !SITEMAP_EXCLUDED.has(normalise(pathname))
+  return !SITEMAP_EXCLUDED.has(stripLocale(normalise(pathname)))
 }

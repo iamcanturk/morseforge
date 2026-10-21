@@ -10,7 +10,7 @@ import {
   type RefObject,
 } from 'react'
 import { KeyStation, releaseFocus, type KeyStationAction } from './KeyStation'
-import { SignalTrace } from './MorseKey'
+import { KeyingLead, SignalTrace } from './MorseKey'
 import { KeyerSpeedPicker } from './KeyerSpeedPicker'
 import {
   cleanMessage,
@@ -24,13 +24,12 @@ import {
   telegramText,
 } from './telegramCard'
 import { shareData } from '../../game/share'
-import { useMorseKey } from './useMorseKey'
+import { useMorseKey, type PaddleControls } from './useMorseKey'
 import { useInView } from './useInView'
 import { SignalTree } from '../SignalTree/SignalTree'
 import { Segmented } from '../ui/Segmented'
 import { SITE } from '../../config/site'
 import { encode, prettify } from '../../engine/morseEncoder'
-import { spokenCode } from '../../engine/spokenCode'
 import { UNKNOWN_CHARACTER } from '../../engine/morseDecoder'
 import type { Achievement } from '../../game/achievements'
 import {
@@ -56,6 +55,10 @@ import {
 } from '../../storage/settings'
 import { LIGHT } from '../../styles/palette'
 import { track } from '../../analytics/track'
+import { useT, withI18n } from '../../i18n/react'
+import { renderRich } from '../../i18n/richReact'
+import type { Translator } from '../../i18n/translator'
+import { achievementCopy } from '../Stats/achievementCopy'
 
 /**
  * The real-time telegraph (PROJECT.md §14, §15, §49, §50).
@@ -75,12 +78,17 @@ import { track } from '../../analytics/track'
 type TargetId = 'free' | EasterEggId | 'name'
 
 /** The targets on offer. Eggs double as targets, so their words come from the data. */
-const TARGETS: readonly { id: TargetId; label: string }[] = [
-  { id: 'sos', label: findEgg('sos').word },
-  { id: 'cq', label: findEgg('cq').word },
-  { id: 'name', label: 'Your name' },
-  { id: 'free', label: 'Free' },
-]
+function targets(t: Translator): readonly { id: TargetId; label: string }[] {
+  return [
+    { id: 'sos', label: findEgg('sos').word },
+    { id: 'cq', label: findEgg('cq').word },
+    { id: 'name', label: t('telegraph.yourName') },
+    { id: 'free', label: t('telegraph.free') },
+  ]
+}
+
+/** The file a saved card downloads as. A name, not copy. */
+const CARD_FILE = 'morseforge-telegram.png'
 
 /** How long an answer from the instrument stays on the status line. */
 const NOTICE_MS = 6500
@@ -90,7 +98,12 @@ const MOMENT_MS = 2400
 type Notice =
   { kind: 'achievement'; achievement: Achievement; xp: number } | { kind: 'egg'; hit: EggHit }
 
+/** The /telegraph/ page's island: `TelegraphScreen` with its messages from the page. */
+export const TelegraphIsland = withI18n(TelegraphScreen)
+
 export function TelegraphScreen() {
+  const t = useT()
+  const TARGETS = targets(t)
   const store = useMemo(() => createSettingsStore(), [])
 
   // Settings start at defaults rather than being read during render: this is
@@ -150,6 +163,8 @@ export function TelegraphScreen() {
     wordGapMs: settings.timing.wordGapMs,
     autoCommit: settings.timing.autoCommit,
     bindings: settings.keys,
+    keyer: settings.keyer.type,
+    swapPaddles: settings.keyer.swapPaddles,
     frequency: settings.audio.frequency,
     volume: settings.audio.enabled ? settings.audio.volume : 0,
     windowKeys: stationInView,
@@ -366,13 +381,13 @@ export function TelegraphScreen() {
       >
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1">
           <span id={sendLabelId} className="mf-engraved max-sm:sr-only">
-            Send
+            {t('telegraph.send')}
           </span>
           {/* A finger tap leaves focus on the segment, and Space would then
               re-select it instead of keying; hand focus back to the page. */}
           <div onClick={(event) => releaseFocus(event)}>
             <Segmented
-              label="What to send"
+              label={t('telegraph.whatToSend')}
               labelledBy={sendLabelId}
               value={target}
               options={TARGETS.map((option) => ({ value: option.id, label: option.label }))}
@@ -385,7 +400,7 @@ export function TelegraphScreen() {
         {target === 'name' && (
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 px-1">
             <label htmlFor={nameId} className="mf-engraved">
-              Your name
+              {t('telegraph.yourName')}
             </label>
             <input
               id={nameId}
@@ -394,7 +409,7 @@ export function TelegraphScreen() {
               maxLength={NAME_MAX}
               autoComplete="given-name"
               spellCheck={false}
-              placeholder="Ada"
+              placeholder={t('telegraph.namePlaceholder')}
               onChange={(event) => setName(sendable(event.target.value))}
               onKeyDown={(event) => {
                 // Space types into the field, so Enter is the way out to the
@@ -407,8 +422,8 @@ export function TelegraphScreen() {
               }}
             />
             <span className="text-sm text-muted">
-              <span className="pointer-coarse:hidden">Press Enter, then key it.</span>
-              <span className="hidden pointer-coarse:inline">Then key it below.</span>
+              <span className="pointer-coarse:hidden">{t('telegraph.enterThenKey')}</span>
+              <span className="hidden pointer-coarse:inline">{t('telegraph.thenKeyBelow')}</span>
             </span>
           </div>
         )}
@@ -424,7 +439,7 @@ export function TelegraphScreen() {
             momentKey={moment?.n ?? 0}
             keyRef={keyButton}
             onAction={onAction}
-            emptyTape={check ? 'Key the first letter' : 'Your message prints here'}
+            emptyTape={check ? t('telegraph.keyFirstLetter') : t('telegraph.printsHere')}
             tapeHeader={check ? <TargetLine target={targetText} check={check} /> : undefined}
             tapeOverlay={egg ? <EggStamp key={egg.n} hit={egg.hit} /> : undefined}
             status={
@@ -434,6 +449,7 @@ export function TelegraphScreen() {
                 target={target}
                 onAgain={again}
                 autoCommit={settings.timing.autoCommit}
+                paddles={morseKey.paddles}
               />
             }
           />
@@ -465,7 +481,7 @@ export function TelegraphScreen() {
         <div className="mt-8 grid grid-cols-1 gap-6 border-t border-line pt-6">
           <KeyerSpeedPicker timing={settings.timing} onChange={applyPreset} />
           <div className="min-w-0">
-            <span className="mf-engraved">Your timing</span>
+            <span className="mf-engraved">{t('telegraph.yourTiming')}</span>
             <SignalTrace
               className="mt-2"
               elements={state.recent}
@@ -479,7 +495,7 @@ export function TelegraphScreen() {
             you can feel where you are. */}
         <div className="mt-8">
           <div className="flex items-center justify-between gap-3">
-            <span className="mf-engraved">Where you are in the tree</span>
+            <span className="mf-engraved">{t('telegraph.whereInTree')}</span>
             <button
               type="button"
               aria-expanded={showTree}
@@ -489,7 +505,7 @@ export function TelegraphScreen() {
               }}
               className="mf-btn mf-btn-ghost mf-btn-sm"
             >
-              {showTree ? 'Hide tree' : 'Show tree'}
+              {showTree ? t('telegraph.hideTree') : t('telegraph.showTree')}
             </button>
           </div>
           {showTree && (
@@ -498,12 +514,12 @@ export function TelegraphScreen() {
         </div>
       </section>
 
-      <aside className="flex min-w-0 flex-col gap-6" aria-label="Received">
+      <aside className="flex min-w-0 flex-col gap-6" aria-label={t('telegraph.received')}>
         <section className="mf-panel p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="mf-engraved">Received</h2>
+            <h2 className="mf-engraved">{t('telegraph.received')}</h2>
             <span className="mf-engraved tabular-nums">
-              {decoded ? `${decoded.replaceAll(' ', '').length} chars` : ''}
+              {decoded ? t('telegraph.chars', { count: decoded.replaceAll(' ', '').length }) : ''}
             </span>
           </div>
 
@@ -513,15 +529,13 @@ export function TelegraphScreen() {
             {decoded ? (
               decoded
             ) : (
-              <span className="font-body text-base text-muted">
-                Nothing sent yet. What you key prints on the tape and here, in full.
-              </span>
+              <span className="font-body text-base text-muted">{t('telegraph.nothingSent')}</span>
             )}
           </p>
 
           {decoded && (
             <div className="mt-5 border-t border-line pt-4">
-              <span className="mf-engraved">As Morse</span>
+              <span className="mf-engraved">{t('telegraph.asMorse')}</span>
               <p className="mt-2 font-mono text-sm tracking-label break-all text-cyan">
                 {prettify(encode(decoded))}
               </p>
@@ -530,15 +544,13 @@ export function TelegraphScreen() {
 
           {hasUnknown && (
             <p className="mt-4 text-sm leading-relaxed text-amber">
-              {UNKNOWN_CHARACTER} marks a sequence that is not a character, usually an extra element
-              slipped in. Give yourself more time per character, or switch to Manual so nothing
-              finishes until you say so.
+              {t('telegraph.unknownNote', { mark: UNKNOWN_CHARACTER })}
             </p>
           )}
         </section>
 
         {earned.length > 0 && (
-          <section aria-label="Earned on this visit" className="hidden flex-col gap-3 lg:flex">
+          <section aria-label={t('telegraph.earnedHere')} className="hidden flex-col gap-3 lg:flex">
             {earned.map((achievement) => (
               <AchievementSlip key={achievement.id} achievement={achievement} />
             ))}
@@ -550,14 +562,14 @@ export function TelegraphScreen() {
         )}
 
         <section className="mf-panel p-5">
-          <h2 className="mf-engraved">Worth sending</h2>
+          <h2 className="mf-engraved">{t('telegraph.worthSending')}</h2>
           <ul className="mt-3 grid gap-2">
             {EASTER_EGGS.map((item) => (
               <li key={item.id} className="flex items-center justify-between gap-3">
                 {/* A 44px row under a finger (A11Y-12): the words alone were
                     targets 13px tall. */}
                 <a
-                  href={item.href}
+                  href={t.href(item.href)}
                   className="font-mono text-control text-ink underline decoration-line-strong underline-offset-4 hover:decoration-signal pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:items-center"
                 >
                   {item.word}
@@ -580,14 +592,15 @@ export function TelegraphScreen() {
 
 /** The target printed along the top of the tape, with what is done ticked off. */
 function TargetLine({ target, check }: { target: string; check: TargetCheck }) {
+  const t = useT()
   let index = -1
   return (
     <div
       className="kc-target"
       role="group"
-      aria-label={target ? `Send ${target}` : 'Send your name'}
+      aria-label={target ? t('telegraph.sendTarget', { target }) : t('telegraph.sendYourName')}
     >
-      <span className="kc-target-label">Send</span>
+      <span className="kc-target-label">{t('telegraph.send')}</span>
       {target ? (
         <span className="kc-target-word" aria-hidden="true">
           {[...target.toUpperCase()].map((character, position) => {
@@ -602,9 +615,9 @@ function TargetLine({ target, check }: { target: string; check: TargetCheck }) {
           })}
         </span>
       ) : (
-        <span className="kc-target-hint">Type your name above</span>
+        <span className="kc-target-hint">{t('telegraph.typeName')}</span>
       )}
-      {check.done && <span className="kc-target-done">Sent</span>}
+      {check.done && <span className="kc-target-done">{t('telegraph.sent')}</span>}
     </div>
   )
 }
@@ -630,24 +643,28 @@ function StatusLine({
   target,
   onAgain,
   autoCommit,
+  paddles,
 }: {
   notice: Notice | null
   check: TargetCheck | null
   target: TargetId
   onAgain: (event: MouseEvent<HTMLButtonElement>) => void
   autoCommit: boolean
+  paddles: PaddleControls | null
 }) {
+  const t = useT()
   let body: ReactNode
   if (notice?.kind === 'achievement') {
     const { achievement, xp } = notice
+    const copy = achievementCopy(t, achievement)
     body = (
       <p className="kc-status-earned">
         <span aria-hidden="true">{achievement.icon}</span>{' '}
-        <strong className="font-mono text-control text-amber uppercase">{achievement.title}</strong>{' '}
-        <span className="text-ink">{achievement.description}</span>
+        <strong className="font-mono text-control text-amber uppercase">{copy.title}</strong>{' '}
+        <span className="text-ink">{copy.description}</span>
         {xp > 0 && (
           <span className="mf-rise ml-2 inline-block font-mono text-control text-amber">
-            +{xp} XP
+            {t('telegraph.xpGain', { xp })}
           </span>
         )}
       </p>
@@ -657,10 +674,10 @@ function StatusLine({
       <p>
         <span className="text-ink">{notice.hit.reply}</span>{' '}
         <a
-          href={notice.hit.egg.href}
+          href={t.href(notice.hit.egg.href)}
           className="whitespace-nowrap text-signal underline underline-offset-4"
         >
-          More on {notice.hit.egg.word}
+          {t('telegraph.moreOn', { word: notice.hit.egg.word })}
         </a>
       </p>
     )
@@ -669,14 +686,12 @@ function StatusLine({
       body = (
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="text-ink">
-            Sent
             {check.slips > 0
-              ? `, with ${check.slips} ${check.slips === 1 ? 'slip' : 'slips'}`
-              : ' clean'}
-            .
+              ? t('telegraph.sentSlips', { count: check.slips })
+              : t('telegraph.sentClean')}
           </span>
           <button type="button" className="mf-btn mf-btn-ghost mf-btn-sm" onClick={onAgain}>
-            Send it again
+            {t('telegraph.sendAgain')}
           </button>
         </p>
       )
@@ -684,17 +699,21 @@ function StatusLine({
       const code = prettify(encode(check.next))
       body = (
         <p>
-          {check.lastSlip && <span className="text-amber">That was {check.lastSlip}. </span>}
+          {check.lastSlip && (
+            <span className="text-amber">{t('telegraph.thatWas', { slip: check.lastSlip })}</span>
+          )}
           <span>
-            Next: <strong className="font-mono text-control text-ink">{check.next}</strong>{' '}
+            {renderRich(t.rich('telegraph.next', { character: check.next }), {
+              next: { el: 'strong', class: 'font-mono text-control text-ink' },
+            })}{' '}
             {/* The glyphs read as "minus minus minus"; the ear gets words (A11Y-11). */}
             <span className="font-mono tracking-code text-cyan" aria-hidden="true">
               {code}
             </span>
-            <span className="sr-only">{spokenCode(code)}</span>
+            <span className="sr-only">{t.spokenCode(code)}</span>
           </span>
           {target === 'name' && check.matched === 0 && !check.lastSlip && (
-            <span className="text-muted"> Letter by letter, with a pause between.</span>
+            <span className="text-muted">{t('telegraph.letterByLetter')}</span>
           )}
         </p>
       )
@@ -706,10 +725,8 @@ function StatusLine({
     <div aria-live="polite" aria-atomic="true">
       {body ?? (
         <p>
-          Tap for a dot, hold for a dash.{' '}
-          {autoCommit
-            ? 'Pause to finish the character; the fuse shows how long you have.'
-            : 'Then press Finish.'}
+          <KeyingLead paddles={paddles} />{' '}
+          {autoCommit ? t('telegraph.pauseHint') : t('telegraph.pressFinish')}
         </p>
       )}
     </div>
@@ -718,15 +735,17 @@ function StatusLine({
 
 /** An achievement, delivered as a telegram slip with a received stamp. */
 function AchievementSlip({ achievement }: { achievement: Achievement }) {
+  const t = useT()
+  const copy = achievementCopy(t, achievement)
   return (
     <article className="mf-tape mf-slip kc-slip">
       <span className="kc-slip-icon" aria-hidden="true">
         {achievement.icon}
       </span>
       <div className="min-w-0">
-        <h3 className="font-display text-base font-bold tracking-normal">{achievement.title}</h3>
+        <h3 className="font-display text-base font-bold tracking-normal">{copy.title}</h3>
         <p className="mt-0.5 font-body text-sm tracking-normal text-paper-muted">
-          {achievement.description}
+          {copy.description}
         </p>
       </div>
       {/* Ink in the green, as a rubber stamp is: at 12px the plain light-theme
@@ -736,7 +755,7 @@ function AchievementSlip({ achievement }: { achievement: Achievement }) {
         className="mf-stamp mf-stamp-in kc-slip-stamp"
         style={{ color: `color-mix(in srgb, ${LIGHT['paper-ink']} 35%, ${LIGHT.signal})` }}
       >
-        Received
+        {t('telegraph.receivedStamp')}
       </span>
     </article>
   )
@@ -753,6 +772,7 @@ function AchievementSlip({ achievement }: { achievement: Achievement }) {
  * outlast it (iOS Safari), so it is encoded ahead of time and only read here.
  */
 function useTelegramShare(message: string, image: RefObject<File | null>) {
+  const t = useT()
   const statusTimer = useRef<number | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [canShareFiles, setCanShareFiles] = useState(false)
@@ -798,11 +818,11 @@ function useTelegramShare(message: string, image: RefObject<File | null>) {
     try {
       await navigator.clipboard.writeText(text)
       track('share_copy', 'telegraph')
-      flash(listenUrl ? 'Copied the telegram and a link that plays it' : 'Copied the telegram')
+      flash(listenUrl ? t('telegraph.copiedWithLink') : t('telegraph.copied'))
     } catch {
-      flash('Copying was blocked. Select the text below instead.')
+      flash(t('telegraph.copyBlocked'))
     }
-  }, [text, listenUrl, flash])
+  }, [text, listenUrl, flash, t])
 
   const share = useCallback(async () => {
     track('share_open', 'telegraph')
@@ -821,12 +841,12 @@ function useTelegramShare(message: string, image: RefObject<File | null>) {
       try {
         await navigator.clipboard.writeText(text)
         track('share_copy', 'telegraph')
-        flash('Sharing was refused, so the telegram and its link were copied instead.')
+        flash(t('telegraph.refusedCopied'))
       } catch {
-        flash('Sharing was refused here. Use Copy text, or Save image.')
+        flash(t('telegraph.refused'))
       }
     }
-  }, [canShareFiles, image, sheet, text, flash])
+  }, [canShareFiles, image, sheet, text, flash, t])
 
   return { status, flash, canShare, copy, share, listenUrl }
 }
@@ -845,6 +865,7 @@ function ShareBar({
   image: RefObject<File | null>
   onDismiss: () => void
 }) {
+  const t = useT()
   const { status, canShare, copy, share } = useTelegramShare(message, image)
   const headingId = useId()
 
@@ -853,14 +874,14 @@ function ShareBar({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 id={headingId} className="font-display text-base font-bold text-ink">
-            Share this telegram
+            {t('telegraph.shareHeading')}
           </h2>
-          <p className="mt-0.5 text-sm text-muted">With a link that plays it in Morse.</p>
+          <p className="mt-0.5 text-sm text-muted">{t('telegraph.shareSub')}</p>
         </div>
         <button
           type="button"
           className="mf-icon-btn -mt-1 -mr-2 shrink-0"
-          aria-label="Dismiss sharing"
+          aria-label={t('telegraph.dismissSharing')}
           onClick={onDismiss}
         >
           <span aria-hidden="true">×</span>
@@ -873,7 +894,7 @@ function ShareBar({
             className="mf-btn mf-btn-primary mf-btn-sm"
             onClick={() => void share()}
           >
-            Share
+            {t('telegraph.share')}
           </button>
         )}
         <button
@@ -881,10 +902,10 @@ function ShareBar({
           className="mf-btn mf-btn-secondary mf-btn-sm"
           onClick={() => void copy()}
         >
-          Copy text
+          {t('telegraph.copyText')}
         </button>
         <a href="#kc-share" className="mf-btn mf-btn-ghost mf-btn-sm">
-          See the card
+          {t('telegraph.seeCard')}
         </a>
       </div>
       <p aria-live="polite" className="mt-2 min-h-5 text-sm text-signal">
@@ -908,6 +929,7 @@ function SharePanel({
   image: RefObject<File | null>
   onDismiss: () => void
 }) {
+  const t = useT()
   const canvas = useRef<HTMLCanvasElement>(null)
   const date = useMemo(() => localDate(), [])
   const { status, flash, canShare, copy, share, listenUrl } = useTelegramShare(message, image)
@@ -921,7 +943,7 @@ function SharePanel({
       // Encoded now rather than on click: see useTelegramShare.
       const blob = await telegramBlob(canvas.current)
       if (live && blob) {
-        image.current = new File([blob], 'morseforge-telegram.png', { type: 'image/png' })
+        image.current = new File([blob], CARD_FILE, { type: 'image/png' })
       }
     })
     return () => {
@@ -933,30 +955,30 @@ function SharePanel({
     if (!canvas.current) return
     const blob = image.current ?? (await telegramBlob(canvas.current))
     if (!blob) {
-      flash('The image could not be made here. Copy text still works.')
+      flash(t('telegraph.imageFailed'))
       return
     }
     const href = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = href
-    link.download = 'morseforge-telegram.png'
+    link.download = CARD_FILE
     link.click()
     // Revoked later, not now: some browsers start the download only after
     // the click handler returns, and a revoked URL downloads nothing.
     window.setTimeout(() => URL.revokeObjectURL(href), 1000)
-    flash('Saved morseforge-telegram.png')
-  }, [flash, image])
+    flash(t('telegraph.saved', { file: CARD_FILE }))
+  }, [flash, image, t])
 
   return (
     <section id="kc-share" className="mf-panel mf-slip p-5" aria-labelledby="kc-share-heading">
       <div className="flex items-start justify-between gap-3">
         <h2 id="kc-share-heading" className="font-display text-h3 font-bold text-ink">
-          Share this as a telegram
+          {t('telegraph.panelHeading')}
         </h2>
         <button
           type="button"
           className="mf-icon-btn -mt-1 -mr-2 shrink-0"
-          aria-label="Dismiss the share panel"
+          aria-label={t('telegraph.dismissPanel')}
           onClick={onDismiss}
         >
           <span aria-hidden="true">×</span>
@@ -979,7 +1001,7 @@ function SharePanel({
             className="mf-btn mf-btn-primary mf-btn-sm"
             onClick={() => void share()}
           >
-            Share
+            {t('telegraph.share')}
           </button>
         )}
         <button
@@ -987,17 +1009,15 @@ function SharePanel({
           className="mf-btn mf-btn-secondary mf-btn-sm"
           onClick={() => void copy()}
         >
-          Copy text
+          {t('telegraph.copyText')}
         </button>
         <button type="button" className="mf-btn mf-btn-ghost mf-btn-sm" onClick={() => void save()}>
-          Save image
+          {t('telegraph.saveImage')}
         </button>
       </div>
 
       <p className="mt-3 text-sm text-muted">
-        {listenUrl
-          ? 'The text carries a link that plays your message in Morse, so whoever gets it can hear it.'
-          : 'Too long, or too unusual, for a message link, so this one links to the telegraph instead.'}
+        {listenUrl ? t('telegraph.linkPlays') : t('telegraph.linkTelegraph')}
       </p>
 
       <p aria-live="polite" className="mt-1 min-h-5 text-sm text-signal">

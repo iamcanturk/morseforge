@@ -1,11 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AudioEngine } from '../../engine/audioEngine'
 import {
   DEFAULT_KEY_BINDINGS,
-  KeyEngine,
   bindKeyboard,
+  contactFor,
+  swapPaddles as swapPaddleKeys,
   type KeyBindings,
+  type KeyEngineCallbacks,
+  type Keyer,
+  type KeyContact,
+  type KeyerKind,
+  type Paddle,
 } from '../../engine/keyEngine'
+import { createKeyer } from '../../engine/keyer'
 import { LiveDecoder } from '../../engine/morseDecoder'
 
 /**
@@ -15,6 +22,11 @@ import { LiveDecoder } from '../../engine/morseDecoder'
  * sending drills, the onboarding first-signal moment. Keeping it in one place
  * means the feel of the key — how long a dash is, when a character commits,
  * when the tone starts — is identical everywhere.
+ *
+ * Which key is attached is a setting (`keyer`), and the hook only uses it to
+ * pick one from `createKeyer`: the straight key and the iambic paddle keyer
+ * are driven through the same `Keyer` interface, and the decoder, the gap
+ * countdown and the sidetone do not care which one sent the element.
  */
 
 export interface KeyedElement {
@@ -33,6 +45,10 @@ export interface UseMorseKeyOptions {
   /** When false, nothing commits on its own; call `commitCharacter` instead. */
   autoCommit?: boolean
   bindings?: KeyBindings
+  /** Which key is attached: Settings → Key type. Default straight. */
+  keyer?: KeyerKind
+  /** Exchange the dit and dah paddles (keys and on-screen), for left-handed operators. */
+  swapPaddles?: boolean
   /** Sidetone frequency in Hz. */
   frequency?: number
   /** 0..1. Zero means silent, and no AudioContext is ever created. */
@@ -62,7 +78,15 @@ export interface UseMorseKeyOptions {
 }
 
 export interface MorseKeyState {
+  /**
+   * The key is in use: a straight key held, or a paddle keyer sending an
+   * element or the space after it. Nothing counts down while it is true.
+   */
   isDown: boolean
+  /** The tone is sounding right now: what the TX lamp shows. */
+  toneOn: boolean
+  /** Which paddles are held (always both false on a straight key). */
+  paddles: Readonly<Record<Paddle, boolean>>
   /** Elements keyed so far for the character in progress, e.g. "..-". */
   pending: string
   /** What `pending` would decode to right now, or null. */
@@ -97,11 +121,35 @@ const RECENT_LIMIT = 40
 
 const EMPTY_STATE: MorseKeyState = {
   isDown: false,
+  toneOn: false,
+  paddles: { dit: false, dah: false },
   pending: '',
   preview: null,
   text: '',
   recent: [],
   commitProgress: 0,
+}
+
+/** Handlers for one on-screen paddle, spread onto its button. */
+export interface PaddleHandlers {
+  onPointerDown: (event: React.PointerEvent) => void
+  onPointerUp: (event?: { timeStamp: number }) => void
+  onPointerLeave: (event?: { timeStamp: number }) => void
+  onPointerCancel: (event?: { timeStamp: number }) => void
+  onKeyDown: (event: React.KeyboardEvent) => void
+  onKeyUp: (event: React.KeyboardEvent) => void
+  onBlur: () => void
+}
+
+/** Everything an on-screen paddle pair needs, or null on a straight key. */
+export interface PaddleControls {
+  kind: Exclude<KeyerKind, 'straight'>
+  /** Left to right as drawn: dit first, or dah first when swapped. */
+  order: readonly [Paddle, Paddle]
+  held: Readonly<Record<Paddle, boolean>>
+  /** The key bound to each paddle, swap applied. */
+  keys: Readonly<Record<Paddle, string>>
+  handlers: Readonly<Record<Paddle, PaddleHandlers>>
 }
 
 export function useMorseKey(options: UseMorseKeyOptions = {}) {
@@ -111,7 +159,9 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
     characterGapMs,
     wordGapMs,
     autoCommit = true,
-    bindings,
+    bindings: boundKeys,
+    keyer = 'straight',
+    swapPaddles = false,
     frequency = 600,
     volume = 0.15,
     disabled = false,
@@ -119,10 +169,19 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
   } = options
 
   const [state, setState] = useState<MorseKeyState>(EMPTY_STATE)
+  /** The kind attached, as state: the window binding is re-made when it changes. */
+  const [kind, setKind] = useState<KeyerKind>(keyer)
+
+  // The paddles swap by swapping their keys, so the window binding, the
+  // on-screen paddles and their labels all agree on which is which.
+  const bindings = useMemo(
+    () => (swapPaddles && boundKeys ? swapPaddleKeys(boundKeys) : boundKeys),
+    [boundKeys, swapPaddles],
+  )
 
   const decoder = useRef(new LiveDecoder())
   const audio = useRef<AudioEngine | null>(null)
-  const engine = useRef<KeyEngine | null>(null)
+  const engine = useRef<Keyer | null>(null)
   const elementId = useRef(0)
   const frame = useRef<number | null>(null)
   const releasedAt = useRef<number | null>(null)
@@ -142,21 +201,27 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
     releasedAt.current = null
   }, [])
 
-  /** Animate the countdown ring from the release timestamp. */
-  const startCountdown = useCallback(() => {
-    stopCountdown()
-    const gap = callbacks.current.characterGapMs
-    if (!callbacks.current.autoCommit || !gap) return
+  /**
+   * Animate the countdown ring from the moment the tone stopped, `silentMs`
+   * ago: a paddle keyer goes idle one element space after its last tone.
+   */
+  const startCountdown = useCallback(
+    (silentMs = 0) => {
+      stopCountdown()
+      const gap = callbacks.current.characterGapMs
+      if (!callbacks.current.autoCommit || !gap) return
 
-    releasedAt.current = performance.now()
-    const tick = () => {
-      if (releasedAt.current === null) return
-      const progress = Math.min((performance.now() - releasedAt.current) / gap, 1)
-      setState((previous) => ({ ...previous, commitProgress: progress }))
-      if (progress < 1) frame.current = requestAnimationFrame(tick)
-    }
-    frame.current = requestAnimationFrame(tick)
-  }, [stopCountdown])
+      releasedAt.current = performance.now() - silentMs
+      const tick = () => {
+        if (releasedAt.current === null) return
+        const progress = Math.min((performance.now() - releasedAt.current) / gap, 1)
+        setState((previous) => ({ ...previous, commitProgress: progress }))
+        if (progress < 1) frame.current = requestAnimationFrame(tick)
+      }
+      frame.current = requestAnimationFrame(tick)
+    },
+    [stopCountdown],
+  )
 
   const sync = useCallback((patch: Partial<MorseKeyState> = {}) => {
     setState((previous) => ({
@@ -168,74 +233,101 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
     }))
   }, [])
 
-  if (engine.current === null) {
-    engine.current = new KeyEngine(
-      { wpm, dotDashThresholdMs, characterGapMs, wordGapMs, autoCommit },
-      {
-        onKeyDown: () => {
-          stopCountdown()
-          // The AudioContext is created here rather than on mount: browsers
-          // only allow it to start from inside a user gesture, and keydown is
-          // the first gesture on a keyboard-driven screen.
-          if (callbacks.current.volume !== 0) {
-            audio.current ??= new AudioEngine({
-              frequency: callbacks.current.frequency ?? 600,
-              volume: callbacks.current.volume ?? 0.15,
-            })
-            void audio.current.keyDown()
-          }
-          sync({ isDown: true, commitProgress: 0 })
-        },
-        onKeyUp: () => {
-          audio.current?.keyUp()
-          sync({ isDown: false })
-          startCountdown()
-        },
-        // A hold the browser never ended: the window lost focus, or the
-        // binding went away, mid-hold. Nothing was keyed, but the tone and
-        // the pressed look must stop rather than wait for the next press.
-        onCancel: () => {
-          audio.current?.keyUp()
-          sync({ isDown: false })
-        },
-        onElement: (element, heldMs) => {
-          decoder.current.pushElement(element)
-          elementId.current += 1
-          const keyed: KeyedElement = { element, heldMs, id: elementId.current }
-          setState((previous) => ({
-            ...previous,
-            pending: decoder.current.pending,
-            preview: decoder.current.preview,
-            recent: [...previous.recent, keyed].slice(-RECENT_LIMIT),
-          }))
-          callbacks.current.onElement?.(element, heldMs)
+  // Built once, for every keyer this hook ever attaches: they all read the
+  // latest options through `callbacks`, so swapping the key type in Settings
+  // swaps the keyer and nothing else.
+  const keyerCallbacks = useRef<KeyEngineCallbacks | null>(null)
+  keyerCallbacks.current ??= {
+    onKeyDown: (toneMs) => {
+      stopCountdown()
+      // The AudioContext is created here rather than on mount: browsers
+      // only allow it to start from inside a user gesture, and keydown is
+      // the first gesture on a keyboard-driven screen. A paddle keyer
+      // says how long its element is, so that tone is scheduled to the
+      // sample on the audio clock (Signal → Lamp sets volume 0, and then
+      // nothing sounds and no context is made).
+      if (callbacks.current.volume !== 0) {
+        audio.current ??= new AudioEngine({
+          frequency: callbacks.current.frequency ?? 600,
+          volume: callbacks.current.volume ?? 0.15,
+        })
+        void (toneMs === undefined ? audio.current.keyDown() : audio.current.keyFor(toneMs))
+      }
+      sync({ isDown: true, toneOn: true, commitProgress: 0 })
+    },
+    onKeyUp: () => {
+      // Ends a held tone only: one scheduled by `keyFor` stops itself, on the
+      // sample, and cutting it from this timer would make it a little short.
+      audio.current?.keyUp()
+      sync({ toneOn: false })
+    },
+    onIdle: (silentMs) => {
+      sync({ isDown: false })
+      startCountdown(silentMs)
+    },
+    onPaddle: (paddle, down) => {
+      setState((previous) => ({ ...previous, paddles: { ...previous.paddles, [paddle]: down } }))
+    },
+    // A hold the browser never ended: the window lost focus, or the
+    // binding went away, mid-hold. Nothing was keyed, but the tone and
+    // the pressed look must stop rather than wait for the next press.
+    onCancel: () => {
+      audio.current?.keyUp()
+      audio.current?.stopKeyed()
+      sync({ isDown: false, toneOn: false })
+    },
+    onElement: (element, heldMs) => {
+      decoder.current.pushElement(element)
+      elementId.current += 1
+      const keyed: KeyedElement = { element, heldMs, id: elementId.current }
+      setState((previous) => ({
+        ...previous,
+        pending: decoder.current.pending,
+        preview: decoder.current.preview,
+        recent: [...previous.recent, keyed].slice(-RECENT_LIMIT),
+      }))
+      callbacks.current.onElement?.(element, heldMs)
 
-          if (shouldCommitEarly(decoder.current.pending, callbacks.current.commitWhen)) {
-            // Deferred to a microtask: the engine emits the element *before*
-            // it arms the gap timers, so committing synchronously here would
-            // leave a word-gap timer armed behind an empty buffer. By the
-            // microtask the release has finished and `commitEarly` can cancel
-            // both timers. The pending check skips it if anything moved on.
-            const expected = decoder.current.pending
-            queueMicrotask(() => {
-              if (decoder.current.pending === expected) commitEarly.current?.()
-            })
-          }
-        },
-        onCharacterGap: () => {
-          stopCountdown()
-          const character = decoder.current.commitCharacter()
-          sync({ commitProgress: 0 })
-          if (character) callbacks.current.onCharacter?.(character)
-        },
-        onWordGap: () => {
-          decoder.current.commitWord()
-          sync({ commitProgress: 0 })
-          callbacks.current.onWord?.()
-        },
-      },
-    )
+      if (shouldCommitEarly(decoder.current.pending, callbacks.current.commitWhen)) {
+        // Deferred to a microtask: the engine emits the element *before*
+        // it arms the gap timers, so committing synchronously here would
+        // leave a word-gap timer armed behind an empty buffer. By the
+        // microtask the release has finished and `commitEarly` can cancel
+        // both timers. The pending check skips it if anything moved on.
+        const expected = decoder.current.pending
+        queueMicrotask(() => {
+          if (decoder.current.pending === expected) commitEarly.current?.()
+        })
+      }
+    },
+    onCharacterGap: () => {
+      stopCountdown()
+      const character = decoder.current.commitCharacter()
+      sync({ commitProgress: 0 })
+      if (character) callbacks.current.onCharacter?.(character)
+    },
+    onWordGap: () => {
+      decoder.current.commitWord()
+      sync({ commitProgress: 0 })
+      callbacks.current.onWord?.()
+    },
   }
+
+  const thresholds = useRef({ wpm, dotDashThresholdMs, characterGapMs, wordGapMs, autoCommit })
+  thresholds.current = { wpm, dotDashThresholdMs, characterGapMs, wordGapMs, autoCommit }
+  if (engine.current === null) {
+    engine.current = createKeyer(keyer, thresholds.current, keyerCallbacks.current)
+  }
+
+  // Settings changed the key type: drop whatever the old key had in flight
+  // (its `onCancel` stops the tone) and attach the new one. The character
+  // being keyed stays pending, to finish with the new key or by hand.
+  useEffect(() => {
+    if (engine.current?.kind === keyer) return
+    engine.current?.reset()
+    engine.current = createKeyer(keyer, thresholds.current, keyerCallbacks.current ?? {})
+    setKind(keyer)
+  }, [keyer])
 
   // Thresholds are reconfigured in place rather than by rebuilding the engine,
   // so changing settings mid-session does not swallow the character being keyed.
@@ -294,7 +386,7 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
       // dropped: a settings change between characters keeps its gap timers.
       if (keyEngine.isPressed) keyEngine.reset()
     }
-  }, [disabled, windowKeys, bindings, commitCharacter, cancelPending])
+  }, [disabled, windowKeys, bindings, kind, commitCharacter, cancelPending])
 
   useEffect(() => {
     return () => {
@@ -307,15 +399,15 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
 
   /** `timeStamp`: the input event's, so the hold is timed from the input (see KeyEngine). */
   const press = useCallback(
-    (timeStamp?: number) => {
+    (timeStamp?: number, contact?: KeyContact) => {
       if (disabled) return
-      engine.current?.press(timeStamp)
+      engine.current?.press(timeStamp, contact)
     },
     [disabled],
   )
 
-  const release = useCallback((timeStamp?: number) => {
-    engine.current?.release(timeStamp)
+  const release = useCallback((timeStamp?: number, contact?: KeyContact) => {
+    engine.current?.release(timeStamp, contact)
   }, [])
 
   /** For handlers React calls with the event: release at the event's own time. */
@@ -378,8 +470,80 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
     onBlur: () => release(),
   }
 
+  const cancelKey = bindings?.cancel ?? DEFAULT_KEY_BINDINGS.cancel
+  const paddleKeys = { ...DEFAULT_KEY_BINDINGS, ...bindings }
+
+  /**
+   * One on-screen paddle. Pointers press it; with the paddle focused, Space
+   * and Enter press it too (the window binding leaves a focused button
+   * alone), and so do the paddle keys, so `[` and `]` keep working after a
+   * tap has focused a paddle.
+   */
+  const paddleHandlers = (paddle: Paddle): PaddleHandlers => {
+    // No `code` is passed: a paddle on Left or Right Ctrl is answered by the
+    // window binding even here, so a Ctrl shortcut is never taken by a button.
+    const contactOf = (event: React.KeyboardEvent, down: boolean): Paddle | null => {
+      if (event.key === ' ' || event.key === 'Enter') return paddle
+      const modifiers = down
+        ? { ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey }
+        : {}
+      const contact = contactFor(event.key, paddleKeys, kind, modifiers)
+      return contact === 'dit' || contact === 'dah' ? contact : null
+    }
+    // At the event's own time: a late keyer judges the release by it.
+    const up = (event?: { timeStamp: number }) => release(event?.timeStamp, paddle)
+    return {
+      onPointerDown: (event) => {
+        event.preventDefault()
+        press(event.timeStamp, paddle)
+      },
+      onPointerUp: up,
+      onPointerLeave: up,
+      onPointerCancel: up,
+      onKeyDown: (event) => {
+        if (event.key === cancelKey) {
+          if (event.repeat) return
+          event.preventDefault()
+          event.stopPropagation()
+          cancelPending()
+          return
+        }
+        const contact = contactOf(event, true)
+        if (!contact) return
+        event.preventDefault()
+        event.stopPropagation()
+        if (!event.repeat) press(event.timeStamp, contact)
+      },
+      onKeyUp: (event) => {
+        const contact = contactOf(event, false)
+        if (!contact) return
+        event.preventDefault()
+        event.stopPropagation()
+        release(event.timeStamp, contact)
+      },
+      // Focus leaving mid-hold never delivers the keyup here. Both, because
+      // either key may have been pressed through this paddle.
+      onBlur: () => {
+        release(undefined, 'dit')
+        release(undefined, 'dah')
+      },
+    }
+  }
+
+  const paddles: PaddleControls | null =
+    kind === 'straight'
+      ? null
+      : {
+          kind,
+          order: swapPaddles ? ['dah', 'dit'] : ['dit', 'dah'],
+          held: state.paddles,
+          keys: { dit: paddleKeys.dit ?? '', dah: paddleKeys.dah ?? '' },
+          handlers: { dit: paddleHandlers('dit'), dah: paddleHandlers('dah') },
+        }
+
   return {
     state,
+    kind,
     press,
     release,
     commitCharacter,
@@ -387,5 +551,6 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
     cancelPending,
     reset,
     pointerHandlers,
+    paddles,
   }
 }

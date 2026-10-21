@@ -93,7 +93,7 @@ export function fitDescription(base: string, suffixes: readonly string[]): strin
 
 const HOME_PATH = '/'
 
-export const PAGES: readonly PageEntry[] = [
+export const PAGES = [
   {
     path: HOME_PATH,
     title: `Learn Morse Code Online — Free Morse Trainer${BRAND}`,
@@ -222,11 +222,12 @@ export const PAGES: readonly PageEntry[] = [
       'Turn your keyboard or phone into a Morse code key. Tap for a dot, hold for a dash, and see each character decoded live with real CW audio. Free.',
     h1: 'Online Morse code key',
     intro:
-      'This online Morse code key turns your keyboard into a straight key. Tap Space for a dot, hold it for a dash, and pause to finish a character; on a phone, use the on-screen button instead. Everything you send is decoded live and played as real CW audio, and nothing is saved to a server.',
+      'This online Morse code key turns your keyboard into a straight key or a pair of iambic paddles. Tap Space for a dot, hold it for a dash, and pause to finish a character; choose paddles in Settings and hold one key for dits, another for dahs. On a phone, use the on-screen key. Everything you send is decoded live and played as real CW audio, and nothing is saved to a server.',
     navLabel: 'Telegraph key',
     hint: 'Send freely and read it back',
     group: 'practise',
-    llmsSummary: 'send Morse with the keyboard or screen as a straight key, decoded live',
+    llmsSummary:
+      'send Morse with the keyboard or screen as a straight key or iambic paddles, decoded live',
     indexable: true,
     parent: null,
     markdown: null,
@@ -484,9 +485,14 @@ export const PAGES: readonly PageEntry[] = [
     parent: null,
     markdown: null,
   },
-]
+] as const satisfies readonly PageEntry[]
 
-const BY_PATH: ReadonlyMap<string, PageEntry> = new Map(PAGES.map((page) => [page.path, page]))
+/** Every registered path, as a type: what a per-language catalog must cover. */
+export type PagePath = (typeof PAGES)[number]['path']
+
+const BY_PATH: ReadonlyMap<string, PageEntry> = new Map(
+  PAGES.map((page): [string, PageEntry] => [page.path, page]),
+)
 
 /** The entry for a path, or undefined. */
 export function findPage(path: string): PageEntry | undefined {

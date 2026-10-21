@@ -1,0 +1,101 @@
+/**
+ * The guided lesson.
+ */
+
+import { namespace } from '../define'
+
+export const lesson = namespace('lesson', {
+  seeLabel: 'See',
+  seeTitle: 'See it',
+  seeBody:
+    'This is the character and its code. Read the dots and dashes once, then stop reading them.',
+  hearLabel: 'Hear',
+  hearTitle: 'Hear it',
+  hearBody:
+    'This is what it sounds like. Learn the rhythm, not the picture: the rhythm is what you will actually be reading.',
+  sendLabel: 'Send',
+  sendTitle: 'Send it',
+  sendBody:
+    'Now key it yourself. Sending builds a different memory from listening, and it is the fastest way to find out that your dashes are too short.',
+  statusDone: 'done',
+  statusCurrent: 'in progress',
+  statusTodo: 'not started',
+  courseStages: 'Course stages',
+  stageStatus: 'Stage {stage}, {characters}: {status}',
+  stepsForCharacter: 'Steps for this character',
+  stepStatus: ': {status}',
+  pathLabel: 'Path from the start: {code}, then {character}',
+  pathStart: 'Start',
+  codeLabel: 'Code: {code}',
+  achievementsReceived: 'Achievements received',
+  received: 'Received',
+  loadingLabel: 'Loading the lesson',
+  lesson: 'Lesson',
+  loading: 'Loading',
+  // Course complete
+  allStages: 'Lesson · all {count} stages',
+  courseComplete: 'Course complete',
+  charactersTaught: 'characters taught, every letter and digit, in {count} stages',
+  wholeCode: 'You have the whole code.',
+  completeBody:
+    'Knowing every character is the first half. The second is hearing them at speed, and that comes from short, regular practice. Pick one of these and keep the streak going.',
+  open: 'Open →',
+  goOver: 'Go over a stage again',
+  goOverNote:
+    'Teaching a stage again never takes anything away; your practice pool stays as it is.',
+  teachStageAgainLabel: 'Teach stage {stage} again: {characters}',
+  // Stage cleared
+  stageOf: 'Stage {stage} of {total}',
+  stageCleared: 'Stage cleared',
+  charactersInStage: 'Characters in this stage: ',
+  stageClearedStamp: 'Stage {stage} cleared',
+  taught: '{title}: taught.',
+  stageFallback: 'Stage {stage}',
+  mixedNext:
+    'Now hear them mixed with everything from earlier stages. A character you can only recognise on its own is not one you know yet.',
+  skippedNext:
+    'You skipped the sending, so nothing was checked yet. The drill does that by ear: it mixes these with everything from earlier stages.',
+  xpThisStage: 'XP this stage',
+  plusValue: '+{value}',
+  course: 'Course',
+  percent: '{value}%',
+  ofAnswered: 'of characters answered',
+  lettersInPractice: 'Letters in practice',
+  newInPractice: 'New in practice: {characters}',
+  alreadyHolds: 'Already holds this stage',
+  ownPace: 'Your method adds these at its own pace',
+  drillStage: 'Drill stage {stage}',
+  finishCourse: 'Finish the course',
+  skipToStage: 'Skip to stage {stage} →',
+  teachAgain: 'Teach it again',
+  install: 'Install for offline',
+  // Drill
+  nextStage: 'Next stage: {characters} →',
+  drillOf: 'Drill · stage {stage} of {total}',
+  prompts: '{count} prompts',
+  drillHeading: 'Everything so far, by ear',
+  drillCharacters: '{count} characters: {characters}',
+  skipDrillFinish: 'Skip the drill and finish',
+  skipDrill: 'Skip the drill',
+  teachStageAgain: 'Teach stage {stage} again',
+  // Teach
+  stageDayTitle: ' · {title}',
+  characterOf: 'Character {index} of {total}',
+  stepOf: 'Step {step} of {total}: ',
+  characterSuffix: ', {character}',
+  signalDetected: 'Signal detected',
+  listeningForKey: 'Listening for your key',
+  xpGain: '+{xp} XP',
+  xpFirstSignal: '+{xp} XP, your first signal',
+  thatIs: 'That is {character}.',
+  notACharacter: '<shown>{shown}</shown><spoken>{spoken}</spoken> is not a character.',
+  thatWas: 'That was {sent} <shown>({shown})</shown><spoken>, {spoken}</spoken>.',
+  targetIs: '{character} is <shown>{shown}</shown><spoken>{spoken}</spoken>. Try it again.',
+  nowHear: 'Now hear it',
+  nowSend: 'Now send it',
+  digitsBelow: 'Digits sit below the letters on the tree, {count} elements from the start.',
+  finishCharacter: 'Finish character',
+  skipSending: 'Skip sending',
+  noKeyboard: 'No keyboard, or no sound? Skip it: the drill checks {character} by ear.',
+  whereOnTree: 'Where you are on the tree',
+})

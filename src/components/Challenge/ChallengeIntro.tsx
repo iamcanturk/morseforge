@@ -1,10 +1,9 @@
-import {
-  challengePool,
-  describeChallenge,
-  isIncoming,
-  type ChallengeLink,
-} from '../../game/challengeLink'
+import { challengePool, isIncoming, type ChallengeLink } from '../../game/challengeLink'
+import { LEARNING_STAGES } from '../../data/morseAlphabet'
 import type { SignalMode } from '../../storage/settings'
+import { useT } from '../../i18n/react'
+import { renderRich } from '../../i18n/richReact'
+import type { Translator } from '../../i18n/translator'
 import { Screen } from '../ui/Screen'
 import { signalNote } from '../Practice/practice'
 import '../../styles/pkg-e.css'
@@ -25,10 +24,28 @@ export interface ChallengeIntroProps {
   signal: SignalMode
 }
 
+/**
+ * "60 seconds · 20 WPM · 26 letters", in the page's language: the same parts
+ * as `describeChallenge` in `src/game/challengeLink.ts`.
+ */
+export function describeChallenge(t: Translator, link: ChallengeLink): string {
+  const parts = [
+    t('challenge.describeTime', { seconds: link.time }),
+    t('challenge.describeWpm', { wpm: link.wpm }),
+    t('challenge.describeLetters', { count: challengePool(link).length }),
+  ]
+  if (link.count !== null) parts.push(t('challenge.describeCharacters', { count: link.count }))
+  return parts.join(' · ')
+}
+
+/** The two one-element letters the newcomer line names: E (short) and T (long). */
+const [SHORT, LONG] = LEARNING_STAGES[0] ?? []
+
 export function ChallengeIntro({ link, onStart, signal }: ChallengeIntroProps) {
+  const t = useT()
   const pool = challengePool(link)
   const incoming = isIncoming(link)
-  const note = signalNote(signal, 'character')
+  const note = signalNote(t, signal)
   const lampOnly = signal === 'lamp'
 
   return (
@@ -39,10 +56,10 @@ export function ChallengeIntro({ link, onStart, signal }: ChallengeIntroProps) {
         <div className="flex items-center justify-between gap-4">
           <h2 id="challenge-ready" className="mf-engraved flex items-center gap-2">
             <span className="mf-lamp" data-on="true" data-tone="amber" aria-hidden="true" />
-            {incoming ? 'Their run, your turn' : `${link.time}-second test`}
+            {incoming ? t('challenge.theirRun') : t('challenge.test', { seconds: link.time })}
           </h2>
           <span className="mf-engraved hidden sm:inline">
-            {lampOnly ? 'Watch · type what you see' : 'Listen · type what you hear'}
+            {lampOnly ? t('challenge.watchType') : t('challenge.listenType')}
           </span>
         </div>
 
@@ -57,15 +74,13 @@ export function ChallengeIntro({ link, onStart, signal }: ChallengeIntroProps) {
             <span className="font-mono text-readout-xl text-signal tabular-nums mf-phosphor">
               {link.time}
             </span>
-            <span className="mf-engraved sm:mt-2">seconds</span>
+            <span className="mf-engraved sm:mt-2">{t('challenge.seconds')}</span>
           </div>
           <div className="relative z-[3]">
             <p className="text-base text-ink sm:text-lead">
-              {lampOnly
-                ? 'One character flashes at a time. Type the letter you saw; the next one follows a moment later.'
-                : 'One character plays at a time. Type the letter you heard; the next one follows a moment later.'}
+              {lampOnly ? t('challenge.flashIntro') : t('challenge.playIntro')}
             </p>
-            <p className="mf-engraved mt-2">{describeChallenge(link)}</p>
+            <p className="mf-engraved mt-2">{describeChallenge(t, link)}</p>
           </div>
         </Screen>
 
@@ -76,12 +91,15 @@ export function ChallengeIntro({ link, onStart, signal }: ChallengeIntroProps) {
           onClick={onStart}
           className="mf-btn mf-btn-amber mf-btn-lg mf-btn-block mt-6"
         >
-          Start the {link.time} seconds
+          {t('challenge.startButton', { seconds: link.time })}
         </button>
 
         <div className="mt-6">
-          <p className="mf-engraved">The letters in this run</p>
-          <ul className="mt-3 flex flex-wrap gap-1.5" aria-label={`${pool.length} letters`}>
+          <p className="mf-engraved">{t('challenge.lettersHeading')}</p>
+          <ul
+            className="mt-3 flex flex-wrap gap-1.5"
+            aria-label={t('challenge.letterCount', { count: pool.length })}
+          >
             {pool.map((character) => (
               <li key={character} className="mf-kbd">
                 {character}
@@ -93,19 +111,22 @@ export function ChallengeIntro({ link, onStart, signal }: ChallengeIntroProps) {
         {note && (
           <p className="mt-4 text-sm text-muted" role="note">
             {note}{' '}
-            <a href="/settings/#signal" className="text-ink underline underline-offset-4">
-              Change it in settings
+            <a href={t.href('/settings/#signal')} className="text-ink underline underline-offset-4">
+              {t('challenge.changeInSettings')}
             </a>
             .
           </p>
         )}
 
         <p className="mt-4 text-sm text-muted">
-          New to Morse code? E is one short {lampOnly ? 'flash' : 'beep'} and T is one long one.{' '}
-          <a href="/learn/" className="text-signal underline underline-offset-4">
-            Learn your first letters
-          </a>{' '}
-          before the clock starts.
+          {renderRich(
+            t.rich(lampOnly ? 'challenge.newToMorseFlash' : 'challenge.newToMorseBeep', {
+              short: SHORT ?? '',
+              long: LONG ?? '',
+            }),
+            { learn: { href: '/learn/', class: 'text-signal underline underline-offset-4' } },
+            t,
+          )}
         </p>
       </section>
     </div>
@@ -114,36 +135,33 @@ export function ChallengeIntro({ link, onStart, signal }: ChallengeIntroProps) {
 
 /** The telegram a recipient holds: the sender's claimed score and the run's settings. */
 export function IncomingWire({ link }: { link: ChallengeLink }) {
+  const t = useT()
   return (
     <section aria-labelledby="incoming-heading" className="pe-telegram mf-slip p-5 sm:p-7">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="mf-engraved">
-            Incoming wire{link.seed !== null && <> · run {link.seed.toUpperCase()}</>}
+            {link.seed !== null
+              ? t('challenge.incomingRun', { run: link.seed.toUpperCase() })
+              : t('challenge.incomingWire')}
           </p>
           <h2 id="incoming-heading" className="mt-3 font-display text-h2 font-bold">
-            {link.beat !== null ? (
-              <>
-                Their score: <span className="tabular-nums">{link.beat}</span>
-              </>
-            ) : (
-              'Someone sent you this run'
-            )}
+            {link.beat !== null
+              ? renderRich(t.rich('challenge.theirScore', { score: link.beat }), {
+                  score: { el: 'span', class: 'tabular-nums' },
+                })
+              : t('challenge.someoneSent')}
           </h2>
           {link.beat !== null && (
-            <p className="pe-paper-muted mt-1 text-sm">
-              Claimed by the link. Nothing checks it; it is whatever the URL says.
-            </p>
+            <p className="pe-paper-muted mt-1 text-sm">{t('challenge.claimed')}</p>
           )}
         </div>
         <span className="mf-stamp pe-paper-stamp shrink-0 text-base sm:text-h3">
-          {link.beat !== null ? `Beat ${link.beat}` : 'Same run'}
+          {link.beat !== null ? t('challenge.beat', { score: link.beat }) : t('challenge.sameRun')}
         </span>
       </div>
       <p className="mt-4 max-w-[60ch]">
-        {link.seed !== null
-          ? 'You get the same characters, in the same order, at the same speed.'
-          : 'This is an older link without a fixed sequence: the speed and length match, but your characters will be your own draw.'}
+        {link.seed !== null ? t('challenge.sameSequence') : t('challenge.olderLink')}
       </p>
     </section>
   )

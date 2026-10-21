@@ -17,6 +17,8 @@ import { MORSE_ALPHABET } from '../../data/morseAlphabet'
 import type { SessionMode } from '../../game/session'
 import { masteryLevel } from '../../game/mastery'
 import { getCharacter, type ProgressRecord } from '../../storage/progress'
+import type { MessageKey } from '../../i18n/keys'
+import type { Translator } from '../../i18n/translator'
 
 /**
  * The lesson's stages: one per day of the plan. Defined once, in the data
@@ -37,22 +39,19 @@ export function stageDay(stageIndex: number) {
 export const TEACH_STEPS = ['see', 'hear', 'send'] as const
 export type TeachStep = (typeof TEACH_STEPS)[number]
 
-export const STEP_COPY: Record<TeachStep, { label: string; title: string; body: string }> = {
-  see: {
-    label: 'See',
-    title: 'See it',
-    body: 'This is the character and its code. Read the dots and dashes once, then stop reading them.',
-  },
-  hear: {
-    label: 'Hear',
-    title: 'Hear it',
-    body: 'This is what it sounds like. Learn the rhythm, not the picture: the rhythm is what you will actually be reading.',
-  },
-  send: {
-    label: 'Send',
-    title: 'Send it',
-    body: 'Now key it yourself. Sending builds a different memory from listening, and it is the fastest way to find out that your dashes are too short.',
-  },
+const STEP_KEYS = {
+  see: { label: 'lesson.seeLabel', title: 'lesson.seeTitle', body: 'lesson.seeBody' },
+  hear: { label: 'lesson.hearLabel', title: 'lesson.hearTitle', body: 'lesson.hearBody' },
+  send: { label: 'lesson.sendLabel', title: 'lesson.sendTitle', body: 'lesson.sendBody' },
+} as const satisfies Record<TeachStep, Record<'label' | 'title' | 'body', MessageKey>>
+
+/** What each teaching step is called and says, in the page's language. */
+export function stepCopy(
+  t: Translator,
+  step: TeachStep,
+): { label: string; title: string; body: string } {
+  const keys = STEP_KEYS[step]
+  return { label: t(keys.label), title: t(keys.title), body: t(keys.body) }
 }
 
 /** Where the lesson is: which stage, which character in it, which step. */

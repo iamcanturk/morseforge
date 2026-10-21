@@ -8,10 +8,8 @@ import { useInView } from '../MorseKey/useInView'
 import { releaseFocus } from '../MorseKey/releaseFocus'
 import { MORSE_ALPHABET, ALL_LETTERS, LEARNING_STAGES } from '../../data/morseAlphabet'
 import { prettify } from '../../engine/morseEncoder'
-import { spokenCode } from '../../engine/spokenCode'
 import {
   NEXT_PROMPT_DELAY_MS,
-  SESSION_MODES,
   type SessionConfig,
   type SessionMode,
   type SessionSummary,
@@ -23,6 +21,7 @@ import {
   type SettingsRecord,
 } from '../../storage/settings'
 import { useTransmitter, type TransmitTiming } from '../ui/transmitter'
+import { commitLabel, keyLabel as keyCap } from '../MorseKey/keyCopy'
 import { SignalLamp } from '../ui/SignalLamp'
 import { distinctPools, feedbackSpeech, receiveLabel } from './practice'
 import { SignalTree } from '../SignalTree/SignalTree'
@@ -52,6 +51,9 @@ import {
 } from '../../game/challengeLink'
 import { SITE } from '../../config/site'
 import { ChallengeIntro } from '../Challenge/ChallengeIntro'
+import { useT, withI18n } from '../../i18n/react'
+import type { Translator } from '../../i18n/translator'
+import { modeCopy } from './copy'
 import { Screen } from '../ui/Screen'
 import { Readout } from '../ui/Readout'
 import { Lamp } from '../ui/Lamp'
@@ -103,12 +105,26 @@ function stagePool(stages: number): readonly string[] {
   return LEARNING_STAGES.slice(0, stages).flat()
 }
 
-const FIXED_POOLS: readonly PoolChoice<Exclude<PoolId, 'method'>>[] = [
-  { id: 'stage1', label: stagePool(1).join(' '), characters: stagePool(1) },
-  { id: 'stage2', label: `First ${stagePool(2).length}`, characters: stagePool(2) },
-  { id: 'stage3', label: `First ${stagePool(3).length}`, characters: stagePool(3) },
-  { id: 'all', label: `All ${ALL_LETTERS.length}`, characters: ALL_LETTERS },
-]
+function fixedPools(t: Translator): readonly PoolChoice<Exclude<PoolId, 'method'>>[] {
+  return [
+    { id: 'stage1', label: stagePool(1).join(' '), characters: stagePool(1) },
+    {
+      id: 'stage2',
+      label: t('practice.poolFirst', { count: stagePool(2).length }),
+      characters: stagePool(2),
+    },
+    {
+      id: 'stage3',
+      label: t('practice.poolFirst', { count: stagePool(3).length }),
+      characters: stagePool(3),
+    },
+    {
+      id: 'all',
+      label: t('practice.poolAll', { count: ALL_LETTERS.length }),
+      characters: ALL_LETTERS,
+    },
+  ]
+}
 
 /** A "drill these" run: enough prompts per character to mean something. */
 const DRILL_PER_CHARACTER = 5
@@ -138,6 +154,9 @@ interface Feedback {
   given: string
 }
 
+/** The practice page's island: `PracticeScreen` with its messages from the page. */
+export const PracticeIsland = withI18n(PracticeScreen)
+
 export function PracticeScreen({
   challenge = false,
   preset,
@@ -145,6 +164,7 @@ export function PracticeScreen({
   onFinish,
   onStatus,
 }: PracticeScreenProps) {
+  const t = useT()
   const settingsStore = useMemo(() => createSettingsStore(), [])
   const [settings, setSettings] = useState<SettingsRecord>(defaultSettings)
 
@@ -217,12 +237,12 @@ export function PracticeScreen({
     () => [
       {
         id: 'method',
-        label: `My method (${methodCharacters.length})`,
+        label: t('practice.poolMethod', { count: methodCharacters.length }),
         characters: methodCharacters,
       },
-      ...distinctPools(FIXED_POOLS, methodCharacters),
+      ...distinctPools(fixedPools(t), methodCharacters),
     ],
-    [methodCharacters],
+    [methodCharacters, t],
   )
   // A pool can drop out of the list when the method grows into it; the
   // characters are then the method's own, so "My method" is the same choice.
@@ -456,6 +476,8 @@ export function PracticeScreen({
     wordGapMs: settings.timing.wordGapMs,
     autoCommit: settings.timing.autoCommit,
     bindings: settings.keys,
+    keyer: settings.keyer.type,
+    swapPaddles: settings.keyer.swapPaddles,
     frequency: settings.audio.frequency,
     volume: settings.audio.enabled ? settings.audio.volume : 0,
     // In tree layout the key is always live: keying a character back is a
@@ -538,10 +560,10 @@ export function PracticeScreen({
 
     const leaveDrill: ResultAction = {
       label: challenge
-        ? 'Back to the challenge'
+        ? t('practice.backToChallenge')
         : preset
-          ? 'Back to the stage drill'
-          : 'Back to set-up',
+          ? t('practice.backToDrill')
+          : t('practice.backToSetup'),
       onClick: () => {
         setDrill(null)
         session.reset()
@@ -564,7 +586,13 @@ export function PracticeScreen({
           versus={timed ? versus(link, result.score) : null}
           primaryAction={main}
           secondaryAction={back}
-          againLabel={drill ? 'Drill again' : timed ? 'Play again' : 'Again'}
+          againLabel={
+            drill
+              ? t('practice.drillAgain')
+              : timed
+                ? t('practice.playChallengeAgain')
+                : t('practice.again')
+          }
           onAgain={() => {
             setUnlockNotice(null)
             if (timed) beginChallenge()
@@ -588,7 +616,13 @@ export function PracticeScreen({
           }
           shareBlurb={
             timed
-              ? `The link carries this exact run: the same ${characters.length} letters in the same order at ${link.wpm} WPM${result.score > 0 ? `, with your ${result.score} to beat` : ''}. Nothing is stored anywhere.`
+              ? result.score > 0
+                ? t('practice.challengeBlurbScore', {
+                    count: characters.length,
+                    wpm: link.wpm,
+                    score: result.score,
+                  })
+                : t('practice.challengeBlurb', { count: characters.length, wpm: link.wpm })
               : undefined
           }
         />
@@ -614,7 +648,7 @@ export function PracticeScreen({
           <section aria-labelledby="ready-heading" className="mf-instrument p-5 sm:p-8">
             <h2 id="ready-heading" className="mf-engraved flex items-center gap-2">
               <span className="mf-lamp" data-on="true" aria-hidden="true" />
-              Ready · {SESSION_MODES[fixed.mode].label} · {fixed.length} prompts
+              {t('practice.ready', { mode: modeCopy(t, fixed.mode).label, count: fixed.length })}
             </h2>
             <p className="mt-4 font-mono text-label tracking-code text-muted">
               {fixed.characters.join(' ')}
@@ -624,7 +658,7 @@ export function PracticeScreen({
               onClick={beginPractice}
               className="mf-btn mf-btn-primary mf-btn-lg mf-btn-block mt-6"
             >
-              Start
+              {t('practice.start')}
             </button>
           </section>
         </div>
@@ -665,10 +699,10 @@ export function PracticeScreen({
 
   return (
     <div ref={frame}>
-      <section aria-label="Practice session" className="mf-instrument p-4 sm:p-6">
+      <section aria-label={t('practice.session')} className="mf-instrument p-4 sm:p-6">
         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-stretch gap-3">
           <Readout
-            label="Right"
+            label={t('practice.right')}
             value={
               <span className={HUD}>
                 {correctSoFar}
@@ -684,11 +718,15 @@ export function PracticeScreen({
               // live region would talk over the character being played, which
               // is the thing the user is trying to hear.
               aria-live={seconds % 10 === 0 ? 'polite' : 'off'}
-              aria-label={`${seconds} seconds left${urgent ? ', hurry' : ''}`}
+              aria-label={
+                urgent
+                  ? t('practice.secondsLeftHurry', { seconds })
+                  : t('practice.secondsLeft', { seconds })
+              }
             >
               <Readout
-                label={urgent ? 'Time !' : 'Time'}
-                value={<span className={HUD}>{seconds}s</span>}
+                label={urgent ? t('practice.timeUrgent') : t('practice.time')}
+                value={<span className={HUD}>{t('practice.seconds', { seconds })}</span>}
                 tone={urgent ? 'danger' : 'ink'}
                 lamp={urgent}
                 className="h-full"
@@ -696,7 +734,7 @@ export function PracticeScreen({
             </div>
           ) : config.target !== null ? (
             <Readout
-              label="Prompt"
+              label={t('practice.prompt')}
               value={
                 <span className={HUD}>
                   {Math.min(answered + 1, config.target)}
@@ -706,7 +744,7 @@ export function PracticeScreen({
             />
           ) : (
             <Readout
-              label="Accuracy"
+              label={t('practice.accuracy')}
               value={
                 <span className={HUD}>
                   {answered === 0 ? '—' : `${Math.round((correctSoFar / answered) * 100)}%`}
@@ -719,7 +757,7 @@ export function PracticeScreen({
             onClick={session.stop}
             className="mf-btn mf-btn-danger self-center border border-line-strong"
           >
-            End
+            {t('practice.end')}
           </button>
         </div>
 
@@ -734,32 +772,34 @@ export function PracticeScreen({
               <Lamp
                 on={config.mode === 'listening' ? playingPrompt : true}
                 tone={config.mode === 'listening' ? 'cyan' : 'signal'}
-                label={playingPrompt ? 'Receiving' : undefined}
+                label={playingPrompt ? t('practice.receiving') : undefined}
               />
               {config.mode === 'listening'
-                ? receiveLabel(settings.signal)
+                ? receiveLabel(t, settings.signal)
                 : config.mode === 'recognition'
-                  ? 'Read'
-                  : 'TX · send'}
+                  ? t('practice.read')
+                  : t('practice.txSend')}
             </span>
             <div className="min-h-6 text-right">
               {/* What a screen reader hears, in words (A-02, A-11): the answer
                 and, on a miss, what it was and how it sounds. Keyed per
                 answer, so two identical results in a row are both read. */}
               <span aria-live="polite" className="sr-only">
-                {feedback && <span key={feedback.id}>{feedbackSpeech(feedback)}</span>}
+                {feedback && <span key={feedback.id}>{feedbackSpeech(t, feedback)}</span>}
               </span>
               {feedback &&
                 (feedback.correct ? (
                   <span aria-hidden="true" className="font-mono text-control text-signal uppercase">
-                    ✓ {feedback.expected} · correct
+                    {t('practice.correctShown', { character: feedback.expected })}
                   </span>
                 ) : (
                   <span aria-hidden="true" className="font-mono text-control text-danger uppercase">
-                    ✕ {feedback.given ? `You said ${feedback.given}` : 'Missed'}
+                    {feedback.given
+                      ? t('practice.youSaidShown', { given: feedback.given })
+                      : t('practice.missedShown')}
                     {config.mode === 'sending' && (
                       <>
-                        {' · it was '}
+                        {t('practice.itWasInline')}
                         <span className="text-ink">{feedback.expected}</span>{' '}
                         <span className="text-cyan tracking-code">
                           {prettify(MORSE_ALPHABET[feedback.expected] ?? '')}
@@ -783,7 +823,7 @@ export function PracticeScreen({
               // reading and sending keep the next prompt up. The live region
               // above says all of it, so this is for the eye only.
               <div key={feedback.id} className="grid justify-items-center gap-2" aria-hidden="true">
-                <span className="mf-engraved">It was</span>
+                <span className="mf-engraved">{t('practice.itWas')}</span>
                 <span className="font-display text-glyph font-bold text-ink">
                   {feedback.expected}
                 </span>
@@ -816,7 +856,7 @@ export function PracticeScreen({
                     >
                       {prettify(code)}
                     </span>
-                    <span className="sr-only">{spokenCode(code)}</span>
+                    <span className="sr-only">{t.spokenCode(code)}</span>
                   </>
                 )}
                 {config.mode === 'sending' && current && (
@@ -852,7 +892,7 @@ export function PracticeScreen({
               sending. */}
             {config.mode === 'listening' && current && (
               <button type="button" onClick={replay} className="mf-btn pe-screen-btn">
-                <span aria-hidden="true">▶</span> Play again
+                <span aria-hidden="true">▶</span> {t('practice.playAgain')}
               </button>
             )}
           </div>
@@ -866,7 +906,7 @@ export function PracticeScreen({
               }}
             >
               <label htmlFor="practice-answer" className="sr-only">
-                What character was that?
+                {t('practice.answerLabel')}
               </label>
               {/* Never remounted: the field keeps focus through a miss (A-01). */}
               <div className={shakeClass(feedback)}>
@@ -892,7 +932,7 @@ export function PracticeScreen({
                 disabled={guess.trim() === ''}
                 className="mf-btn mf-btn-primary min-h-[72px] px-6"
               >
-                Enter
+                {t('practice.enter')}
               </button>
             </form>
           ) : (
@@ -913,9 +953,7 @@ export function PracticeScreen({
               onSelect={answer}
               className="min-w-0"
             />
-            <p className="mt-3 text-center text-sm text-muted">
-              Tap a node, or key it and watch the path light up as you go.
-            </p>
+            <p className="mt-3 text-center text-sm text-muted">{t('practice.treeHint')}</p>
           </div>
         )}
 
@@ -927,9 +965,11 @@ export function PracticeScreen({
               preview={key.state.preview}
               commitProgress={key.state.commitProgress}
               autoCommit={settings.timing.autoCommit}
-              keyLabel={settings.keys.key === ' ' ? 'SPACE' : settings.keys.key.toUpperCase()}
-              commitLabel={(settings.keys.submit ?? 'Control').toUpperCase()}
+              keyLabel={keyCap(t, settings.keys.key)}
+              commitLabel={commitLabel(t, settings.keys.submit)}
               pointerHandlers={key.pointerHandlers}
+              paddles={key.paddles}
+              toneOn={key.state.toneOn}
             />
             <button
               type="button"
@@ -942,7 +982,7 @@ export function PracticeScreen({
               disabled={key.state.pending === ''}
               className="mf-btn mf-btn-secondary mf-btn-block mx-auto mt-5 max-w-md"
             >
-              Finish character
+              {t('practice.finishCharacter')}
             </button>
           </div>
         )}

@@ -1,5 +1,6 @@
 ---
-import { THEME_CONTROL_SCRIPT } from './ui/themeControl'
+import { themeControlScript, themeLabels } from './ui/themeControl'
+import { useTranslations } from '../i18n/server'
 
 /**
  * Theme switch for the Settings page (PROJECT.md §26). The header has the
@@ -24,17 +25,18 @@ import { THEME_CONTROL_SCRIPT } from './ui/themeControl'
  * Settings passes this into its island as a slot, so the markup arrives as
  * static HTML and the inline script binds it as soon as it is parsed.
  */
+const t = useTranslations(Astro)
 const options = [
-  { value: 'system', label: 'Follow system theme' },
-  { value: 'dark', label: 'Dark theme' },
-  { value: 'light', label: 'Light theme' },
+  { value: 'system', label: t('theme.followSystem') },
+  { value: 'dark', label: t('theme.darkTheme') },
+  { value: 'light', label: t('theme.lightTheme') },
 ] as const
 ---
 
 <div
   class="mf-segmented mf-segmented-sm mf-segmented-icons"
   role="radiogroup"
-  aria-label="Colour theme"
+  aria-label={t('theme.colourTheme')}
   data-theme-toggle
 >
   {
@@ -94,4 +96,4 @@ const options = [
   }
 </div>
 
-<script is:inline set:html={THEME_CONTROL_SCRIPT} />
+<script is:inline set:html={themeControlScript(themeLabels(t))} />

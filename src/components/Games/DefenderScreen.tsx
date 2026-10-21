@@ -32,7 +32,7 @@ import {
 import { createRandom, seedFrom } from '../../game/random'
 import { AudioEngine } from '../../engine/audioEngine'
 import { MORSE_ALPHABET } from '../../data/morseAlphabet'
-import { joinList, numberWord } from '../../data/format'
+import { useT } from '../../i18n/react'
 import { createSettingsStore, defaultSettings, type SettingsRecord } from '../../storage/settings'
 import { answer as recordAnswer, createProgressStore } from '../../storage/progress'
 import { createStatsStore } from '../../storage/stats'
@@ -105,6 +105,7 @@ const PREVIEW_SPOTS = [
 ] as const
 
 export function DefenderScreen({ identity }: { identity: GameIdentity }) {
+  const t = useT()
   const settingsStore = useMemo(() => createSettingsStore(), [])
   const progressStore = useMemo(() => createProgressStore(), [])
   const statsStore = useMemo(() => createStatsStore(), [])
@@ -245,7 +246,7 @@ export function DefenderScreen({ identity }: { identity: GameIdentity }) {
       // A landed signal is the one moment its letter is worth telling: it is
       // how the code gets learned next time.
       const letters = [...new Set(landed.map((signal) => signal.character))]
-      setFeedback({ kind: 'miss', text: `${joinList(letters)} got through` })
+      setFeedback({ kind: 'miss', text: t('defender.gotThrough', { letters: t.list(letters) }) })
     }
     if (isOver(state)) finish(state)
   })
@@ -269,14 +270,20 @@ export function DefenderScreen({ identity }: { identity: GameIdentity }) {
         }
         setBursts((list) => [...list, burst])
         later(BURST_MS * 2, () => setBursts((list) => list.filter((entry) => entry !== burst)))
-        setFeedback({ kind: 'hit', text: `${hit.character} down, +${burst.points}` })
+        setFeedback({
+          kind: 'hit',
+          text: t('defender.down', { character: hit.character, points: burst.points }),
+        })
       } else {
         if (blamed) record(blamed.character, false)
         setMisses((count) => count + 1)
-        setFeedback({ kind: 'miss', text: `${character.toUpperCase()} matched nothing` })
+        setFeedback({
+          kind: 'miss',
+          text: t('defender.matchedNothing', { character: character.toUpperCase() }),
+        })
       }
     },
-    [commit, record, later],
+    [commit, record, later, t],
   )
 
   const quit = useCallback(() => {
@@ -297,14 +304,14 @@ export function DefenderScreen({ identity }: { identity: GameIdentity }) {
     return (
       <GameSetup
         identity={identity}
-        console="Receiving console"
-        startLabel="Start"
+        console={t('defender.console')}
+        startLabel={t('defender.start')}
         onStart={start}
         rules={[
-          'Signals fall as Morse code, each one sounding as it appears.',
-          'Type the character a code spells to knock down the lowest one that matches.',
-          'The letter shows only once it is hit.',
-          `Let ${numberWord(STARTING_LIVES)} reach the floor and the run is over.`,
+          t('defender.ruleFall'),
+          t('defender.ruleType'),
+          t('defender.ruleReveal'),
+          t('defender.ruleLives', { lives: t.numberWord(STARTING_LIVES) }),
         ]}
         preview={
           <>
@@ -324,12 +331,7 @@ export function DefenderScreen({ identity }: { identity: GameIdentity }) {
           </>
         }
         note={
-          !settings.audio.enabled && (
-            <p className="text-sm text-amber">
-              Sound is off in settings. The signals still fall and still show their code, so the
-              game works: you read each code instead of hearing it.
-            </p>
-          )
+          !settings.audio.enabled && <p className="text-sm text-amber">{t('defender.soundOff')}</p>
         }
       />
     )
@@ -341,21 +343,32 @@ export function DefenderScreen({ identity }: { identity: GameIdentity }) {
     return (
       <GameOver
         identity={identity}
-        overLabel="Overrun"
+        overLabel={t('defender.overrun')}
         quit={game.quit}
         score={game.score}
         cleared={accuracy(game)}
-        caption={`${percent}% cleared · ${game.hits} down, ${game.leaked.length} landed`}
+        caption={t('defender.caption', {
+          percent,
+          hits: game.hits,
+          landed: game.leaked.length,
+        })}
         plates={[
-          { label: 'Best streak', value: String(game.bestStreak) },
-          { label: 'Lasted', value: `${Math.round(game.elapsedMs / 1000)}s` },
-          { label: 'XP', value: `+${formatScore(report.xp)}`, tone: 'amber' },
+          { label: t('defender.bestStreak'), value: String(game.bestStreak) },
+          {
+            label: t('defender.lasted'),
+            value: t('defender.seconds', { seconds: Math.round(game.elapsedMs / 1000) }),
+          },
+          {
+            label: t('defender.xp'),
+            value: t('defender.plusXp', { xp: formatScore(report.xp) }),
+            tone: 'amber',
+          },
         ]}
         outcomes={game.outcomes}
-        stripCaption="Each lamp is one signal or one key, in order. A ring is a miss."
+        stripCaption={t('defender.strip')}
         report={report}
         weakest={weakest(game)}
-        weakestLabel="What got past you"
+        weakestLabel={t('defender.gotPast')}
         onAgain={start}
         onSetup={setup}
       />
@@ -369,28 +382,28 @@ export function DefenderScreen({ identity }: { identity: GameIdentity }) {
     <section
       ref={cabinet}
       className="mf-instrument gm-cabinet p-4 sm:p-6"
-      aria-label={`${identity.name}, playing`}
+      aria-label={t('defender.playing', { name: identity.name })}
     >
       <PlateRow
-        title={`${identity.name} · Receiving`}
+        title={t('defender.receiving', { name: identity.name })}
         status={
           <StatusLamp on tone={danger ? 'danger' : 'signal'}>
-            On air
+            {t('defender.onAir')}
           </StatusLamp>
         }
       >
         <button type="button" onClick={quit} className="mf-btn mf-btn-danger mf-btn-sm">
-          End run
+          {t('defender.endRun')}
         </button>
       </PlateRow>
 
       <div className="gm-console mt-4">
         <div className="gm-hud">
-          <HudCell label="Score">{formatScore(game.score)}</HudCell>
+          <HudCell label={t('defender.score')}>{formatScore(game.score)}</HudCell>
           <HudCell
-            label="Streak"
+            label={t('defender.streak')}
             tone={game.streak >= 5 ? 'amber' : undefined}
-            sub={`×${streakMultiplier(game.streak).toFixed(1)}`}
+            sub={t('defender.multiplier', { value: streakMultiplier(game.streak).toFixed(1) })}
           >
             {game.streak}
           </HudCell>
@@ -398,7 +411,7 @@ export function DefenderScreen({ identity }: { identity: GameIdentity }) {
           {/* Desk only: the column has room, and a reminder of what can fall
               is worth more there than empty panel. */}
           <div className="gm-hud-cell hidden lg:grid">
-            <span className="mf-engraved">On the wire</span>
+            <span className="mf-engraved">{t('defender.onTheWire')}</span>
             <span className="font-mono text-sm tracking-code break-words text-ink">
               {pool.characters.join(' ')}
             </span>
@@ -434,10 +447,10 @@ export function DefenderScreen({ identity }: { identity: GameIdentity }) {
 
             <span className="gm-floor" aria-hidden="true" />
             <span className="mf-engraved gm-floor-label" aria-hidden="true">
-              Floor
+              {t('defender.floor')}
             </span>
             <span className="gm-corner right-3 bottom-2" aria-hidden="true">
-              <span className="mf-engraved">Pressure</span>
+              <span className="mf-engraved">{t('defender.pressure')}</span>
               <span className="gm-gauge" style={{ '--fill': load } as CSSProperties}>
                 <span />
               </span>
@@ -454,7 +467,7 @@ export function DefenderScreen({ identity }: { identity: GameIdentity }) {
         >
           <div className="mf-screen mf-screen-flush grid gap-2 p-3">
             <label htmlFor="defender-answer" className="mf-engraved">
-              Type what each code spells
+              {t('defender.typeLabel')}
             </label>
             {/* Two shake classes, alternated, so each wrong key restarts the
                 shake without remounting (and so unfocusing) the field. */}
@@ -491,7 +504,7 @@ export function DefenderScreen({ identity }: { identity: GameIdentity }) {
                   gridTemplateColumns: `repeat(${Math.min(pool.characters.length, 4)}, minmax(0, 1fr))`,
                 }}
                 role="group"
-                aria-label="Answer pad"
+                aria-label={t('defender.answerPad')}
               >
                 {pool.characters.map((character) => (
                   <button
@@ -512,7 +525,7 @@ export function DefenderScreen({ identity }: { identity: GameIdentity }) {
                   {feedback.text}
                 </span>
               ) : (
-                <span className="text-muted">Waiting for the first signal</span>
+                <span className="text-muted">{t('defender.waiting')}</span>
               )}
             </p>
           </div>

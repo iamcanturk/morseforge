@@ -8,6 +8,7 @@
  * was, left-aligned, so "Home" still lines up with the H1 below it.
  */
 import type { Crumb } from '../../config/pages'
+import { useTranslations } from '../../i18n/server'
 
 export interface Props {
   trail: readonly Crumb[]
@@ -15,11 +16,12 @@ export interface Props {
 }
 
 const { trail, class: className } = Astro.props
+const t = useTranslations(Astro)
 ---
 
 {
   trail.length > 0 && (
-    <nav aria-label="Breadcrumb" class={className}>
+    <nav aria-label={t('crumbs.label')} class={className}>
       <ol class="mf-engraved flex flex-wrap items-center gap-x-2 gap-y-1">
         {trail.map((crumb, index) => (
           <li class="flex items-center gap-2">

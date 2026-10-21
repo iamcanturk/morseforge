@@ -8,7 +8,8 @@
  * a question nobody can weigh without knowing what "all" is.
  */
 
-import { joinList, plural } from '../../data/format'
+import type { MessageKey } from '../../i18n/keys'
+import type { Translator } from '../../i18n/translator'
 import { currentStreak, levelFromXp } from '../../game/progression'
 import { type BackupSection, BACKUP_SECTIONS, type ImportResult } from '../../storage/backup'
 import { DAILY_KEY, type DailyRecord } from '../../storage/daily'
@@ -18,20 +19,29 @@ import { STATS_KEY, type StatsRecord } from '../../storage/stats'
 import { isRecord } from '../../storage/store'
 
 /** How each section is named mid-sentence, to the person whose data it is. */
-export const SECTION_LABELS: Readonly<Record<BackupSection, string>> = {
-  progress: 'learning progress',
-  settings: 'settings',
-  stats: 'stats',
-  daily: 'daily results',
+const SECTION_LABEL_KEYS: Readonly<Record<BackupSection, MessageKey>> = {
+  progress: 'settings.sectionProgress',
+  settings: 'settings.sectionSettings',
+  stats: 'settings.sectionStats',
+  daily: 'settings.sectionDaily',
 }
 
-/** What each section holds, for the line under its name. */
-export const SECTION_HINTS: Readonly<Record<BackupSection, string>> = {
-  progress: 'Every character you have met, its accuracy and when it is due',
-  settings: 'Signal, tone, speed, keys, motion and usage counts',
-  stats: 'XP, level, streak, sessions and achievements',
-  daily: 'Your daily challenge results and their streak',
+const SECTION_HINT_KEYS: Readonly<Record<BackupSection, MessageKey>> = {
+  progress: 'settings.sectionProgressHint',
+  settings: 'settings.sectionSettingsHint',
+  stats: 'settings.sectionStatsHint',
+  daily: 'settings.sectionDailyHint',
 }
+
+/** What a backup section is called in a sentence: "learning progress". */
+export const sectionLabel = (t: Translator, section: BackupSection): string =>
+  t.raw(SECTION_LABEL_KEYS[section])
+
+/** One line under a section's name, saying what it holds. */
+export const sectionHint = (t: Translator, section: BackupSection): string =>
+  t.raw(SECTION_HINT_KEYS[section])
+
+/** What each section holds, for the line under its name. */
 
 /**
  * The storage key each section is filed under in a backup. backup.ts keeps
@@ -99,35 +109,33 @@ export function sectionOutcomes(result: ImportResult): Record<BackupSection, Sec
   }
 }
 
-const names = (sections: readonly BackupSection[]) =>
-  joinList(sections.map((section) => SECTION_LABELS[section]))
+/** "learning progress and stats". */
+export const sectionNames = (t: Translator, sections: readonly BackupSection[]): string =>
+  t.list(sections.map((section) => sectionLabel(t, section)))
 
 /** The one-sentence verdict announced after an import. */
-export function importSummary(result: ImportResult): string {
-  if (!result.recognised) {
-    return 'Nothing restored. This file is not a MorseForge backup, so nothing was changed.'
-  }
+export function importSummary(t: Translator, result: ImportResult): string {
+  if (!result.recognised) return t('settings.notBackup')
+  const names = (sections: readonly BackupSection[]) => sectionNames(t, sections)
   const unsaved =
     result.unsaved.length === 0
       ? ''
-      : `Could not save ${names(result.unsaved)} in this browser, so what was here is unchanged.`
+      : t('settings.couldNotSave', { sections: names(result.unsaved) })
   if (result.restored.length === 0) {
-    const parts = ['Nothing restored.']
+    const parts = [t('settings.nothingRestored')]
     if (result.rejected.length > 0) {
       parts.push(
         result.unsaved.length === 0
-          ? `The ${names(result.rejected)} in this file did not pass validation, so nothing in this browser was changed.`
-          : `The ${names(result.rejected)} in this file did not pass validation.`,
+          ? t('settings.failedValidationKept', { sections: names(result.rejected) })
+          : t('settings.failedValidation', { sections: names(result.rejected) }),
       )
     }
     if (unsaved) parts.push(unsaved)
     return parts.join(' ')
   }
-  const parts = [`Restored ${names(result.restored)}.`]
+  const parts = [t('settings.restoredSections', { sections: names(result.restored) })]
   if (result.rejected.length > 0) {
-    parts.push(
-      `Rejected ${names(result.rejected)}: incomplete or from a newer version, so the copy in this browser was kept.`,
-    )
+    parts.push(t('settings.rejectedSections', { sections: names(result.rejected) }))
   }
   if (unsaved) parts.push(unsaved)
   return parts.join(' ')
@@ -175,22 +183,25 @@ export function isEmptyInventory(inventory: Inventory): boolean {
  * The consequence statement for the reset confirmation, built from the real
  * numbers so the dialog says what is actually at stake.
  */
-export function resetConsequence(inventory: Inventory): string {
+export function resetConsequence(t: Translator, inventory: Inventory): string {
   const parts: string[] = []
   if (inventory.characters > 0) {
-    parts.push(`history for ${plural(inventory.characters, 'character')}`)
+    parts.push(t('settings.historyFor', { count: inventory.characters }))
   }
   if (inventory.xp > 0) {
-    parts.push(`level ${inventory.level} and ${inventory.xp.toLocaleString('en')} XP`)
+    parts.push(
+      t('settings.levelAndXp', {
+        level: inventory.level,
+        xp: inventory.xp.toLocaleString(t.locale.lang === 'en' ? 'en' : t.locale.lang),
+      }),
+    )
   }
-  if (inventory.streak > 0) parts.push(`a ${inventory.streak}-day streak`)
-  if (inventory.dailies > 0) parts.push(plural(inventory.dailies, 'daily result'))
+  if (inventory.streak > 0) parts.push(t('settings.streakDays', { days: inventory.streak }))
+  if (inventory.dailies > 0) parts.push(t('settings.dailyResults', { count: inventory.dailies }))
 
-  const settings = 'every setting except the anonymous usage counts goes back to its default'
-  if (parts.length === 0) {
-    return `There is no progress stored yet, so only the settings change: ${settings}.`
-  }
-  return `This erases ${joinList(parts)}, and ${settings}. There is no other copy, so it cannot be undone.`
+  const settings = t('settings.resetSettings')
+  if (parts.length === 0) return t('settings.resetNothing', { settings })
+  return t('settings.resetErases', { parts: t.list(parts), settings })
 }
 
 /** `morseforge-backup-2026-10-21.json`, dated in the user's own day. */

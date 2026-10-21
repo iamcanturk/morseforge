@@ -3,6 +3,10 @@ import { type CardData, cardDescription, drawCard, ensureCardFonts, toBlob } fro
 import { SITE } from '../../config/site'
 import { shareData, type ShareMessage } from '../../game/share'
 import { track } from '../../analytics/track'
+import { useT } from '../../i18n/react'
+
+/** The file a saved card downloads as. A name, not copy: it stays the same in every language. */
+const CARD_FILE = 'morseforge-result.png'
 
 /**
  * The result card as an image, and the two ways to get it out.
@@ -62,6 +66,7 @@ export function ShareCard({ data, message }: { data: CardData; message: ShareMes
     [],
   )
 
+  const t = useT()
   const flash = useCallback((text: string) => {
     if (flashTimer.current !== null) clearTimeout(flashTimer.current)
     setStatus(text)
@@ -72,25 +77,25 @@ export function ShareCard({ data, message }: { data: CardData; message: ShareMes
     if (!canvas.current) return
     const blob = image.current ?? (await toBlob(canvas.current))
     if (!blob) {
-      flash('The image could not be made in this browser.')
+      flash(t('share.imageFailed'))
       return
     }
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = 'morseforge-result.png'
+    link.download = CARD_FILE
     link.click()
     // Revoked later: some browsers start the download after the handler
     // returns, and a revoked URL downloads nothing.
     setTimeout(() => URL.revokeObjectURL(url), 1000)
-    flash('Saved morseforge-result.png')
-  }, [flash])
+    flash(t('share.imageSaved', { file: CARD_FILE }))
+  }, [flash, t])
 
   const share = useCallback(async () => {
     // Nothing awaited before the share itself: see the draw effect.
     const file = image.current
     if (!file) {
-      flash('The image is still being made. Try again in a moment.')
+      flash(t('share.imageNotReady'))
       return
     }
     track('share_open', 'card')
@@ -100,9 +105,9 @@ export function ShareCard({ data, message }: { data: CardData; message: ShareMes
       // Dismissed: the person's choice, nothing to say.
       if (error instanceof DOMException && error.name === 'AbortError') return
       // Refused: say so, rather than a button that silently does nothing.
-      flash('Sharing the image was refused here. Save it instead, or use the link above.')
+      flash(t('share.imageRefused'))
     }
-  }, [message, flash])
+  }, [message, flash, t])
 
   return (
     <div>
@@ -117,11 +122,11 @@ export function ShareCard({ data, message }: { data: CardData; message: ShareMes
       <div className="mt-4 flex flex-wrap gap-3">
         {canShareFiles && (
           <button type="button" onClick={() => void share()} className="mf-btn mf-btn-secondary">
-            Share image
+            {t('share.shareImage')}
           </button>
         )}
         <button type="button" onClick={() => void download()} className="mf-btn mf-btn-secondary">
-          Save image
+          {t('share.saveImage')}
         </button>
       </div>
       {/* Mounted whether or not there is a message: a live region that appears

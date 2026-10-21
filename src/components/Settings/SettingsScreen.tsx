@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ConfirmDialog, KeyCapture, Panel, Row, Slider, Switch, keyName } from './controls'
 import {
-  SECTION_HINTS,
-  SECTION_LABELS,
   backupFileName,
   importSummary,
   isAppleMobile,
   previewBackup,
   resetConsequence,
+  sectionHint,
+  sectionLabel,
+  sectionNames,
   sectionOutcomes,
   takeInventory,
   type BackupPreview,
@@ -16,9 +17,15 @@ import {
 import { REFERENCE_WORD, TimingPreview } from './TimingPreview'
 import { track } from '../../analytics/track'
 import { METHODS, METHOD_IDS, type MethodId, activeCharacters } from '../../data/methods'
-import { capitalise, formatSeconds, joinList, plural } from '../../data/format'
+import { formatSeconds } from '../../data/format'
 import { AudioEngine } from '../../engine/audioEngine'
-import { DEFAULT_KEY_BINDINGS, type KeyBindings } from '../../engine/keyEngine'
+import {
+  ADAPTER_PADDLES,
+  DEFAULT_KEY_BINDINGS,
+  KEYER_KINDS,
+  bindingsOverlap,
+  type KeyBindings,
+} from '../../engine/keyEngine'
 import { encode } from '../../engine/morseEncoder'
 import { resolveTiming } from '../../engine/timingEngine'
 import { resolveMotion } from '../../hooks/useReducedMotion'
@@ -41,7 +48,6 @@ import {
   FREQUENCY_PRESETS,
   KEYER_PRESETS,
   LIMITS,
-  SIGNAL_LABELS,
   SIGNAL_MODES,
   type KeyerPreset,
   type MotionPreference,
@@ -63,6 +69,11 @@ import { Lamp } from '../ui/Lamp'
 import { OptionGroup } from '../ui/OptionGroup'
 import { Segmented } from '../ui/Segmented'
 import { useTransmitter } from '../ui/transmitter'
+import type { MessageKey } from '../../i18n/keys'
+import { useT, withI18n } from '../../i18n/react'
+import { renderRich } from '../../i18n/richReact'
+import { keyerLabel, presetLabel, signalLabel } from '../MorseKey/keyCopy'
+import { methodCopy } from '../Practice/copy'
 
 /**
  * Settings (PROJECT.md §10, §22, §27, §28): the station's control panel.
@@ -74,13 +85,13 @@ import { useTransmitter } from '../ui/transmitter'
  */
 
 const SECTIONS = [
-  { id: 'signal', title: 'Signal', rail: 'Signal' },
-  { id: 'timing', title: 'Timing', rail: 'Timing' },
-  { id: 'key', title: 'Key', rail: 'Key' },
-  { id: 'course', title: 'Teaching order', rail: 'Teaching' },
-  { id: 'display', title: 'Display & motion', rail: 'Display' },
-  { id: 'data', title: 'Data', rail: 'Data' },
-] as const
+  { id: 'signal', title: 'settings.signalTitle', rail: 'settings.signalRail' },
+  { id: 'timing', title: 'settings.timingTitle', rail: 'settings.timingRail' },
+  { id: 'key', title: 'settings.keyTitle', rail: 'settings.keyRail' },
+  { id: 'course', title: 'settings.courseTitle', rail: 'settings.courseRail' },
+  { id: 'display', title: 'settings.displayTitle', rail: 'settings.displayRail' },
+  { id: 'data', title: 'settings.dataTitle', rail: 'settings.dataRail' },
+] as const satisfies readonly { id: string; title: MessageKey; rail: MessageKey }[]
 
 type SectionId = (typeof SECTIONS)[number]['id']
 
@@ -90,27 +101,33 @@ const indexOf = (id: SectionId) => SECTIONS.findIndex((section) => section.id ==
 const TEST_SIGNAL = 'VVV'
 
 /** The Signal panel's status plate. */
-const SIGNAL_STATE: Readonly<Record<SignalMode, string>> = {
-  sound: 'Sound on',
-  lamp: 'Silent, by lamp',
-  both: 'Sound and lamp',
+const SIGNAL_STATE: Readonly<Record<SignalMode, MessageKey>> = {
+  sound: 'settings.stateSound',
+  lamp: 'settings.stateLamp',
+  both: 'settings.stateBoth',
 }
 
-/** Why the tone rows cannot be changed while Signal is Lamp. */
-const NO_TONE = 'Signal is set to Lamp, so no tone is played. Choose Sound or Both to change it.'
-
-const KEY_ACTIONS: readonly { key: keyof KeyBindings; label: string }[] = [
-  { key: 'key', label: 'Morse key' },
-  { key: 'alternative', label: 'Second key' },
-  { key: 'submit', label: 'Finish character' },
-  { key: 'cancel', label: 'Cancel' },
+const KEY_ACTIONS: readonly { key: keyof KeyBindings; label: MessageKey }[] = [
+  { key: 'key', label: 'settings.actionKey' },
+  { key: 'alternative', label: 'settings.actionAlternative' },
+  { key: 'submit', label: 'settings.actionSubmit' },
+  { key: 'cancel', label: 'settings.actionCancel' },
+  { key: 'dit', label: 'settings.actionDit' },
+  { key: 'dah', label: 'settings.actionDah' },
 ]
 
-const MOTION_OPTIONS: readonly { value: MotionPreference; label: string }[] = [
-  { value: 'system', label: 'System' },
-  { value: 'full', label: 'Full' },
-  { value: 'reduce', label: 'Reduced' },
+const MOTION_OPTIONS: readonly { value: MotionPreference; label: MessageKey }[] = [
+  { value: 'system', label: 'settings.motionSystem' },
+  { value: 'full', label: 'settings.motionFull' },
+  { value: 'reduce', label: 'settings.motionReduce' },
 ]
+
+const WPM_PRESET_KEYS: Readonly<Record<keyof typeof WPM_PRESETS, MessageKey>> = {
+  beginner: 'settings.speedBeginner',
+  normal: 'settings.speedNormal',
+  advanced: 'settings.speedAdvanced',
+  expert: 'settings.speedExpert',
+}
 
 type Playing = 'test' | 'paris' | null
 type Platform = 'apple' | 'standalone' | 'other'
@@ -120,7 +137,13 @@ export interface SettingsScreenProps {
   theme?: ReactNode
 }
 
+/** The /settings/ page's island: `SettingsScreen` with its messages from the page. */
+export const SettingsIsland = withI18n(SettingsScreen)
+
 export function SettingsScreen({ theme }: SettingsScreenProps) {
+  const t = useT()
+  /** Why the tone rows cannot be changed while Signal is Lamp. */
+  const NO_TONE = t('settings.noTone')
   const settingsStore = useMemo(() => createSettingsStore(), [])
   const progressStore = useMemo(() => createProgressStore(), [])
   const statsStore = useMemo(() => createStatsStore(), [])
@@ -265,12 +288,12 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
     const outcome = await install.prompt()
     setInstallNote(
       outcome === 'accepted'
-        ? 'Installed. MorseForge now opens from your apps, and works offline.'
+        ? t('settings.installed')
         : outcome === 'dismissed'
-          ? 'Not installed. The button stays here if you change your mind.'
-          : 'This browser is not offering installation right now.',
+          ? t('settings.notInstalled')
+          : t('settings.noOffer'),
     )
-  }, [install])
+  }, [install, t])
 
   /* ---- Data ------------------------------------------------------------ */
 
@@ -289,19 +312,31 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
 
   const holdings: Record<BackupSection, { value: string; lit: boolean }> = {
     progress: {
-      value: inventory.characters > 0 ? plural(inventory.characters, 'character') : 'Nothing yet',
+      value:
+        inventory.characters > 0
+          ? t('settings.characterCount', { count: inventory.characters })
+          : t('settings.nothingYet'),
       lit: inventory.characters > 0,
     },
-    settings: { value: customised ? 'Changed' : 'Defaults', lit: customised },
+    settings: {
+      value: customised ? t('settings.changed') : t('settings.defaults'),
+      lit: customised,
+    },
     stats: {
       value:
         inventory.xp > 0 || inventory.sessions > 0
-          ? `Level ${inventory.level} · ${inventory.xp.toLocaleString('en')} XP`
-          : 'Nothing yet',
+          ? t('settings.levelXp', {
+              level: inventory.level,
+              xp: inventory.xp.toLocaleString(t.locale.lang === 'en' ? 'en' : t.locale.lang),
+            })
+          : t('settings.nothingYet'),
       lit: inventory.xp > 0 || inventory.sessions > 0,
     },
     daily: {
-      value: inventory.dailies > 0 ? plural(inventory.dailies, 'result') : 'Nothing yet',
+      value:
+        inventory.dailies > 0
+          ? t('settings.results', { count: inventory.dailies })
+          : t('settings.nothingYet'),
       lit: inventory.dailies > 0,
     },
   }
@@ -321,15 +356,16 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
     setTimeout(() => URL.revokeObjectURL(url), 1000)
     setOutcomes(null)
     setLastExport(name)
-    setNotice(
-      `Saved ${name}, with your ${joinList(BACKUP_SECTIONS.map((section) => SECTION_LABELS[section]))}.`,
-    )
-  }, [])
+    setNotice(t('settings.exported', { file: name, sections: sectionNames(t, BACKUP_SECTIONS) }))
+  }, [t])
 
-  const report = useCallback((result: ImportResult) => {
-    setOutcomes(sectionOutcomes(result))
-    setNotice(importSummary(result))
-  }, [])
+  const report = useCallback(
+    (result: ImportResult) => {
+      setOutcomes(sectionOutcomes(result))
+      setNotice(importSummary(t, result))
+    },
+    [t],
+  )
 
   const chooseFile = useCallback(
     async (file: File) => {
@@ -338,7 +374,7 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
         text = await file.text()
       } catch {
         setOutcomes(null)
-        setNotice('That file could not be opened, so nothing was changed.')
+        setNotice(t('settings.unreadable'))
         return
       }
       const preview = previewBackup(text)
@@ -347,7 +383,7 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
       if (preview.sections.length === 0) report(importAll(text))
       else setPendingImport({ text, preview })
     },
-    [report],
+    [report, t],
   )
 
   const confirmImport = useCallback(() => {
@@ -366,9 +402,9 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
     setConfirmReset(false)
     setOutcomes(null)
     setNotice(
-      `Erased. This browser holds no progress now, and every setting is back to its default except anonymous usage counts, which stay ${kept.counters ? 'on' : 'off'}, as you had them.`,
+      t('settings.erased', { state: kept.counters ? t('settings.on') : t('settings.offWord') }),
     )
-  }, [settingsStore, stopSending])
+  }, [settingsStore, stopSending, t])
 
   /* ---- Section rail ---------------------------------------------------- */
 
@@ -408,14 +444,14 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
   const resolved = resolveTiming(timingOptions(settings))
   const motionReduced = resolveMotion(motion, systemReduce)
   const method = METHODS[progress.method]
+  const methodText = methodCopy(t, progress.method)
   const characters = activeCharacters(method, progress.unlocked)
 
-  const bindingCounts = new Map<string, number>()
-  for (const { key } of KEY_ACTIONS) {
-    const bound = keys[key]
-    if (bound) bindingCounts.set(bound, (bindingCounts.get(bound) ?? 0) + 1)
-  }
-  const conflicts = KEY_ACTIONS.filter(({ key }) => (bindingCounts.get(keys[key] ?? '') ?? 0) > 1)
+  // Overlap rather than equality: Ctrl and Left Ctrl are set off by one press.
+  const conflicts = KEY_ACTIONS.filter(({ key }) =>
+    KEY_ACTIONS.some((other) => other.key !== key && bindingsOverlap(keys[key], keys[other.key])),
+  )
+  const paddlesOnAdapter = keys.dit === ADAPTER_PADDLES.dit && keys.dah === ADAPTER_PADDLES.dah
   const keysAreDefault = KEY_ACTIONS.every(({ key }) => keys[key] === DEFAULT_KEY_BINDINGS[key])
 
   const setSpeed = (wpm: number) =>
@@ -429,7 +465,7 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
 
   return (
     <div className="lg:grid lg:grid-cols-[12rem_minmax(0,1fr)] lg:gap-10">
-      <nav aria-label="Settings sections" className="hidden lg:block">
+      <nav aria-label={t('settings.sections')} className="hidden lg:block">
         <ul className="sticky top-24 space-y-1">
           {SECTIONS.map(({ id, rail }, index) => (
             <li key={id}>
@@ -441,7 +477,7 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
                 <span className={current === id ? 'text-signal' : 'text-muted'} aria-hidden="true">
                   {String(index + 1).padStart(2, '0')}
                 </span>
-                {rail}
+                {t(rail)}
               </a>
             </li>
           ))}
@@ -451,7 +487,7 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
       <div className="space-y-8">
         {/* Six panels make a long page on a phone (J-26): an index under the
             title, where the rail is on a desktop. */}
-        <nav aria-label="Settings sections" className="lg:hidden">
+        <nav aria-label={t('settings.sections')} className="lg:hidden">
           <ul className="flex flex-wrap gap-2">
             {SECTIONS.map(({ id, rail }, index) => (
               <li key={id}>
@@ -459,7 +495,7 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
                   <span className="text-muted" aria-hidden="true">
                     {String(index + 1).padStart(2, '0')}
                   </span>
-                  {rail}
+                  {t(rail)}
                 </a>
               </li>
             ))}
@@ -470,22 +506,22 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
         <Panel
           id="signal"
           index={indexOf('signal')}
-          title="Signal"
-          intro="How every Morse signal on the site reaches you: as a tone, as a light, or both."
-          lamp={{ on: true, label: SIGNAL_STATE[settings.signal] }}
+          title={t('settings.signalTitle')}
+          intro={t('settings.signalIntro')}
+          lamp={{ on: true, label: t.raw(SIGNAL_STATE[settings.signal]) }}
         >
           <Row
-            label="Signal"
+            label={t('settings.signal')}
             labelId="setting-signal"
-            hint="Sound plays the tone. Lamp flashes a light with the same timing and stays silent. Both does both. Listening practice works in every mode."
+            hint={t('settings.signalHint')}
           >
             <Segmented
-              label="Signal"
+              label={t('settings.signal')}
               labelledBy="setting-signal"
               size="sm"
               block
               value={settings.signal}
-              options={SIGNAL_MODES.map((mode) => ({ value: mode, label: SIGNAL_LABELS[mode] }))}
+              options={SIGNAL_MODES.map((mode) => ({ value: mode, label: signalLabel(t, mode) }))}
               onChange={(signal) => {
                 // Whatever was sending was sent the old way; stop it.
                 stopSending()
@@ -496,16 +532,12 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
           </Row>
 
           <Row
-            label="Tone"
+            label={t('settings.tone')}
             labelId="setting-tone"
-            hint={
-              sound
-                ? `The pitch of the sidetone, in hertz. Pick whatever sits most clearly against your own hearing. Now ${audioSettings.frequency} Hz.`
-                : NO_TONE
-            }
+            hint={sound ? t('settings.toneHint', { hz: audioSettings.frequency }) : NO_TONE}
           >
             <Segmented
-              label="Tone frequency"
+              label={t('settings.toneFrequency')}
               labelledBy="setting-tone"
               size="sm"
               block
@@ -513,7 +545,7 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
               options={FREQUENCY_PRESETS.map((hz) => ({
                 value: hz,
                 label: String(hz),
-                ariaLabel: `${hz} hertz`,
+                ariaLabel: t('settings.hertz', { hz }),
                 disabled: !sound,
               }))}
               onChange={(frequency) => {
@@ -523,16 +555,20 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
             />
           </Row>
 
-          <Row label="Volume" htmlFor="setting-volume" hint={sound ? undefined : NO_TONE}>
+          <Row
+            label={t('settings.volume')}
+            htmlFor="setting-volume"
+            hint={sound ? undefined : NO_TONE}
+          >
             <Slider
               id="setting-volume"
-              label="Volume"
+              label={t('settings.volume')}
               value={audioSettings.volume}
               min={0}
               max={LIMITS.volume.max}
               step={0.01}
               disabled={!sound}
-              format={(v) => `${Math.round(v * 100)}%`}
+              format={(v) => t('settings.percent', { value: Math.round(v * 100) })}
               onChange={(volume) => {
                 update((c) => ({ ...c, audio: { ...c.audio, volume } }))
                 preview({ frequency: audioSettings.frequency, volume })
@@ -541,13 +577,13 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
           </Row>
 
           <Row
-            label="Test signal"
+            label={t('settings.testSignal')}
             hint={
               !sound
-                ? `Flashes ${TEST_SIGNAL}, the operator's traditional test signal, on the lamp in the button, at your speed.`
+                ? t('settings.testFlash', { signal: TEST_SIGNAL })
                 : lamp
-                  ? `Sends ${TEST_SIGNAL}, the operator's traditional test signal, as a tone and on the lamp in the button, at your tone, volume and speed.`
-                  : `Sends ${TEST_SIGNAL}, the operator's traditional test signal, at your tone, volume and speed.`
+                  ? t('settings.testBoth', { signal: TEST_SIGNAL })
+                  : t('settings.testSound', { signal: TEST_SIGNAL })
             }
           >
             <div className="flex sm:justify-end">
@@ -557,7 +593,9 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
                 onClick={() => play('test')}
               >
                 <Lamp on={buttonLamp('test')} tone="cyan" size={lamp ? 'lg' : 'md'} />
-                {playing === 'test' ? 'Stop' : `Send ${TEST_SIGNAL}`}
+                {playing === 'test'
+                  ? t('settings.stop')
+                  : t('settings.sendSignal', { signal: TEST_SIGNAL })}
               </button>
             </div>
           </Row>
@@ -578,9 +616,9 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
                 <path d="M18 7h2" />
               </svg>
               <span>
-                <strong className="font-semibold text-ink">On an iPhone,</strong> the ring/silent
-                switch on the side also mutes sound from web pages. If the test signal is silent,
-                check that switch first.
+                {renderRich(t.rich('settings.iphone'), {
+                  b: { el: 'strong', class: 'font-semibold text-ink' },
+                })}
               </span>
             </p>
           )}
@@ -590,54 +628,58 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
         <Panel
           id="timing"
           index={indexOf('timing')}
-          title="Timing"
-          intro="How fast Morse is played to you. Character speed shapes each letter; effective speed sets the space around it."
+          title={t('settings.timingTitle')}
+          intro={t('settings.timingIntro')}
         >
-          <Row label="Preset" labelId="setting-preset">
+          <Row label={t('settings.preset')} labelId="setting-preset">
             <Segmented
-              label="Speed preset"
+              label={t('settings.speedPreset')}
               labelledBy="setting-preset"
               size="sm"
               block
               className="grid grid-cols-2"
               value={timing.wpm}
-              options={Object.entries(WPM_PRESETS).map(([name, wpm]) => ({
-                value: wpm,
-                label: capitalise(name),
-                ariaLabel: `${capitalise(name)}, ${wpm} words per minute`,
-              }))}
+              options={(Object.keys(WPM_PRESETS) as (keyof typeof WPM_PRESETS)[]).map((name) => {
+                const wpm = WPM_PRESETS[name]
+                const label = t.raw(WPM_PRESET_KEYS[name])
+                return {
+                  value: wpm,
+                  label,
+                  ariaLabel: t('settings.presetLabel', { name: label, wpm }),
+                }
+              })}
               onChange={setSpeed}
             />
           </Row>
 
           <Row
-            label="Character speed"
+            label={t('settings.characterSpeed')}
             htmlFor="setting-wpm"
-            hint="How fast the dots and dashes themselves are sent. Keep this high, even as a beginner."
+            hint={t('settings.characterSpeedHint')}
           >
             <Slider
               id="setting-wpm"
-              label="Character speed in words per minute"
+              label={t('settings.characterSpeedLabel')}
               value={timing.wpm}
               min={WPM_RANGE.min}
               max={WPM_RANGE.max}
-              format={(v) => `${v} WPM`}
+              format={(v) => t('settings.wpm', { wpm: v })}
               onChange={setSpeed}
             />
           </Row>
 
           <Row
-            label="Effective speed"
+            label={t('settings.effectiveSpeed')}
             htmlFor="setting-farnsworth"
-            hint="Farnsworth spacing. Below the character speed, it stretches the gaps between letters, which is what stops you learning to count beeps."
+            hint={t('settings.effectiveSpeedHint')}
           >
             <Slider
               id="setting-farnsworth"
-              label="Effective speed in words per minute"
+              label={t('settings.effectiveSpeedLabel')}
               value={timing.farnsworthWpm}
               min={LIMITS.farnsworthWpm.min}
               max={timing.wpm}
-              format={(v) => (v >= timing.wpm ? 'Off' : `${v} WPM`)}
+              format={(v) => (v >= timing.wpm ? t('settings.off') : t('settings.wpm', { wpm: v }))}
               onChange={(farnsworthWpm) =>
                 update((c) => ({ ...c, timing: { ...c.timing, farnsworthWpm } }))
               }
@@ -648,11 +690,13 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
             <TimingPreview timing={timingOptions(settings)} />
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
               <p className="max-w-[46ch] text-sm text-muted">
-                {REFERENCE_WORD} is the standard word that words-per-minute is measured with.
+                {t('settings.referenceNote', { word: REFERENCE_WORD })}
               </p>
               <button type="button" className="mf-btn mf-btn-audio" onClick={() => play('paris')}>
                 <Lamp on={buttonLamp('paris')} tone="cyan" size={lamp ? 'lg' : 'md'} />
-                {playing === 'paris' ? 'Stop' : `Play ${REFERENCE_WORD}`}
+                {playing === 'paris'
+                  ? t('settings.stop')
+                  : t('settings.playWord', { word: REFERENCE_WORD })}
               </button>
             </div>
           </div>
@@ -662,22 +706,68 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
         <Panel
           id="key"
           index={indexOf('key')}
-          title="Key"
-          intro="How your keying is read on the telegraph, in lessons and in practice."
+          title={t('settings.keyTitle')}
+          intro={t('settings.keyIntro')}
         >
           <Row
-            label="Dot or dash"
+            label={t('settings.keyType')}
+            labelId="setting-keyer"
+            hint={
+              settings.keyer.type === 'straight'
+                ? t('settings.straightHint')
+                : settings.keyer.type === 'iambicA'
+                  ? t('settings.paddlesHintA', { wpm: timing.wpm })
+                  : t('settings.paddlesHintB', { wpm: timing.wpm })
+            }
+          >
+            <Segmented
+              label={t('settings.keyType')}
+              labelledBy="setting-keyer"
+              size="sm"
+              block
+              value={settings.keyer.type}
+              options={KEYER_KINDS.map((type) => ({ value: type, label: keyerLabel(t, type) }))}
+              onChange={(type) => update((c) => ({ ...c, keyer: { ...c.keyer, type } }))}
+            />
+          </Row>
+
+          {settings.keyer.type !== 'straight' && (
+            <Row
+              label={t('settings.swapPaddles')}
+              htmlFor="setting-swap-paddles"
+              hint={t('settings.swapHint', {
+                dit: keyName(t, keys.dit ?? DEFAULT_KEY_BINDINGS.dit ?? ''),
+                dah: keyName(t, keys.dah ?? DEFAULT_KEY_BINDINGS.dah ?? ''),
+              })}
+            >
+              <Switch
+                id="setting-swap-paddles"
+                checked={settings.keyer.swapPaddles}
+                label={t('settings.swapPaddles')}
+                onChange={(swapPaddles) =>
+                  update((c) => ({ ...c, keyer: { ...c.keyer, swapPaddles } }))
+                }
+              />
+            </Row>
+          )}
+
+          <Row
+            label={t('settings.dotOrDash')}
             htmlFor="setting-threshold"
-            hint={`Hold longer than this and the key sends a dash. For reference, at ${timing.wpm} WPM a dot lasts ${Math.round(resolved.dot)} ms and a dash ${Math.round(resolved.dash)} ms.`}
+            hint={t('settings.thresholdHint', {
+              wpm: timing.wpm,
+              dot: Math.round(resolved.dot),
+              dash: Math.round(resolved.dash),
+            })}
           >
             <Slider
               id="setting-threshold"
-              label="Dot or dash threshold in milliseconds"
+              label={t('settings.thresholdLabel')}
               value={timing.dotDashThresholdMs}
               min={LIMITS.dotDashThresholdMs.min}
               max={LIMITS.dotDashThresholdMs.max}
               step={10}
-              format={(v) => `${v} ms`}
+              format={(v) => t('settings.ms', { ms: v })}
               onChange={(dotDashThresholdMs) =>
                 update((c) => ({ ...c, timing: { ...c.timing, dotDashThresholdMs } }))
               }
@@ -685,17 +775,13 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
           </Row>
 
           <Row
-            label="Time to finish a character"
+            label={t('settings.patience')}
             labelId="setting-patience"
             wide
-            hint={
-              activePreset === null
-                ? 'Your current timing was set by hand or by an import. Pick one to return to a preset.'
-                : 'How long you may pause mid-character before it counts as finished. This is thinking time, not speed.'
-            }
+            hint={activePreset === null ? t('settings.patienceCustom') : t('settings.patienceHint')}
           >
             <OptionGroup
-              label="Time to finish a character"
+              label={t('settings.patience')}
               labelledBy="setting-patience"
               columns={2}
               value={activePreset}
@@ -703,10 +789,15 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
                 const preset = KEYER_PRESETS[name]
                 return {
                   value: name,
-                  title: preset.label,
+                  title: presetLabel(t, name),
                   hint: preset.autoCommit
-                    ? `Finishes a character after ${formatSeconds(preset.characterGapMs)} s of quiet, a word after ${formatSeconds(preset.wordGapMs)} s.`
-                    : `Never finishes on its own: you press ${keyName(keys.submit ?? DEFAULT_KEY_BINDINGS.submit ?? '')} to finish each character.`,
+                    ? t('settings.patienceAuto', {
+                        characterGap: formatSeconds(preset.characterGapMs),
+                        wordGap: formatSeconds(preset.wordGapMs),
+                      })
+                    : t('settings.patienceManual', {
+                        key: keyName(t, keys.submit ?? DEFAULT_KEY_BINDINGS.submit ?? ''),
+                      }),
                 }
               })}
               onChange={(name) => {
@@ -724,27 +815,27 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
             />
           </Row>
 
-          <Row
-            label="Keys"
-            wide
-            hint="Select a key, then press the one you want. Escape keeps the old one."
-          >
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Row label={t('settings.keys')} wide hint={t('settings.keysHint')}>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {KEY_ACTIONS.map(({ key, label }) => (
                 <div key={key}>
                   <p className="mf-engraved mb-2" aria-hidden="true">
-                    {label}
+                    {t.raw(label)}
                   </p>
                   <KeyCapture
-                    label={label}
+                    label={t.raw(label)}
                     value={keys[key] ?? DEFAULT_KEY_BINDINGS[key] ?? ''}
                     conflict={conflicts.some((conflict) => conflict.key === key)}
                     takenBy={(candidate) =>
-                      KEY_ACTIONS.find(
-                        (other) => other.key !== key && keys[other.key] === candidate,
-                      )?.label ?? null
+                      ((found) => (found ? t.raw(found.label) : null))(
+                        KEY_ACTIONS.find(
+                          (other) =>
+                            other.key !== key && bindingsOverlap(keys[other.key], candidate),
+                        ),
+                      )
                     }
                     onChange={(next) => update((c) => ({ ...c, keys: { ...c.keys, [key]: next } }))}
+                    ctrlSides={key === 'dit' || key === 'dah'}
                   />
                 </div>
               ))}
@@ -753,7 +844,9 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
               {/* Always mounted, so the warning is announced when it appears. */}
               <p className="text-sm text-danger" role="status">
                 {conflicts.length > 0
-                  ? `${joinList(conflicts.map((c) => c.label))} share a key, so only one of them will work.`
+                  ? t('settings.conflicts', {
+                      actions: t.list(conflicts.map((c) => t.raw(c.label))),
+                    })
                   : ''}
               </p>
               {!keysAreDefault && (
@@ -762,10 +855,23 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
                   className="mf-btn mf-btn-ghost mf-btn-sm"
                   onClick={() => update((c) => ({ ...c, keys: { ...DEFAULT_KEY_BINDINGS } }))}
                 >
-                  Restore default keys
+                  {t('settings.restoreKeys')}
                 </button>
               )}
             </div>
+            {settings.keyer.type !== 'straight' && (
+              <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-line pt-4">
+                <button
+                  type="button"
+                  className="mf-btn mf-btn-secondary mf-btn-sm"
+                  disabled={paddlesOnAdapter}
+                  onClick={() => update((c) => ({ ...c, keys: { ...c.keys, ...ADAPTER_PADDLES } }))}
+                >
+                  {t('settings.adapterPreset')}
+                </button>
+                <p className="max-w-[60ch] text-sm text-muted">{t('settings.adapterHint')}</p>
+              </div>
+            )}
           </Row>
         </Panel>
 
@@ -773,40 +879,44 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
         <Panel
           id="course"
           index={indexOf('course')}
-          title="Teaching order"
-          intro="Which order new characters arrive in. The practice screen has the same choice; this is the place to set it once."
+          title={t('settings.courseTitle')}
+          intro={t('settings.courseIntro')}
         >
-          <Row label="Order" labelId="setting-method" wide>
+          <Row label={t('settings.order')} labelId="setting-method" wide>
             <OptionGroup
-              label="Teaching order"
+              label={t('settings.courseTitle')}
               labelledBy="setting-method"
               columns={3}
               value={progress.method}
-              options={METHOD_IDS.map((id) => ({
-                value: id,
-                title: METHODS[id].name,
-                hint: METHODS[id].summary,
-              }))}
+              options={METHOD_IDS.map((id) => {
+                const option = methodCopy(t, id)
+                return { value: id, title: option.name, hint: option.summary }
+              })}
               onChange={(next: MethodId) => {
                 progressStore.update((c) => setMethod(c, next))
                 track('method_change', next)
               }}
             />
-            <p className="mt-4 max-w-[68ch] text-sm text-muted">{method.rationale}</p>
+            <p className="mt-4 max-w-[68ch] text-sm text-muted">{methodText.rationale}</p>
           </Row>
 
           <Row
-            label="Your set now"
+            label={t('settings.yourSet')}
             wide
             hint={
               method.unlockAccuracy === null
-                ? `${plural(characters.length, 'character')}. This order does not unlock on score.`
-                : `${plural(characters.length, 'character')}. More arrive when a practice session long enough to count scores ${Math.round(method.unlockAccuracy * 100)}% or better.`
+                ? t('settings.setNoUnlock', {
+                    characters: t('settings.characterCount', { count: characters.length }),
+                  })
+                : t('settings.setUnlock', {
+                    characters: t('settings.characterCount', { count: characters.length }),
+                    percent: Math.round(method.unlockAccuracy * 100),
+                  })
             }
           >
             <p
               className="mf-tape text-lg break-words"
-              aria-label={`Current set: ${characters.join(', ')}`}
+              aria-label={t('settings.currentSet', { characters: characters.join(', ') })}
             >
               {characters.join(' ')}
             </p>
@@ -814,38 +924,41 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
         </Panel>
 
         {/* ---- 05 Display & motion ------------------------------------- */}
-        <Panel id="display" index={indexOf('display')} title="Display & motion">
+        <Panel id="display" index={indexOf('display')} title={t('settings.displayTitle')}>
           {theme && (
-            <Row
-              label="Theme"
-              hint="Dark is the station at night; light is the telegram form. The same switch sits in the header."
-            >
+            <Row label={t('settings.theme')} hint={t('settings.themeHint')}>
               <div className="flex sm:justify-end">{theme}</div>
             </Row>
           )}
           <Row
-            label="Animation"
+            label={t('settings.animation')}
             labelId="setting-motion"
             hint={
               <>
-                Following the system is usually right. The overrides exist because the system
-                setting is all or nothing.{' '}
+                {t('settings.animationHint')}{' '}
                 <span className="text-ink">
                   {loaded
                     ? motionReduced
-                      ? `Motion is reduced${motion === 'system' ? ', as your system asks' : ''}.`
-                      : `Motion is on${motion === 'system' ? ', as your system allows' : ''}.`
+                      ? motion === 'system'
+                        ? t('settings.motionReducedSystem')
+                        : t('settings.motionReduced')
+                      : motion === 'system'
+                        ? t('settings.motionOnSystem')
+                        : t('settings.motionOn')
                     : ''}
                 </span>
               </>
             }
           >
             <Segmented
-              label="Animation"
+              label={t('settings.animation')}
               labelledBy="setting-motion"
               block
               value={motion}
-              options={MOTION_OPTIONS}
+              options={MOTION_OPTIONS.map((option) => ({
+                value: option.value,
+                label: t.raw(option.label),
+              }))}
               onChange={(next) => update((c) => ({ ...c, motion: next }))}
             />
           </Row>
@@ -855,11 +968,11 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
         <Panel
           id="data"
           index={indexOf('data')}
-          title="Data"
-          intro="Everything lives in this browser and nowhere else. Clearing your browser data erases it, so keep a backup if it matters to you."
+          title={t('settings.dataTitle')}
+          intro={t('settings.dataIntro')}
         >
           <div className="py-5">
-            <p className="mf-engraved">In this browser</p>
+            <p className="mf-engraved">{t('settings.inBrowser')}</p>
             <ul className="mt-3 divide-y divide-line rounded-panel border border-line-strong bg-void">
               {BACKUP_SECTIONS.map((section) => (
                 <li
@@ -877,9 +990,9 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
                   />
                   <span className="min-w-0">
                     <span className="block font-semibold text-ink">
-                      {capitalise(SECTION_LABELS[section])}
+                      {t.capitalise(sectionLabel(t, section))}
                     </span>
-                    <span className="block text-sm text-muted">{SECTION_HINTS[section]}</span>
+                    <span className="block text-sm text-muted">{sectionHint(t, section)}</span>
                   </span>
                   <span className="col-start-2 flex flex-wrap items-baseline gap-x-3 sm:col-start-3 sm:block sm:text-right">
                     <span className="block font-mono text-control text-ink tabular-nums">
@@ -893,12 +1006,12 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
                         data-state={outcomes[section]}
                       >
                         {outcomes[section] === 'restored'
-                          ? 'Restored'
+                          ? t('settings.restored')
                           : outcomes[section] === 'rejected'
-                            ? 'Rejected'
+                            ? t('settings.rejected')
                             : outcomes[section] === 'unsaved'
-                              ? 'Not saved'
-                              : 'Not in file'}
+                              ? t('settings.notSaved')
+                              : t('settings.notInFile')}
                       </span>
                     )}
                   </span>
@@ -918,14 +1031,14 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
 
             <div className="mt-5 flex flex-wrap gap-3">
               <button type="button" className="mf-btn mf-btn-primary" onClick={exportBackup}>
-                Export backup
+                {t('settings.exportBackup')}
               </button>
               <button
                 type="button"
                 className="mf-btn mf-btn-secondary"
                 onClick={() => fileInput.current?.click()}
               >
-                Import backup
+                {t('settings.importBackup')}
               </button>
               <input
                 ref={fileInput}
@@ -943,28 +1056,28 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
           </div>
 
           <Row
-            label="Anonymous usage counts"
+            label={t('settings.counters')}
             htmlFor="setting-counters"
-            hint="A tally of which screens get used: no identifier, no progress, nothing you typed. Never sent if your browser asks not to be tracked."
+            hint={t('settings.countersHint')}
           >
             <Switch
               id="setting-counters"
               checked={settings.counters}
-              label="Anonymous usage counts"
+              label={t('settings.counters')}
               onChange={(counters) => update((c) => ({ ...c, counters }))}
             />
           </Row>
 
           {(install || platform === 'apple' || platform === 'standalone' || installNote) && (
             <Row
-              label="Install"
+              label={t('settings.install')}
               hint={
                 installNote ??
                 (platform === 'standalone'
-                  ? 'You are using the installed app. It works offline.'
+                  ? t('settings.standalone')
                   : install
-                    ? 'Add MorseForge to your apps. It opens in its own window and works offline.'
-                    : 'On iPhone and iPad: Share → Add to Home Screen.')
+                    ? t('settings.installHint')
+                    : t('settings.appleHint'))
               }
             >
               {install && (
@@ -974,17 +1087,14 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
                     className="mf-btn mf-btn-secondary"
                     onClick={() => void offerInstall()}
                   >
-                    Install MorseForge
+                    {t('settings.installButton')}
                   </button>
                 </div>
               )}
             </Row>
           )}
 
-          <Row
-            label="Erase everything"
-            hint="Removes progress, stats, daily results and settings from this browser. You will be asked first."
-          >
+          <Row label={t('settings.erase')} hint={t('settings.eraseHint')}>
             <div className="flex sm:justify-end">
               <button
                 type="button"
@@ -994,7 +1104,7 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
                   setConfirmReset(true)
                 }}
               >
-                Erase everything
+                {t('settings.erase')}
               </button>
             </div>
           </Row>
@@ -1003,7 +1113,7 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
 
       <ConfirmDialog
         open={pendingImport !== null}
-        title="Restore from this backup?"
+        title={t('settings.restoreTitle')}
         onClose={() => setPendingImport(null)}
         actions={
           <>
@@ -1012,10 +1122,10 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
               className="mf-btn mf-btn-ghost"
               onClick={() => setPendingImport(null)}
             >
-              Cancel
+              {t('settings.cancel')}
             </button>
             <button type="button" className="mf-btn mf-btn-primary" onClick={confirmImport}>
-              Restore
+              {t('settings.restore')}
             </button>
           </>
         }
@@ -1023,55 +1133,60 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
         {pendingImport && (
           <>
             <p>
-              This file
               {pendingImport.preview.exported
-                ? `, exported ${pendingImport.preview.exported.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })},`
-                : ''}{' '}
-              holds your{' '}
-              {joinList(pendingImport.preview.sections.map((section) => SECTION_LABELS[section]))}.
+                ? t('settings.restoreBodyDated', {
+                    date: pendingImport.preview.exported.toLocaleDateString(
+                      t.locale.lang === 'en' ? 'en-GB' : t.locale.lang,
+                      { day: 'numeric', month: 'long', year: 'numeric' },
+                    ),
+                    sections: sectionNames(t, pendingImport.preview.sections),
+                  })
+                : t('settings.restoreBody', {
+                    sections: sectionNames(t, pendingImport.preview.sections),
+                  })}
             </p>
-            <p className="mt-3 text-muted">
-              Restoring replaces those in this browser. A section that fails validation is skipped,
-              and what you have now is kept for it.
-            </p>
+            <p className="mt-3 text-muted">{t('settings.restoreNote')}</p>
           </>
         )}
       </ConfirmDialog>
 
       <ConfirmDialog
         open={confirmReset}
-        title="Erase everything in this browser?"
+        title={t('settings.eraseTitle')}
         tone="danger"
         onClose={() => setConfirmReset(false)}
         actions={
           <>
             <button type="button" className="mf-btn mf-btn-ghost sm:mr-auto" onClick={exportBackup}>
-              Export a backup first
+              {t('settings.exportFirst')}
             </button>
             <button
               type="button"
               className="mf-btn mf-btn-secondary"
               onClick={() => setConfirmReset(false)}
             >
-              Cancel
+              {t('settings.cancel')}
             </button>
             <button
               type="button"
               className="mf-btn mf-btn-secondary pj-btn-erase"
               onClick={eraseEverything}
             >
-              Erase everything
+              {t('settings.erase')}
             </button>
           </>
         }
       >
-        <p>{resetConsequence(inventory)}</p>
+        <p>{resetConsequence(t, inventory)}</p>
         <p className="mt-3 text-muted">
-          Your theme stays, and so does your choice about anonymous usage counts (now{' '}
-          {settings.counters ? 'on' : 'off'}).
+          {t('settings.eraseKeeps', {
+            state: settings.counters ? t('settings.on') : t('settings.offWord'),
+          })}
         </p>
         {lastExport && (
-          <p className="mt-3 font-mono text-control text-signal">Saved {lastExport}</p>
+          <p className="mt-3 font-mono text-control text-signal">
+            {t('settings.saved', { file: lastExport })}
+          </p>
         )}
       </ConfirmDialog>
     </div>

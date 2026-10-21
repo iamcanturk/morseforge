@@ -1,5 +1,6 @@
 ---
-import { THEME_CHOICE_NAMES, THEME_CONTROL_SCRIPT } from './ui/themeControl'
+import { themeControlScript, themeLabels } from './ui/themeControl'
+import { useTranslations } from '../i18n/server'
 
 /**
  * The header's theme control (DEC-040): one button, not a three-segment
@@ -16,18 +17,21 @@ import { THEME_CHOICE_NAMES, THEME_CONTROL_SCRIPT } from './ui/themeControl'
  * "Colour theme: System, dark now" (AI-3); the plain name below is only what
  * a page without JavaScript keeps.
  */
+const t = useTranslations(Astro)
+const labels = themeLabels(t)
 const options = (['system', 'dark', 'light'] as const).map((value) => ({
   value,
-  label: THEME_CHOICE_NAMES[value],
+  label: labels.names[value],
 }))
+const colourTheme = t('theme.colourTheme')
 ---
 
 <details name="mf-menu" class="mf-theme-menu group relative" data-menu data-theme-menu>
   <summary
     class="mf-summary mf-icon-btn group-open:text-ink"
-    aria-label="Colour theme"
+    aria-label={colourTheme}
     aria-haspopup="menu"
-    title="Colour theme"
+    title={colourTheme}
   >
     <svg
       class="mf-theme-icon-dark"
@@ -61,7 +65,7 @@ const options = (['system', 'dark', 'light'] as const).map((value) => ({
     </svg>
   </summary>
 
-  <div class="mf-popover" role="menu" aria-label="Colour theme">
+  <div class="mf-popover" role="menu" aria-label={colourTheme}>
     {
       options.map(({ value, label }) => (
         <button
@@ -134,4 +138,4 @@ const options = (['system', 'dark', 'light'] as const).map((value) => ({
   </div>
 </details>
 
-<script is:inline set:html={THEME_CONTROL_SCRIPT} />
+<script is:inline set:html={themeControlScript(labels)} />

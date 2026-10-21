@@ -1,4 +1,6 @@
 import { THEME_COLOR, THEME_KEY } from '../../styles/palette'
+import type { Translator } from '../../i18n/translator'
+import { translatorFor } from '../../i18n/server'
 
 /**
  * The one implementation of theme switching, for both of its controls:
@@ -20,13 +22,35 @@ import { THEME_COLOR, THEME_KEY } from '../../styles/palette'
  * paint; this only keeps the controls and the choice in step after that.
  */
 
-/** What each choice is called, in the menu and in the theme button's name. */
-export const THEME_CHOICE_NAMES = { system: 'System', dark: 'Dark', light: 'Light' } as const
+export type ThemeChoice = 'system' | 'dark' | 'light'
 
-export const THEME_CONTROL_SCRIPT = `(() => {
+/** What the script says, in the page's language. */
+export interface ThemeLabels {
+  /** What each choice is called, in the menu and in the theme button's name. */
+  names: Readonly<Record<ThemeChoice, string>>
+  /** What `system` currently resolves to, as the button's name says it. */
+  resolved: Readonly<Record<Exclude<ThemeChoice, 'system'>, string>>
+  /** "Colour theme: {choice}" and, for system, "Colour theme: {choice}, {resolved} now". */
+  name: string
+  systemName: string
+}
+
+export function themeLabels(t: Translator): ThemeLabels {
+  return {
+    names: { system: t('theme.system'), dark: t('theme.dark'), light: t('theme.light') },
+    resolved: { dark: t('theme.resolvedDark'), light: t('theme.resolvedLight') },
+    name: t.raw('theme.buttonName'),
+    systemName: t.raw('theme.buttonNameSystem'),
+  }
+}
+
+/** The script, with its labels in one language. */
+export function themeControlScript(labels: ThemeLabels): string {
+  return `(() => {
   const KEY = ${JSON.stringify(THEME_KEY)}
   const COLOURS = ${JSON.stringify(THEME_COLOR)}
-  const NAMES = ${JSON.stringify(THEME_CHOICE_NAMES)}
+  const LABELS = ${JSON.stringify(labels)}
+  const NAMES = LABELS.names
   // Where arrow keys, Home and End move in a list, wrapping; null otherwise.
   const nextIndex = (key, from, length) => {
     const last = length - 1
@@ -61,10 +85,9 @@ export const THEME_CONTROL_SCRIPT = `(() => {
       // The menu button names the choice, and what "system" resolves to, so
       // the state is known without opening the menu (AI-3).
       for (const menu of document.querySelectorAll('[data-theme-menu]')) {
-        const name =
-          'Colour theme: ' +
-          (NAMES[choice] ?? NAMES.system) +
-          (choice === 'system' ? ', ' + root.dataset.theme + ' now' : '')
+        const name = (choice === 'system' ? LABELS.systemName : LABELS.name)
+          .replace('{choice}', NAMES[choice] ?? NAMES.system)
+          .replace('{resolved}', LABELS.resolved[root.dataset.theme] ?? root.dataset.theme)
         const summary = menu.querySelector('summary')
         summary?.setAttribute('aria-label', name)
         summary?.setAttribute('title', name)
@@ -147,3 +170,7 @@ export const THEME_CONTROL_SCRIPT = `(() => {
     })
   }
 })()`
+}
+
+/** The English script, as the tests know it. */
+export const THEME_CONTROL_SCRIPT = themeControlScript(themeLabels(translatorFor('en')))

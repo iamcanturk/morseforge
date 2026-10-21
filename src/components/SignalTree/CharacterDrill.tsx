@@ -7,6 +7,9 @@ import type { Skill } from '../../game/mastery'
 import type { SettingsRecord } from '../../storage/settings'
 import { Screen } from '../ui/Screen'
 import { Segmented } from '../ui/Segmented'
+import { useT } from '../../i18n/react'
+import { commitLabel, keyLabel as keyCap } from '../MorseKey/keyCopy'
+import { renderRich } from '../../i18n/richReact'
 
 /**
  * Practise one character, right where the learner picked it on the tree.
@@ -45,11 +48,6 @@ interface CharacterDrillProps {
 
 type Verdict = { correct: boolean; sent: string } | null
 
-const MODES = [
-  { value: 'send' as const, label: 'Send it' },
-  { value: 'listen' as const, label: 'Hear it' },
-]
-
 export function CharacterDrill({
   character,
   settings,
@@ -57,6 +55,11 @@ export function CharacterDrill({
   playing = false,
   onAttempt,
 }: CharacterDrillProps) {
+  const t = useT()
+  const MODES = [
+    { value: 'send' as const, label: t('tree.drillSend') },
+    { value: 'listen' as const, label: t('tree.drillHear') },
+  ]
   const [mode, setMode] = useState<DrillMode>('send')
   const [verdict, setVerdict] = useState<Verdict>(null)
   const [guess, setGuess] = useState('')
@@ -90,6 +93,8 @@ export function CharacterDrill({
     wordGapMs: settings.timing.wordGapMs,
     autoCommit: settings.timing.autoCommit,
     bindings: settings.keys,
+    keyer: settings.keyer.type,
+    swapPaddles: settings.keyer.swapPaddles,
     frequency: settings.audio.frequency,
     volume: settings.audio.enabled ? settings.audio.volume : 0,
     // Paused while a verdict is up, so a stray Space does not start the next
@@ -126,16 +131,16 @@ export function CharacterDrill({
     reset()
   }, [reset])
 
-  const keyLabel = settings.keys.key === ' ' ? 'SPACE' : settings.keys.key.toUpperCase()
+  const keyLabel = keyCap(t, settings.keys.key)
 
   return (
     <section className="mt-6 border-t border-line pt-6" aria-labelledby="drill-title">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 id="drill-title" className="mf-engraved">
-          Drill {character}
+          {t('tree.drillHeading', { character })}
         </h3>
         <Segmented
-          label={`Drill ${character}`}
+          label={t('tree.drillHeading', { character })}
           value={mode}
           options={MODES}
           size="sm"
@@ -154,28 +159,38 @@ export function CharacterDrill({
           data-state={verdict.correct ? 'correct' : 'wrong'}
         >
           {verdict.correct ? (
-            <span className="mf-stamp mf-stamp-in text-signal">Signal locked</span>
+            <span className="mf-stamp mf-stamp-in text-signal">{t('tree.signalLocked')}</span>
           ) : (
             <>
               <p className="font-display text-h3 font-bold text-amber">
-                <span aria-hidden="true">✕ </span>Not quite
+                <span aria-hidden="true">✕ </span>
+                {t('tree.notQuite')}
               </p>
               <p className="mt-2 text-sm text-muted">
-                You {mode === 'send' ? 'sent' : 'typed'}{' '}
-                <span className="font-mono text-ink">{verdict.sent}</span>. {character} is{' '}
-                <span className="font-mono tracking-code text-cyan">{prettify(target)}</span>.
+                {renderRich(
+                  t.rich(mode === 'send' ? 'tree.youSent' : 'tree.youTyped', {
+                    sent: verdict.sent,
+                    character,
+                    morse: prettify(target),
+                  }),
+                  {
+                    code: { el: 'span', class: 'font-mono text-ink' },
+                    morse: { el: 'span', class: 'font-mono tracking-code text-cyan' },
+                  },
+                )}
               </p>
             </>
           )}
           <button type="button" onClick={tryAgain} className="mf-btn mf-btn-secondary mt-5 w-full">
-            {verdict.correct ? 'Again' : 'Try again'}
+            {verdict.correct ? t('tree.again') : t('tree.tryAgain')}
           </button>
         </div>
       ) : mode === 'send' ? (
         <div className="mt-5">
           <p className="text-center text-sm text-muted">
-            Key <span className="font-display text-h3 font-bold text-ink">{character}</span> on the
-            key below
+            {renderRich(t.rich('tree.keyIt', { character }), {
+              glyph: { el: 'span', class: 'font-display text-h3 font-bold text-ink' },
+            })}
           </p>
           <div className="mt-4">
             <MorseKey
@@ -185,8 +200,10 @@ export function CharacterDrill({
               commitProgress={key.state.commitProgress}
               autoCommit={settings.timing.autoCommit}
               keyLabel={keyLabel}
-              commitLabel={(settings.keys.submit ?? 'Control').toUpperCase()}
+              commitLabel={commitLabel(t, settings.keys.submit)}
               pointerHandlers={key.pointerHandlers}
+              paddles={key.paddles}
+              toneOn={key.state.toneOn}
             />
           </div>
           <button
@@ -195,7 +212,7 @@ export function CharacterDrill({
             disabled={key.state.pending === ''}
             className="mf-btn mf-btn-secondary mf-btn-block mt-4"
           >
-            Finish character
+            {t('tree.finishCharacter')}
           </button>
         </div>
       ) : (
@@ -207,13 +224,17 @@ export function CharacterDrill({
             className="mf-btn mf-btn-secondary mf-btn-block"
           >
             <span aria-hidden="true">▶</span>
-            {playing ? 'Sending…' : settings.audio.enabled ? 'Play the signal' : 'Flash the signal'}
+            {playing
+              ? t('tree.sending')
+              : settings.audio.enabled
+                ? t('tree.playSignal')
+                : t('tree.flashSignal')}
           </button>
 
           <Screen className="mt-4 p-4">
             <label className="relative z-[3] block">
               <span className="mf-engraved">
-                What did you {settings.audio.enabled ? 'hear' : 'see'}?
+                {settings.audio.enabled ? t('tree.whatHeard') : t('tree.whatSeen')}
               </span>
               <input
                 value={guess}
@@ -236,7 +257,7 @@ export function CharacterDrill({
             disabled={guess.trim() === ''}
             className="mf-btn mf-btn-primary mf-btn-block mt-4"
           >
-            Check
+            {t('tree.check')}
           </button>
         </form>
       )}

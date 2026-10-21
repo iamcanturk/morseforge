@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   SECTION_KEYS,
-  SECTION_LABELS,
+  sectionLabel,
   backupFileName,
   importSummary,
   isAppleMobile,
@@ -17,6 +17,9 @@ import { answer, emptyProgress } from '../../storage/progress'
 import { defaultStats } from '../../storage/stats'
 import { createMemoryDriver } from '../../storage/store'
 import { dayKey, levelFromXp } from '../../game/progression'
+import { translatorFor } from '../../i18n/server'
+
+const t = translatorFor('en')
 
 const T0 = Date.UTC(2026, 9, 21, 12)
 
@@ -46,7 +49,7 @@ describe('SECTION_KEYS', () => {
   })
 
   it('labels every section', () => {
-    for (const section of BACKUP_SECTIONS) expect(SECTION_LABELS[section]).toBeTruthy()
+    for (const section of BACKUP_SECTIONS) expect(sectionLabel(t, section)).toBeTruthy()
   })
 })
 
@@ -76,10 +79,10 @@ describe('importSummary', () => {
   it('never calls a section restored when the browser would not save it', () => {
     const result = { ...none, unsaved: ['stats' as const] }
     expect(sectionOutcomes(result).stats).toBe('unsaved')
-    expect(importSummary(result)).toBe(
+    expect(importSummary(t, result)).toBe(
       'Nothing restored. Could not save stats in this browser, so what was here is unchanged.',
     )
-    expect(importSummary(result)).not.toMatch(/The {2}|Restored/)
+    expect(importSummary(t, result)).not.toMatch(/The {2}|Restored/)
   })
 
   it('names saved, rejected and unsaved sections apart', () => {
@@ -95,14 +98,14 @@ describe('importSummary', () => {
       stats: 'unsaved',
       daily: 'rejected',
     })
-    expect(importSummary(result)).toBe(
+    expect(importSummary(t, result)).toBe(
       'Restored learning progress. Rejected daily results: incomplete or from a newer version, so the copy in this browser was kept. Could not save settings and stats in this browser, so what was here is unchanged.',
     )
   })
 
   it('does not claim nothing changed when a rejection sits beside a failed save', () => {
     const result = { ...none, rejected: ['daily' as const], unsaved: ['stats' as const] }
-    expect(importSummary(result)).toBe(
+    expect(importSummary(t, result)).toBe(
       'Nothing restored. The daily results in this file did not pass validation. Could not save stats in this browser, so what was here is unchanged.',
     )
   })
@@ -110,7 +113,7 @@ describe('importSummary', () => {
   it('reports nothing restored for {}', () => {
     const result = importAll('{}', createBackupStores(createMemoryDriver()))
     expect(result.restored).toEqual([])
-    expect(importSummary(result)).toMatch(
+    expect(importSummary(t, result)).toMatch(
       /^Nothing restored\. This file is not a MorseForge backup/,
     )
     expect(Object.values(sectionOutcomes(result))).toEqual(['absent', 'absent', 'absent', 'absent'])
@@ -119,7 +122,7 @@ describe('importSummary', () => {
   it('names every restored section after a full round trip', () => {
     const text = JSON.stringify(exportAll(populated(), T0))
     const result = importAll(text, createBackupStores(createMemoryDriver()), T0)
-    expect(importSummary(result)).toBe(
+    expect(importSummary(t, result)).toBe(
       'Restored learning progress, settings, stats and daily results.',
     )
     expect(Object.values(sectionOutcomes(result))).toEqual([
@@ -139,14 +142,18 @@ describe('importSummary', () => {
 
     expect(target.stats.read()).toEqual(before)
     expect(sectionOutcomes(result).stats).toBe('rejected')
-    expect(importSummary(result)).toMatch(/Rejected stats: .* the copy in this browser was kept\.$/)
+    expect(importSummary(t, result)).toMatch(
+      /Rejected stats: .* the copy in this browser was kept\.$/,
+    )
   })
 
   it('says nothing was restored when every present section is rejected', () => {
     const text = JSON.stringify({ [SECTION_KEYS.progress]: { characters: 'no' } })
     const result = importAll(text, createBackupStores(createMemoryDriver()))
     expect(result.recognised).toBe(true)
-    expect(importSummary(result)).toMatch(/^Nothing restored\. The learning progress in this file/)
+    expect(importSummary(t, result)).toMatch(
+      /^Nothing restored\. The learning progress in this file/,
+    )
     expect(sectionOutcomes(result)).toEqual({
       progress: 'rejected',
       settings: 'absent',
@@ -174,7 +181,7 @@ describe('takeInventory and resetConsequence', () => {
       dailies: 1,
     })
     expect(isEmptyInventory(inventory)).toBe(false)
-    expect(resetConsequence(inventory)).toBe(
+    expect(resetConsequence(t, inventory)).toBe(
       `This erases history for 2 characters, level ${levelFromXp(1240)} and 1,240 XP, a 5-day streak and 1 daily result, and every setting except the anonymous usage counts goes back to its default. There is no other copy, so it cannot be undone.`,
     )
   })
@@ -182,7 +189,7 @@ describe('takeInventory and resetConsequence', () => {
   it('says only the settings change on a fresh profile', () => {
     const inventory = takeInventory(emptyProgress(), defaultStats(), emptyDaily(), T0)
     expect(isEmptyInventory(inventory)).toBe(true)
-    expect(resetConsequence(inventory)).toMatch(/^There is no progress stored yet/)
+    expect(resetConsequence(t, inventory)).toMatch(/^There is no progress stored yet/)
   })
 })
 

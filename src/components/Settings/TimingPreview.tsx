@@ -7,6 +7,7 @@ import {
   timelineDuration,
 } from '../../engine/timingEngine'
 import { Screen } from '../ui/Screen'
+import { useT } from '../../i18n/react'
 
 /** The word every WPM figure is defined by (timingEngine `PARIS_UNITS`). */
 export const REFERENCE_WORD = 'PARIS'
@@ -59,6 +60,7 @@ export function stripLayout(
  * letters themselves stay the same length.
  */
 export function TimingPreview({ timing }: { timing: TimingOptions }) {
+  const t = useT()
   const resolved = resolveTiming(timing)
   const { tones, letters, wordMs } = stripLayout(REFERENCE_WORD, timing)
   const farnsworth = timing.farnsworthWpm !== undefined && timing.farnsworthWpm < timing.wpm
@@ -67,11 +69,16 @@ export function TimingPreview({ timing }: { timing: TimingOptions }) {
     <Screen grid className="p-4 sm:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="mf-engraved">
-          {REFERENCE_WORD} at {timing.wpm}
-          {farnsworth ? ` / ${timing.farnsworthWpm}` : ''} WPM
+          {farnsworth
+            ? t('settings.stripHeadingFarnsworth', {
+                word: REFERENCE_WORD,
+                wpm: timing.wpm,
+                farnsworth: timing.farnsworthWpm ?? timing.wpm,
+              })
+            : t('settings.stripHeading', { word: REFERENCE_WORD, wpm: timing.wpm })}
         </p>
         <p className="font-mono text-control text-signal tabular-nums">
-          {formatSeconds(wordMs)} s per word
+          {t('settings.perWord', { seconds: formatSeconds(wordMs) })}
         </p>
       </div>
 
@@ -80,7 +87,7 @@ export function TimingPreview({ timing }: { timing: TimingOptions }) {
         viewBox="0 0 1000 40"
         preserveAspectRatio="none"
         role="img"
-        aria-label={`${REFERENCE_WORD} drawn to scale: each bar is a tone, each space is silence.`}
+        aria-label={t('settings.stripLabel', { word: REFERENCE_WORD })}
       >
         <line className="pj-strip-base" x1="0" y1="34" x2="1000" y2="34" />
         {tones.map((tone, index) => (
@@ -109,19 +116,21 @@ export function TimingPreview({ timing }: { timing: TimingOptions }) {
 
       <dl className="mt-3 grid grid-cols-3 gap-3 border-t border-line pt-3 font-mono text-label">
         <div>
-          <dt className="mf-engraved">Dot</dt>
-          <dd className="mt-1 text-control text-ink tabular-nums">{Math.round(resolved.dot)} ms</dd>
-        </div>
-        <div>
-          <dt className="mf-engraved">Letter gap</dt>
+          <dt className="mf-engraved">{t('settings.dot')}</dt>
           <dd className="mt-1 text-control text-ink tabular-nums">
-            {Math.round(resolved.characterGap)} ms
+            {t('settings.ms', { ms: Math.round(resolved.dot) })}
           </dd>
         </div>
         <div>
-          <dt className="mf-engraved">Word gap</dt>
+          <dt className="mf-engraved">{t('settings.letterGap')}</dt>
           <dd className="mt-1 text-control text-ink tabular-nums">
-            {Math.round(resolved.wordGap)} ms
+            {t('settings.ms', { ms: Math.round(resolved.characterGap) })}
+          </dd>
+        </div>
+        <div>
+          <dt className="mf-engraved">{t('settings.wordGap')}</dt>
+          <dd className="mt-1 text-control text-ink tabular-nums">
+            {t('settings.ms', { ms: Math.round(resolved.wordGap) })}
           </dd>
         </div>
       </dl>

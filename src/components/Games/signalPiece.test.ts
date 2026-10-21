@@ -1,7 +1,11 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { SignalPiece, SignalReveal, fieldX, spokenCode } from './signalPiece'
+import { SignalPiece, SignalReveal, fieldX } from './signalPiece'
+import { translatorFor } from '../../i18n/server'
+import { inIsland } from '../../i18n/testing'
+
+const spokenCode = (code: string) => translatorFor('en').spokenCode(code)
 import { ALL_DIGITS, ALL_LETTERS, MORSE_ALPHABET } from '../../data/morseAlphabet'
 
 /** The visible text of some markup: tags and attributes dropped. */
@@ -11,7 +15,10 @@ describe('a falling Signal Defender piece (DEC-027)', () => {
   it('shows the code and never the letter it spells', () => {
     for (const character of ALL_LETTERS) {
       const html = renderToStaticMarkup(
-        createElement(SignalPiece, { character, x: 0.5, y: 0.3, danger: false }),
+        inIsland(
+          createElement(SignalPiece, { character, x: 0.5, y: 0.3, danger: false }),
+          'defender',
+        ),
       )
       const code = MORSE_ALPHABET[character]!
       // Drawn element by element, in order...
@@ -25,7 +32,10 @@ describe('a falling Signal Defender piece (DEC-027)', () => {
 
   it('reveals the letter once the signal is hit', () => {
     const html = renderToStaticMarkup(
-      createElement(SignalReveal, { character: 'Q', x: 0.5, y: 0.5, points: 24 }),
+      inIsland(
+        createElement(SignalReveal, { character: 'Q', x: 0.5, y: 0.5, points: 24 }),
+        'defender',
+      ),
     )
     expect(text(html)).toContain('Q')
     expect(text(html)).toContain('+24')

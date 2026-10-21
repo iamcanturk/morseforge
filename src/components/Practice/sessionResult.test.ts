@@ -2,18 +2,22 @@ import { describe, expect, it } from 'vitest'
 import {
   LOW_ACCURACY,
   PASS_ACCURACY,
-  SCORE_RULE,
   accuracyTone,
   lessonPath,
   nextStep,
   offersLessonPath,
   resultAnnouncement,
+  scoreRule,
 } from './SessionResult'
+import { translatorFor } from '../../i18n/server'
 import { LESSON_STAGES, LESSON_ORDER, currentStageIndex } from '../Lesson/lesson'
 import { LEARNING_STAGES } from '../../data/morseAlphabet'
 import { answer, emptyProgress, type ProgressRecord } from '../../storage/progress'
 import { SCORE, type SessionSummary } from '../../game/session'
 import { LEVEL_REQUIREMENTS } from '../../game/mastery'
+
+const t = translatorFor('en')
+const SCORE_RULE = scoreRule(t)
 
 const NOW = Date.UTC(2026, 9, 21, 12)
 
@@ -27,7 +31,7 @@ function through(characters: readonly string[]): ProgressRecord {
 
 describe('the result screen’s "next" link', () => {
   it('starts a new learner on lesson 1', () => {
-    expect(nextStep(currentStageIndex(emptyProgress(), NOW))).toEqual({
+    expect(nextStep(t, currentStageIndex(emptyProgress(), NOW))).toEqual({
       href: '/learn/',
       label: 'Start lesson 1',
     })
@@ -36,24 +40,24 @@ describe('the result screen’s "next" link', () => {
   it('names the lesson stage /learn/ will open, in the word /learn/ uses (J-15)', () => {
     for (const done of [2, 4, 6]) {
       const stage = currentStageIndex(through(LESSON_STAGES.slice(0, done).flat()), NOW)
-      expect(nextStep(stage)).toEqual({ href: '/learn/', label: `Stage ${done + 1}` })
+      expect(nextStep(t, stage)).toEqual({ href: '/learn/', label: `Stage ${done + 1}` })
     }
   })
 
   it('never says "Lesson N" for a stage', () => {
     for (let stage = 1; stage < LESSON_STAGES.length; stage++) {
-      expect(nextStep(stage).label).not.toMatch(/Lesson/)
+      expect(nextStep(t, stage).label).not.toMatch(/Lesson/)
     }
   })
 
   it('keeps someone with every letter but no digits on the lesson', () => {
     const stage = currentStageIndex(through(LEARNING_STAGES.flat()), NOW)
-    expect(nextStep(stage)).toEqual({ href: '/learn/', label: `Stage ${LESSON_STAGES.length}` })
+    expect(nextStep(t, stage)).toEqual({ href: '/learn/', label: `Stage ${LESSON_STAGES.length}` })
   })
 
   it('moves on to the daily wire only once the whole course is done', () => {
     const stage = currentStageIndex(through(LESSON_ORDER), NOW)
-    expect(nextStep(stage).href).toBe('/daily/')
+    expect(nextStep(t, stage).href).toBe('/daily/')
   })
 })
 
@@ -70,10 +74,10 @@ describe('resultAnnouncement', () => {
   }
 
   it('reads accuracy, the count and the score in one sentence', () => {
-    expect(resultAnnouncement(summary, false)).toBe(
+    expect(resultAnnouncement(t, summary, false)).toBe(
       'Session over. Accuracy 80%, 8 of 10 right. Score 140.',
     )
-    expect(resultAnnouncement(summary, true)).toBe(
+    expect(resultAnnouncement(t, summary, true)).toBe(
       'Session over. Accuracy 80%, 8 of 10 decoded. Score 140.',
     )
   })
@@ -88,7 +92,7 @@ describe('a low challenge result (J-10)', () => {
   })
 
   it('starts a newcomer on lesson 1, and says what it teaches from the stage itself', () => {
-    const path = lessonPath(0)!
+    const path = lessonPath(t, 0)!
     expect(path.href).toBe('/learn/')
     expect(path.label).toBe('Start lesson 1')
     const first = LESSON_STAGES[0]!
@@ -98,12 +102,12 @@ describe('a low challenge result (J-10)', () => {
   })
 
   it('points a learner further on at their own stage', () => {
-    expect(lessonPath(2)?.label).toBe('Stage 3')
-    for (const character of LESSON_STAGES[2]!) expect(lessonPath(2)?.line).toContain(character)
+    expect(lessonPath(t, 2)?.label).toBe('Stage 3')
+    for (const character of LESSON_STAGES[2]!) expect(lessonPath(t, 2)?.line).toContain(character)
   })
 
   it('has no lesson to offer once the course is done', () => {
-    expect(lessonPath(LESSON_STAGES.length)).toBeNull()
+    expect(lessonPath(t, LESSON_STAGES.length)).toBeNull()
   })
 
   it('explains the score with the numbers summarize uses', () => {

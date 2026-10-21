@@ -1,6 +1,8 @@
 import { SESSION_MODES, type SessionMode } from '../../game/session'
 import type { MethodId } from '../../data/methods'
-import { METHODS } from '../../data/methods'
+import { useT } from '../../i18n/react'
+import type { Translator } from '../../i18n/translator'
+import { methodCopy, modeCopy } from './copy'
 import type { ProgressRecord } from '../../storage/progress'
 import type { SignalMode } from '../../storage/settings'
 import { Segmented } from '../ui/Segmented'
@@ -43,10 +45,12 @@ export interface PracticeSetupProps<Id extends string> {
 
 const MODES = Object.keys(SESSION_MODES) as SessionMode[]
 
-const LAYOUTS: { value: PracticeLayout; label: string; hint: string }[] = [
-  { value: 'flat', label: 'Typing', hint: 'Type the character.' },
-  { value: 'tree', label: 'The tree', hint: 'Pick it on the Morse tree, or key it.' },
-]
+function layouts(t: Translator): { value: PracticeLayout; label: string; hint: string }[] {
+  return [
+    { value: 'flat', label: t('practice.layoutTyping'), hint: t('practice.layoutTypingHint') },
+    { value: 'tree', label: t('practice.layoutTree'), hint: t('practice.layoutTreeHint') },
+  ]
+}
 
 export function PracticeSetup<Id extends string>({
   mode,
@@ -61,45 +65,48 @@ export function PracticeSetup<Id extends string>({
   onStart,
   signal,
 }: PracticeSetupProps<Id>) {
+  const t = useT()
+  const LAYOUTS = layouts(t)
   const pool = pools.find((entry) => entry.id === poolId) ?? pools[0]
   const layoutEntry = LAYOUTS.find((entry) => entry.value === layout) ?? LAYOUTS[0]!
-  const summary = [SESSION_MODES[mode].label, pool?.label ?? '', layoutEntry.label]
-    .filter(Boolean)
-    .join(' · ')
-  const note = mode === 'listening' ? signalNote(signal, 'character') : null
+  const modeText = modeCopy(t, mode)
+  const summary = [modeText.label, pool?.label ?? '', layoutEntry.label].filter(Boolean).join(' · ')
+  const note = mode === 'listening' ? signalNote(t, signal) : null
 
   return (
     <section aria-labelledby="setup-heading" className="mf-instrument p-5 sm:p-8">
       <div className="flex items-center justify-between gap-4">
         <h2 id="setup-heading" className="mf-engraved flex items-center gap-2">
           <span className="mf-lamp" data-on="true" aria-hidden="true" />
-          Practice set-up
+          {t('practice.setupHeading')}
         </h2>
-        <span className="mf-engraved hidden sm:inline">{METHODS[progress.method].name} order</span>
+        <span className="mf-engraved hidden sm:inline">
+          {t('methods.order', { name: methodCopy(t, progress.method).name })}
+        </span>
       </div>
 
       <div className="mt-6 grid gap-6">
         <div>
           <h3 id="mode-label" className="mf-engraved">
-            Mode
+            {t('practice.mode')}
           </h3>
           <Segmented
-            label="Mode"
+            label={t('practice.mode')}
             labelledBy="mode-label"
             className="mt-3"
             value={mode}
             onChange={onMode}
-            options={MODES.map((id) => ({ value: id, label: SESSION_MODES[id].label }))}
+            options={MODES.map((id) => ({ value: id, label: modeCopy(t, id).label }))}
           />
-          <p className="mt-2 text-sm text-muted">{SESSION_MODES[mode].prompt}.</p>
+          <p className="mt-2 text-sm text-muted">{modeText.prompt}.</p>
         </div>
 
         <div>
           <h3 id="pool-label" className="mf-engraved">
-            Characters
+            {t('practice.characters')}
           </h3>
           <Segmented
-            label="Characters"
+            label={t('practice.characters')}
             labelledBy="pool-label"
             className="mt-3"
             value={poolId}
@@ -109,7 +116,7 @@ export function PracticeSetup<Id extends string>({
           {pool && (
             <ul
               className="mt-3 flex flex-wrap gap-1.5"
-              aria-label={`${pool.characters.length} characters`}
+              aria-label={t('practice.characterCount', { count: pool.characters.length })}
             >
               {pool.characters.map((character) => (
                 <li key={character} className="mf-kbd">
@@ -123,9 +130,9 @@ export function PracticeSetup<Id extends string>({
 
       <details className="pe-details mt-6 border-t border-line pt-4">
         <summary className="flex min-h-11 items-center justify-between gap-3">
-          <span className="font-mono text-control text-ink uppercase">Adjust</span>
+          <span className="font-mono text-control text-ink uppercase">{t('practice.adjust')}</span>
           <span className="flex items-center gap-2 text-sm text-muted">
-            Answer by, teaching order
+            {t('practice.adjustHint')}
             <svg
               className="pe-chevron"
               viewBox="0 0 12 12"
@@ -141,10 +148,10 @@ export function PracticeSetup<Id extends string>({
         <div className="mt-4 grid gap-6">
           <div>
             <h3 id="layout-label" className="mf-engraved">
-              Answer by
+              {t('practice.answerBy')}
             </h3>
             <Segmented
-              label="Answer by"
+              label={t('practice.answerBy')}
               labelledBy="layout-label"
               className="mt-3"
               value={layout}
@@ -166,17 +173,17 @@ export function PracticeSetup<Id extends string>({
           type="button"
           onClick={onStart}
           className="mf-btn mf-btn-primary mf-btn-lg mf-btn-block"
-          aria-label={`Start: ${summary}`}
+          aria-label={t('practice.startSummary', { summary })}
         >
-          Start
+          {t('practice.start')}
         </button>
       </div>
 
       {note && (
         <p className="mt-4 text-sm text-muted" role="note">
           {note}{' '}
-          <a href="/settings/#signal" className="text-ink underline underline-offset-4">
-            Change it in settings
+          <a href={t.href('/settings/#signal')} className="text-ink underline underline-offset-4">
+            {t('practice.changeInSettings')}
           </a>
           .
         </p>

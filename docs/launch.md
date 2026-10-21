@@ -69,7 +69,7 @@ card.
 
 > Free and open source, MIT.
 >
-> github.com/iamcanturk/morse
+> github.com/iamcanturk/morseforge
 
 ---
 
@@ -114,7 +114,7 @@ emoji.
 > No account, no server, no analytics beyond an anonymous counter you can turn
 > off. Progress is in localStorage and never leaves the device.
 >
-> MIT: https://github.com/iamcanturk/morse
+> MIT: https://github.com/iamcanturk/morseforge
 
 **If it gets traction, the questions you will get, and honest answers:**
 
@@ -198,7 +198,7 @@ Different audience — they care about how it is built, not about CW.
 >   page can reach. Three features once shipped fully tested and completely
 >   unreachable.
 >
-> Source: github.com/iamcanturk/morse — MIT.
+> Source: github.com/iamcanturk/morseforge — MIT.
 
 ---
 

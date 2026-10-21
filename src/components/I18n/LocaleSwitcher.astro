@@ -1,0 +1,43 @@
+---
+/**
+ * The language switcher. Renders nothing while English is the only published
+ * language, which is today: no empty control, no dead markup.
+ *
+ * Plain links, not a select: each one is the same page in another language,
+ * so it works without JavaScript, a crawler follows it, and it carries
+ * `hreflang`. A page that has no translated copy (an article) links each
+ * language's home instead.
+ */
+import { alternateLocales } from '../../i18n/alternates'
+import { isLocalizable, localizePath, stripLocale } from '../../i18n/locales'
+import { useTranslations } from '../../i18n/server'
+
+const t = useTranslations(Astro)
+const pathname = Astro.url.pathname
+const locales = alternateLocales(pathname, t.def)
+const key = stripLocale(pathname)
+const target = isLocalizable(key) ? key : '/'
+---
+
+{
+  locales.length > 1 && (
+    <nav aria-label={t('switcher.label')} class="mf-engraved flex flex-wrap items-center gap-x-4">
+      {locales.map((locale) =>
+        locale.code === t.locale.code ? (
+          <span aria-current="true" lang={locale.lang} class="text-ink">
+            {locale.label}
+          </span>
+        ) : (
+          <a
+            href={localizePath(target, locale)}
+            hreflang={locale.lang}
+            lang={locale.lang}
+            class="inline-flex min-h-8 items-center hover:text-ink pointer-coarse:min-h-11"
+          >
+            {locale.label}
+          </a>
+        ),
+      )}
+    </nav>
+  )
+}

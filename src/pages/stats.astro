@@ -1,12 +1,13 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro'
 import PageShell from '../components/PageShell.astro'
-import { StatsScreen, type StatsGame } from '../components/Stats/StatsScreen'
+import { StatsIsland, type StatsGame } from '../components/Stats/StatsScreen'
 import { hasPage } from '../components/ui/siteNav'
-import { breadcrumbTrail, getPage } from '../config/pages'
+import { useTranslations } from '../i18n/server'
 
-const page = getPage('/stats/')
-const trail = breadcrumbTrail(page.path)
+const t = useTranslations(Astro)
+const page = t.page('/stats/')
+const trail = t.trail(page.key)
 
 /** The games that keep a best, labelled from the registry, only if their page exists. */
 const games: StatsGame[] = (
@@ -16,7 +17,10 @@ const games: StatsGame[] = (
   ] as const
 )
   .filter((game) => hasPage(game.path))
-  .map((game) => ({ id: game.id, label: getPage(game.path).navLabel, href: game.path }))
+  .map((game) => {
+    const entry = t.page(game.path)
+    return { id: game.id, label: entry.navLabel, href: entry.path }
+  })
 ---
 
 <BaseLayout
@@ -26,6 +30,6 @@ const games: StatsGame[] = (
   noindex={!page.indexable}
 >
   <PageShell width="tool" trail={trail} h1={page.h1} intro={page.intro}>
-    <StatsScreen client:load games={games} />
+    <StatsIsland client:load games={games} i18n={t.island('stats')} />
   </PageShell>
 </BaseLayout>

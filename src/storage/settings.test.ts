@@ -3,6 +3,7 @@ import { createBackupStores, exportAll, importAll } from './backup'
 import {
   SETTINGS_KEY,
   SETTINGS_VERSION,
+  KEYER_LABELS,
   SIGNAL_LABELS,
   SIGNAL_MODES,
   type SettingsRecord,
@@ -14,6 +15,7 @@ import {
   withSignal,
 } from './settings'
 import { createMemoryDriver } from './store'
+import { DEFAULT_KEY_BINDINGS, KEYER_KINDS } from '../engine/keyEngine'
 
 /** A store over a driver that already holds `data`, as an older build left it. */
 function storeHolding(data: unknown) {
@@ -22,10 +24,14 @@ function storeHolding(data: unknown) {
   return createSettingsStore(driver)
 }
 
-/** The record exactly as it was stored before the Signal setting existed. */
+/**
+ * The record exactly as it was stored before the Signal setting existed,
+ * which was also before the key type and the paddle keys.
+ */
 function legacyRecord(enabled: boolean): Record<string, unknown> {
-  const { signal: _signal, ...rest } = defaultSettings()
-  return { ...rest, audio: { ...rest.audio, enabled } }
+  const { signal: _signal, keyer: _keyer, ...rest } = defaultSettings()
+  const { dit: _dit, dah: _dah, ...keys } = rest.keys
+  return { ...rest, keys, audio: { ...rest.audio, enabled } }
 }
 
 describe('Signal setting', () => {
@@ -107,7 +113,13 @@ describe('Signal migration from the old sound switch', () => {
       motion: 'reduce',
       counters: false,
     }
-    expect(storeHolding(old).read()).toEqual({ ...old, signal: 'lamp' })
+    expect(storeHolding(old).read()).toEqual({
+      ...old,
+      signal: 'lamp',
+      // The fields added since are filled with their defaults.
+      keys: { ...old.keys, dit: DEFAULT_KEY_BINDINGS.dit, dah: DEFAULT_KEY_BINDINGS.dah },
+      keyer: defaultSettings().keyer,
+    })
   })
 
   it('lets a stored signal win over a switch that disagrees with it', () => {
@@ -181,5 +193,86 @@ describe('Signal in a backup', () => {
     expect(result.restored).toEqual(['settings'])
     expect(target.settings.read().signal).toBe('lamp')
     expect(target.settings.read().audio.enabled).toBe(false)
+  })
+})
+
+describe('Key type and paddles (issue #43)', () => {
+  it('names every key type once, in the order the settings control shows them', () => {
+    expect(Object.keys(KEYER_LABELS)).toEqual([...KEYER_KINDS])
+    expect(KEYER_LABELS).toEqual({ straight: 'Straight', iambicA: 'Iambic A', iambicB: 'Iambic B' })
+  })
+
+  it('defaults to the straight key, paddles unswapped, on [ and ]', () => {
+    const settings = defaultSettings()
+    expect(settings.keyer).toEqual({ type: 'straight', swapPaddles: false })
+    expect(settings.keys.dit).toBe('[')
+    expect(settings.keys.dah).toBe(']')
+  })
+
+  it('reads a record from before the key type as the straight key it always was', () => {
+    const settings = storeHolding(legacyRecord(true)).read()
+    expect(settings.keyer).toEqual({ type: 'straight', swapPaddles: false })
+    expect(settings.keys).toEqual(DEFAULT_KEY_BINDINGS)
+  })
+
+  it("keeps an old record's own keys when it fills in the paddle keys", () => {
+    const old = {
+      ...legacyRecord(true),
+      keys: { key: 'k', alternative: 'l', cancel: 'q', submit: 'Enter' },
+    }
+    expect(storeHolding(old).read().keys).toEqual({ ...old.keys, dit: '[', dah: ']' })
+  })
+
+  it('keeps every valid key type and swap, and stored paddle keys', () => {
+    for (const type of KEYER_KINDS) {
+      for (const swapPaddles of [true, false]) {
+        const settings = storeHolding({
+          ...defaultSettings(),
+          keyer: { type, swapPaddles },
+          keys: { ...DEFAULT_KEY_BINDINGS, dit: 'z', dah: 'x' },
+        }).read()
+        expect(settings.keyer).toEqual({ type, swapPaddles })
+        expect(settings.keys.dit).toBe('z')
+        expect(settings.keys.dah).toBe('x')
+      }
+    }
+  })
+
+  it('falls back field by field on garbage, never dropping the rest of the record', () => {
+    const garbage: unknown[] = ['iambic', 'Straight', 7, null, 'yes', ['iambicA'], { type: 'x' }]
+    for (const value of garbage) {
+      const settings = storeHolding({
+        ...defaultSettings(),
+        counters: false,
+        keyer: { type: value, swapPaddles: value },
+        // Any string is a key name, as for the other bindings; anything else is not.
+        keys: {
+          ...DEFAULT_KEY_BINDINGS,
+          ...(typeof value === 'string' ? {} : { dit: value, dah: value }),
+        },
+      }).read()
+      expect(settings.keyer).toEqual({ type: 'straight', swapPaddles: false })
+      expect(settings.keys.dit).toBe('[')
+      expect(settings.keys.dah).toBe(']')
+      expect(settings.counters).toBe(false)
+    }
+    for (const keyer of ['iambicA', 3, null, []]) {
+      expect(storeHolding({ ...defaultSettings(), keyer }).read().keyer.type).toBe('straight')
+    }
+  })
+
+  it('round-trips through export and import, and imports an older export', () => {
+    const source = createBackupStores(createMemoryDriver())
+    source.settings.update((current) => ({
+      ...current,
+      keyer: { type: 'iambicB', swapPaddles: true },
+    }))
+    const target = createBackupStores(createMemoryDriver())
+    importAll(JSON.stringify(exportAll(source)), target)
+    expect(target.settings.read().keyer).toEqual({ type: 'iambicB', swapPaddles: true })
+
+    const older = createBackupStores(createMemoryDriver())
+    expect(importAll({ [SETTINGS_KEY]: legacyRecord(true) }, older).restored).toEqual(['settings'])
+    expect(older.settings.read().keyer.type).toBe('straight')
   })
 })

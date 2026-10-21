@@ -14,6 +14,9 @@ import { createProgressStore } from '../../storage/progress'
 import { GAME_IDS, createStatsStore, defaultStats } from '../../storage/stats'
 import { createMemoryDriver } from '../../storage/store'
 import { XP } from '../../game/progression'
+import { translatorFor } from '../../i18n/server'
+
+const t = translatorFor('en')
 
 const NOW = new Date(2026, 9, 21, 12).getTime()
 
@@ -120,18 +123,18 @@ describe('bankRun', () => {
 
 describe('sharing', () => {
   it('reads "<name>: <score>, <x>% cleared"', () => {
-    expect(shareLine('Signal Defender', 1240, 0.912)).toBe('Signal Defender: 1,240, 91% cleared')
+    expect(shareLine(t, 'Signal Defender', 1240, 0.912)).toBe('Signal Defender: 1,240, 91% cleared')
   })
 
   it('never shares a nonsense number', () => {
-    expect(shareLine('Morse Runner', Number.NaN, Number.POSITIVE_INFINITY)).toBe(
+    expect(shareLine(t, 'Morse Runner', Number.NaN, Number.POSITIVE_INFINITY)).toBe(
       'Morse Runner: 0, 0% cleared',
     )
-    expect(shareLine('Morse Runner', -5, 2)).toBe('Morse Runner: 0, 100% cleared')
+    expect(shareLine(t, 'Morse Runner', -5, 2)).toBe('Morse Runner: 0, 100% cleared')
   })
 
   it('rounds down, so a run with a miss never shares as 100% cleared', () => {
-    expect(shareLine('Signal Defender', 3000, 199 / 200)).toBe(
+    expect(shareLine(t, 'Signal Defender', 3000, 199 / 200)).toBe(
       'Signal Defender: 3,000, 99% cleared',
     )
     expect(clearedPercent(199 / 200)).toBe(99)
@@ -141,19 +144,19 @@ describe('sharing', () => {
 
   it('puts the game URL on its own line', () => {
     const identity = { game: 'runner' as const, name: 'Morse Runner', url: 'https://x.test/g/' }
-    expect(shareText(identity, 90, 0.5)).toBe('Morse Runner: 90, 50% cleared\nhttps://x.test/g/')
+    expect(shareText(t, identity, 90, 0.5)).toBe('Morse Runner: 90, 50% cleared\nhttps://x.test/g/')
   })
 
   it('gives a share sheet the link only as url, and the clipboard the link (DEC-035)', () => {
     const identity = { game: 'runner' as const, name: 'Morse Runner', url: 'https://x.test/g/' }
-    const share = gameShare(identity, 90, 0.5)
+    const share = gameShare(t, identity, 90, 0.5)
     expect(share).toEqual({
       title: 'Morse Runner',
       text: 'Morse Runner: 90, 50% cleared',
       url: 'https://x.test/g/',
     })
     expect(share.text).not.toContain(share.url)
-    expect(shareText(identity, 90, 0.5).endsWith(share.url)).toBe(true)
+    expect(shareText(t, identity, 90, 0.5).endsWith(share.url)).toBe(true)
   })
 
   it('has a registered page for every game, whose name is the one shared', () => {

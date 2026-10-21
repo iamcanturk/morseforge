@@ -22,6 +22,7 @@ import {
   type StatsRecord,
 } from '../../storage/stats'
 import type { Store } from '../../storage/store'
+import type { Translator } from '../../i18n/translator'
 
 /** Where each game lives. The page passes the registry's name and URL in as props. */
 export const GAME_PATHS: Readonly<Record<GameId, string>> = {
@@ -128,20 +129,38 @@ export function clearedPercent(cleared: number): number {
 }
 
 /** "Signal Defender: 1,240, 91% cleared". `cleared` is 0..1. */
-export function shareLine(name: string, score: number, cleared: number): string {
+export function shareLine(t: Translator, name: string, score: number, cleared: number): string {
   const points = Number.isFinite(score) ? Math.max(0, Math.round(score)) : 0
-  return `${name}: ${points.toLocaleString('en')}, ${clearedPercent(cleared)}% cleared`
+  return t('games.shareLine', {
+    name,
+    score: points.toLocaleString(t.locale.lang === 'en' ? 'en' : t.locale.lang),
+    percent: clearedPercent(cleared),
+  })
 }
 
 /**
  * The run as a share (DEC-035): the line as text, the game's page as url. A
  * share sheet gets the link once, as `url`; the clipboard gets `shareText`.
  */
-export function gameShare(identity: GameIdentity, score: number, cleared: number): ShareMessage {
-  return { title: identity.name, text: shareLine(identity.name, score, cleared), url: identity.url }
+export function gameShare(
+  t: Translator,
+  identity: GameIdentity,
+  score: number,
+  cleared: number,
+): ShareMessage {
+  return {
+    title: identity.name,
+    text: shareLine(t, identity.name, score, cleared),
+    url: identity.url,
+  }
 }
 
 /** The line plus the game's URL on its own line: what is copied. */
-export function shareText(identity: GameIdentity, score: number, cleared: number): string {
-  return clipboardText(gameShare(identity, score, cleared), '\n')
+export function shareText(
+  t: Translator,
+  identity: GameIdentity,
+  score: number,
+  cleared: number,
+): string {
+  return clipboardText(gameShare(t, identity, score, cleared), '\n')
 }

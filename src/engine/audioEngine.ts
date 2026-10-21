@@ -76,6 +76,8 @@ export class AudioEngine {
   #liveOscillator: OscillatorNode | null = null
   #liveGain: GainNode | null = null
   #activeNodes = new Set<OscillatorNode>()
+  /** Tones `keyFor` scheduled, with when each is due to end. */
+  #keyed = new Map<OscillatorNode, { gain: GainNode; off: number }>()
 
   constructor(settings: Partial<AudioSettings> = {}) {
     this.#settings = { ...DEFAULT_AUDIO_SETTINGS, ...settings }
@@ -251,9 +253,62 @@ export class AudioEngine {
     this.#liveGain = null
   }
 
+  /**
+   * Sound the sidetone for exactly `ms`, on the sample clock.
+   *
+   * For the paddle keyer, which knows how long each element is the moment it
+   * starts. Stopping the tone from a timer instead would land each edge a few
+   * milliseconds off, a different few every time, and at 30 WPM that is heard
+   * as a ragged fist. The keyer's own timers still drive the lamp and the
+   * decoder; only the sound is scheduled here.
+   */
+  async keyFor(ms: number): Promise<void> {
+    await this.resume()
+    const context = this.#context!
+    const oscillator = context.createOscillator()
+    const gain = context.createGain()
+    oscillator.type = 'sine'
+    oscillator.frequency.value = this.#settings.frequency
+
+    const on = context.currentTime
+    const off = on + ms / 1000
+    const rise = Math.min(this.#settings.riseTime, ms / 2000)
+    // The same shaped edges as `playTimeline`: see the key-click note above.
+    gain.gain.setValueAtTime(0, on)
+    gain.gain.linearRampToValueAtTime(1, on + rise)
+    gain.gain.setValueAtTime(1, off - rise)
+    gain.gain.linearRampToValueAtTime(0, off)
+
+    oscillator.connect(gain).connect(this.#master!)
+    oscillator.start(on)
+    oscillator.stop(off + 0.01)
+    this.#keyed.set(oscillator, { gain, off })
+    oscillator.addEventListener('ended', () => this.#keyed.delete(oscillator))
+  }
+
+  /** Cut short whatever `keyFor` is sounding, with the usual soft fall. */
+  stopKeyed(): void {
+    if (!this.#context) return
+    const now = this.#context.currentTime
+    const fall = this.#settings.riseTime
+    for (const [oscillator, { gain, off }] of this.#keyed) {
+      if (off <= now) continue
+      gain.gain.cancelScheduledValues(now)
+      gain.gain.setValueAtTime(gain.gain.value, now)
+      gain.gain.linearRampToValueAtTime(0, now + fall)
+      try {
+        oscillator.stop(now + fall + 0.01)
+      } catch {
+        // Already stopped.
+      }
+    }
+    this.#keyed.clear()
+  }
+
   /** Stop everything immediately. */
   stopAll(): void {
     this.keyUp()
+    this.stopKeyed()
     for (const oscillator of this.#activeNodes) {
       try {
         oscillator.stop()

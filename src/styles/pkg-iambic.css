@@ -1,0 +1,22 @@
+/*
+ * The on-screen iambic paddle (issue #43). It borrows the straight key's bezel
+ * (.kc-key in pkg-c.css); this file only adds what a pair of levers needs.
+ */
+
+.ik-paddle {
+  /* Two thumbs at once: never let the browser read the pair as a gesture. */
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/*
+ * A thumb needs more than a click target. The straight key asks 160px; a
+ * paddle is narrower, so it gets the height back.
+ */
+@media (pointer: coarse) {
+  .ik-paddle {
+    min-height: 176px;
+    justify-content: center;
+  }
+}

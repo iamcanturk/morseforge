@@ -20,7 +20,7 @@ export const SITE = {
   description:
     'Learn Morse code by sound with a free trainer: real CW audio, a keyboard telegraph key and a Signal Tree that fills in as you go. No account, no ads.',
   locale: 'en',
-  repo: 'https://github.com/iamcanturk/morse',
+  repo: 'https://github.com/iamcanturk/morseforge',
 } as const
 
 export const AUTHOR = {

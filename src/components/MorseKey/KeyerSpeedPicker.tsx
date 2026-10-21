@@ -3,6 +3,8 @@ import { Segmented } from '../ui/Segmented'
 import { formatSeconds } from '../../data/format'
 import { KEYER_PRESETS, type KeyerPreset, matchKeyerPreset } from '../../storage/settings'
 import type { SettingsRecord } from '../../storage/settings'
+import { useT } from '../../i18n/react'
+import { presetLabel } from './keyCopy'
 
 /**
  * Picks how patient the decoder is while keying.
@@ -26,19 +28,24 @@ export function KeyerSpeedPicker({
   onChange: (preset: KeyerPreset) => void
   className?: string
 }) {
+  const t = useT()
   const labelId = useId()
   const active = matchKeyerPreset(timing)
   const names = Object.keys(KEYER_PRESETS) as KeyerPreset[]
 
   const options = names.map((name) => {
     const preset = KEYER_PRESETS[name]
-    const detail = preset.autoCommit ? `${formatSeconds(preset.characterGapMs)} s` : 'No timer'
+    const label = presetLabel(t, name)
+    const seconds = formatSeconds(preset.characterGapMs)
+    const detail = preset.autoCommit ? t('key.seconds', { seconds }) : t('key.noTimer')
     return {
       value: name,
-      ariaLabel: `${preset.label}, ${preset.autoCommit ? `${formatSeconds(preset.characterGapMs)} seconds` : 'no timer'}`,
+      ariaLabel: preset.autoCommit
+        ? t('key.patienceSeconds', { preset: label, seconds })
+        : t('key.patienceNoTimer', { preset: label }),
       label: (
         <span className="flex flex-col items-center gap-1 py-1 leading-none">
-          <span>{preset.label}</span>
+          <span>{label}</span>
           <span className="font-mono text-label tracking-normal normal-case">{detail}</span>
         </span>
       ),
@@ -49,12 +56,12 @@ export function KeyerSpeedPicker({
     <div className={className}>
       <div className="flex items-baseline justify-between gap-3">
         <span id={labelId} className="mf-engraved">
-          Time to finish a character
+          {t('key.patience')}
         </span>
-        {active === null && <span className="mf-engraved text-amber">Custom, set in Settings</span>}
+        {active === null && <span className="mf-engraved text-amber">{t('key.custom')}</span>}
       </div>
       <Segmented
-        label="Time to finish a character"
+        label={t('key.patience')}
         labelledBy={labelId}
         value={active}
         options={options}

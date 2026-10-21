@@ -1,7 +1,7 @@
 import { MORSE_ALPHABET } from '../../data/morseAlphabet'
-import { spokenCode } from '../../engine/spokenCode'
 import type { SignalMode } from '../../storage/settings'
 import type { PoolChoice } from './PracticeSetup'
+import type { Translator } from '../../i18n/translator'
 
 /**
  * The practice screen's pure parts, kept out of the component so they can be
@@ -24,11 +24,15 @@ export interface AnswerFeedback {
  * and how it sounds, in every mode, because being told is the point of a
  * miss; listening mode used to say only "You said Q".
  */
-export function feedbackSpeech(feedback: AnswerFeedback): string {
-  if (feedback.correct) return `${feedback.expected}, correct.`
-  const said = feedback.given ? `You said ${feedback.given}.` : 'Missed.'
-  const code = spokenCode(MORSE_ALPHABET[feedback.expected] ?? '')
-  return `${said} It was ${feedback.expected}${code ? `, ${code}` : ''}.`
+export function feedbackSpeech(t: Translator, feedback: AnswerFeedback): string {
+  if (feedback.correct) return t('practice.speechCorrect', { character: feedback.expected })
+  const said = feedback.given
+    ? t('practice.speechYouSaid', { given: feedback.given })
+    : t('practice.speechMissed')
+  const code = t.spokenCode(MORSE_ALPHABET[feedback.expected] ?? '')
+  return code
+    ? t('practice.speechItWasCode', { said, character: feedback.expected, code })
+    : t('practice.speechItWas', { said, character: feedback.expected })
 }
 
 /** Whether two pools hold the same characters, in any order. */
@@ -53,16 +57,16 @@ export function distinctPools<Id extends string>(
 }
 
 /** The RX header's verb for a listening prompt: you watch a lamp and listen to a tone. */
-export function receiveLabel(signal: SignalMode): string {
-  return signal === 'lamp' ? 'RX · watch' : 'RX · listen'
+export function receiveLabel(t: Translator, signal: SignalMode): string {
+  return signal === 'lamp' ? t('practice.rxWatch') : t('practice.rxListen')
 }
 
 /**
  * The note under a listening set-up, or null when the signal is the plain
  * tone and there is nothing to say (A-03).
  */
-export function signalNote(signal: SignalMode, what: string): string | null {
-  if (signal === 'lamp') return `Signal is set to Lamp: each ${what} flashes instead of sounding.`
-  if (signal === 'both') return `Signal is set to Both: each ${what} sounds and flashes.`
+export function signalNote(t: Translator, signal: SignalMode): string | null {
+  if (signal === 'lamp') return t('practice.signalLamp')
+  if (signal === 'both') return t('practice.signalBoth')
   return null
 }

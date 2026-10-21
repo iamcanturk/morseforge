@@ -7,7 +7,12 @@
  */
 
 import { DEFAULT_AUDIO_SETTINGS } from '../engine/audioEngine'
-import { DEFAULT_KEY_BINDINGS, type KeyBindings } from '../engine/keyEngine'
+import {
+  DEFAULT_KEY_BINDINGS,
+  KEYER_KINDS,
+  type KeyBindings,
+  type KeyerKind,
+} from '../engine/keyEngine'
 import {
   type Store,
   type StorageDriver,
@@ -110,6 +115,13 @@ export const SIGNAL_LABELS: Readonly<Record<SignalMode, string>> = {
   both: 'Both',
 }
 
+/** Settings → Key type, in the order the control shows them. */
+export const KEYER_LABELS: Readonly<Record<KeyerKind, string>> = {
+  straight: 'Straight',
+  iambicA: 'Iambic A',
+  iambicB: 'Iambic B',
+}
+
 export interface SettingsRecord {
   audio: {
     /**
@@ -159,6 +171,16 @@ export interface SettingsRecord {
   counters: boolean
   /** How a listening signal reaches the learner (DEC-045). Default 'sound'. */
   signal: SignalMode
+  /**
+   * Which key the sending screens attach (issue #43). Straight by default:
+   * the course teaches the rhythm of a character by hand first, and a paddle
+   * is for someone who already keys with one.
+   */
+  keyer: {
+    type: KeyerKind
+    /** Dit on the right paddle and the second paddle key, for left-handed operators. */
+    swapPaddles: boolean
+  }
 }
 
 /** Tones are audible. The same truth as `audio.enabled`. */
@@ -203,6 +225,7 @@ export function defaultSettings(): SettingsRecord {
     motion: 'system',
     counters: true,
     signal: 'sound',
+    keyer: { type: 'straight', swapPaddles: false },
   }
 }
 
@@ -213,6 +236,9 @@ function validateSettings(value: unknown): SettingsRecord | null {
   const audio = isRecord(value['audio']) ? value['audio'] : {}
   const timing = isRecord(value['timing']) ? value['timing'] : {}
   const keys = isRecord(value['keys']) ? value['keys'] : {}
+  // Added after the first release: a record without it is an older one and
+  // gets the straight key it always had. Additive, so no version bump.
+  const keyer = isRecord(value['keyer']) ? value['keyer'] : {}
 
   const wpm = num(timing['wpm'], fallback.timing.wpm, LIMITS.wpm.min, LIMITS.wpm.max)
 
@@ -279,10 +305,16 @@ function validateSettings(value: unknown): SettingsRecord | null {
       alternative: str(keys['alternative'], fallback.keys.alternative ?? 'Enter'),
       cancel: str(keys['cancel'], fallback.keys.cancel ?? 'Escape'),
       submit: str(keys['submit'], fallback.keys.submit ?? 'Control'),
+      dit: str(keys['dit'], fallback.keys.dit ?? '['),
+      dah: str(keys['dah'], fallback.keys.dah ?? ']'),
     },
     motion: oneOf(value['motion'], ['system', 'reduce', 'full'] as const, fallback.motion),
     counters: bool(value['counters'], fallback.counters),
     signal,
+    keyer: {
+      type: oneOf(keyer['type'], KEYER_KINDS, fallback.keyer.type),
+      swapPaddles: bool(keyer['swapPaddles'], fallback.keyer.swapPaddles),
+    },
   }
 }
 

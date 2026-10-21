@@ -1,9 +1,13 @@
 import { useEffect, useRef, type MouseEvent, type ReactNode, type Ref } from 'react'
-import { Fuse, MorseKey, PendingSpeech } from './MorseKey'
-import type { useMorseKey } from './useMorseKey'
+import { Fuse, KeyingLead, MorseKey, POINTER_TAGS, PendingSpeech } from './MorseKey'
+import type { PaddleControls, useMorseKey } from './useMorseKey'
 import { prettify } from '../../engine/morseEncoder'
 import type { SettingsRecord } from '../../storage/settings'
+import { keyName } from './keyName'
 import { releaseFocus } from './releaseFocus'
+import { keyLabel as keyCap } from './keyCopy'
+import { useT } from '../../i18n/react'
+import { renderRich } from '../../i18n/richReact'
 import { browserDockEnvironment, publishStickyDock } from './stickyDock'
 import '../../styles/pkg-c.css'
 
@@ -72,11 +76,7 @@ export interface KeyStationProps {
 const TAPE_CHARACTERS = 80
 
 /** The bound key as a label: "SPACE", "ENTER", "K". */
-export function keyName(key: string): string {
-  if (key === ' ') return 'SPACE'
-  if (key === 'Control') return 'CTRL'
-  return key.toUpperCase()
-}
+export { keyName }
 
 export { releaseFocus } from './releaseFocus'
 
@@ -107,8 +107,9 @@ export function KeyStation({
     if (!stickyTape || !element) return
     return publishStickyDock(element, browserDockEnvironment())
   }, [stickyTape, tape])
-  const keyLabel = keyName(settings.keys.key)
-  const commitLabel = keyName(settings.keys.submit ?? 'Control')
+  const t = useT()
+  const keyLabel = keyCap(t, settings.keys.key)
+  const commitLabel = keyCap(t, settings.keys.submit ?? 'Control')
   const showCountdown = autoCommit && state.pending !== '' && !state.isDown
 
   const act = (action: KeyStationAction) => (event: MouseEvent<HTMLButtonElement>) => {
@@ -155,7 +156,13 @@ export function KeyStation({
 
       <div className="mt-3 flex min-h-11 items-start justify-between gap-3">
         <div className="min-w-0 flex-1 text-sm leading-snug text-muted">
-          {status ?? <KeyingHint autoCommit={autoCommit} commitLabel={commitLabel} />}
+          {status ?? (
+            <KeyingHint
+              autoCommit={autoCommit}
+              commitLabel={commitLabel}
+              paddles={morseKey.paddles}
+            />
+          )}
         </div>
         <span
           className="flex shrink-0 items-center gap-2 pt-0.5"
@@ -169,7 +176,7 @@ export function KeyStation({
               moment === 'detected' ? 'text-signal' : '',
             ].join(' ')}
           >
-            Signal detected
+            {t('key.signalDetected')}
           </span>
         </span>
       </div>
@@ -192,6 +199,8 @@ export function KeyStation({
         frequency={settings.audio.frequency}
         muted={!settings.audio.enabled || settings.audio.volume === 0}
         keyRef={keyRef}
+        paddles={morseKey.paddles}
+        toneOn={state.toneOn}
         className="mt-3"
       />
 
@@ -207,7 +216,8 @@ export function KeyStation({
                 autoCommit ? 'mf-btn-secondary' : 'mf-btn-primary',
               ].join(' ')}
             >
-              Finish<span className="max-sm:hidden"> character</span>
+              {t('key.finish')}
+              <span className="max-sm:hidden">{t('key.finishCharacter')}</span>
               {/* Not below `sm` either: two buttons share a 390px row there,
                   and the key name pushed the label out of its button. There
                   the label itself is "Finish": in full it filled its half of
@@ -222,7 +232,7 @@ export function KeyStation({
               disabled={disabled || nothingSent}
               className="mf-btn mf-btn-secondary mf-btn-sm"
             >
-              New word
+              {t('key.newWord')}
             </button>
           )}
           {actions.includes('undo') && (
@@ -232,7 +242,7 @@ export function KeyStation({
               disabled={disabled || state.pending === ''}
               className="mf-btn mf-btn-ghost mf-btn-sm"
             >
-              Undo character
+              {t('key.undo')}
             </button>
           )}
           {actions.includes('clear') && (
@@ -242,7 +252,7 @@ export function KeyStation({
               disabled={disabled || nothingSent}
               className="mf-btn mf-btn-danger mf-btn-sm"
             >
-              Clear tape
+              {t('key.clear')}
             </button>
           )}
         </div>
@@ -255,22 +265,19 @@ export function KeyStation({
 export function KeyingHint({
   autoCommit,
   commitLabel,
+  paddles = null,
 }: {
   autoCommit: boolean
   commitLabel: string
+  paddles?: PaddleControls | null
 }) {
+  const t = useT()
   return (
     <p>
-      Tap for a dot, hold for a dash.{' '}
-      {autoCommit ? (
-        'Pause to finish the character; the fuse shows how long you have.'
-      ) : (
-        <>
-          Take your time, then
-          <span className="pointer-coarse:hidden"> press {commitLabel}</span>
-          <span className="hidden pointer-coarse:inline"> tap Finish</span>.
-        </>
-      )}
+      <KeyingLead paddles={paddles} />{' '}
+      {autoCommit
+        ? t('key.stationPause')
+        : renderRich(t.rich('key.stationManual', { key: commitLabel }), POINTER_TAGS)}
     </p>
   )
 }
@@ -293,6 +300,7 @@ function DecodedLine({
   pending: string
   empty?: ReactNode
 }) {
+  const t = useT()
   const start = Math.max(0, text.length - TAPE_CHARACTERS)
   const shown = [...text.slice(start)]
   const blank = text === '' && pending === ''
@@ -304,7 +312,7 @@ function DecodedLine({
           character is the one that matters most. */}
       <output
         aria-live="polite"
-        aria-label="Decoded text"
+        aria-label={t('key.decoded')}
         className={blank ? 'sr-only' : 'kc-ticker'}
       >
         {shown.map((character, index) => (
@@ -314,7 +322,7 @@ function DecodedLine({
         ))}
       </output>
       {blank ? (
-        <span className="kc-tape-empty">{empty ?? 'Your message prints here'}</span>
+        <span className="kc-tape-empty">{empty ?? t('key.printsHere')}</span>
       ) : (
         <span className="kc-punch" aria-hidden="true" data-on={pending !== ''}>
           {pending ? prettify(pending) : ''}
@@ -326,15 +334,18 @@ function DecodedLine({
 
 /** The drill tape: just the character in progress and what it would be. */
 function PendingLine({ pending, preview }: { pending: string; preview: string | null }) {
+  const t = useT()
   return (
     <div className="kc-tape-line kc-tape-line-centre" aria-hidden="true">
       {pending ? (
         <>
           <span className="kc-pending-code">{prettify(pending)}</span>
-          <span className="kc-pending-preview">{preview ? `= ${preview}` : '= ?'}</span>
+          <span className="kc-pending-preview">
+            {preview ? t('key.preview', { preview }) : t('key.previewUnknown')}
+          </span>
         </>
       ) : (
-        <span className="kc-tape-empty">Ready</span>
+        <span className="kc-tape-empty">{t('key.ready')}</span>
       )}
     </div>
   )

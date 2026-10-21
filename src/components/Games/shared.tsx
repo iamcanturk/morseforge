@@ -25,6 +25,10 @@ import { Screen } from '../ui/Screen'
 import { Segmented } from '../ui/Segmented'
 import { gameShare, shareLine, shareText, type GameIdentity, type RunReport } from './results'
 import { shareData } from '../../game/share'
+import { useT } from '../../i18n/react'
+import { renderRich } from '../../i18n/richReact'
+import type { Translator } from '../../i18n/translator'
+import { achievementCopy } from '../Stats/achievementCopy'
 import '../../styles/pkg-h.css'
 
 /**
@@ -47,12 +51,29 @@ export interface Pool {
 const throughStage = (n: number): string[] => LEARNING_STAGES.slice(0, n).flat()
 
 /** Fixed pools. Every label is counted from the data, never typed. */
-const POOLS: readonly Pool[] = [
-  { id: 'stage1', label: throughStage(1).join(' '), characters: throughStage(1) },
-  { id: 'stage2', label: `First ${throughStage(2).length}`, characters: throughStage(2) },
-  { id: 'stage3', label: `First ${throughStage(3).length}`, characters: throughStage(3) },
-  { id: 'all', label: `All ${ALL_LETTERS.length}`, characters: ALL_LETTERS },
-]
+function fixedPools(t: Translator): readonly Pool[] {
+  return [
+    { id: 'stage1', label: throughStage(1).join(' '), characters: throughStage(1) },
+    {
+      id: 'stage2',
+      label: t('games.poolFirst', { count: throughStage(2).length }),
+      characters: throughStage(2),
+    },
+    {
+      id: 'stage3',
+      label: t('games.poolFirst', { count: throughStage(3).length }),
+      characters: throughStage(3),
+    },
+    {
+      id: 'all',
+      label: t('games.poolAll', { count: ALL_LETTERS.length }),
+      characters: ALL_LETTERS,
+    },
+  ]
+}
+
+/** Every letter, the pool a game falls back to outside the provider. */
+const ALL_POOL: Pool = { id: 'all', label: '', characters: ALL_LETTERS }
 
 interface PoolContext {
   pool: Pool
@@ -71,6 +92,7 @@ const Ctx = createContext<PoolContext | null>(null)
  * progress store, so it grows with every stage the method unlocks.
  */
 export function GamePoolProvider({ children }: { children: ReactNode }) {
+  const t = useT()
   const store = useMemo(() => createProgressStore(), [])
   const [progress, setProgress] = useState<ProgressRecord>(emptyProgress)
   const [poolId, setPoolId] = useState('method')
@@ -82,23 +104,28 @@ export function GamePoolProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<PoolContext>(() => {
     const characters = unlockedCharacters(progress)
-    const mine: Pool = { id: 'method', label: `My method (${characters.length})`, characters }
-    const options = [mine, ...POOLS]
+    const mine: Pool = {
+      id: 'method',
+      label: t('games.poolMethod', { count: characters.length }),
+      characters,
+    }
+    const options = [mine, ...fixedPools(t)]
     return {
       pool: options.find((entry) => entry.id === poolId) ?? mine,
       setPoolId,
       options,
     }
-  }, [progress, poolId])
+  }, [progress, poolId, t])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
 export function useGamePool(): Pool {
-  return useContext(Ctx)?.pool ?? POOLS[POOLS.length - 1]!
+  return useContext(Ctx)?.pool ?? ALL_POOL
 }
 
 export function PoolPicker() {
+  const t = useT()
   const context = useContext(Ctx)
   const id = useId()
   if (!context) return null
@@ -106,11 +133,11 @@ export function PoolPicker() {
   return (
     <div>
       <p id={id} className="mf-engraved">
-        Characters
+        {t('games.characters')}
       </p>
       <Segmented
         className="mt-2.5"
-        label="Characters"
+        label={t('games.characters')}
         labelledBy={id}
         value={context.pool.id}
         onChange={context.setPoolId}
@@ -205,9 +232,10 @@ export function HudCell({
 
 /** Lives as lamps plus the count: three lamps and two are hard to tell apart under pressure. */
 export function LivesCell({ lives, of }: { lives: number; of: number }) {
+  const t = useT()
   const left = Math.max(0, lives)
   return (
-    <HudCell label="Lives" tone={left <= 1 ? 'danger' : undefined}>
+    <HudCell label={t('games.lives')} tone={left <= 1 ? 'danger' : undefined}>
       <span className="gm-lives" aria-hidden="true">
         {Array.from({ length: of }, (_, index) => (
           <Lamp key={index} on={index < left} tone={left <= 1 ? 'danger' : 'signal'} size="lg" />
@@ -216,7 +244,7 @@ export function LivesCell({ lives, of }: { lives: number; of: number }) {
       <span>
         {left}
         <span className="hidden text-muted sm:inline">/{of}</span>
-        <span className="sr-only"> lives left</span>
+        <span className="sr-only">{t('games.livesLeft')}</span>
       </span>
     </HudCell>
   )
@@ -240,16 +268,20 @@ export function GameSetup({
   onStart: () => void
   note?: ReactNode
 }) {
+  const t = useT()
   const stats = useStats()
   const best = stats?.gameBests?.[identity.game]
 
   return (
-    <section className="mf-instrument gm-cabinet p-5 sm:p-8" aria-label={`${identity.name} setup`}>
+    <section
+      className="mf-instrument gm-cabinet p-5 sm:p-8"
+      aria-label={t('games.setup', { name: identity.name })}
+    >
       <PlateRow
-        title={`${identity.name} · ${consoleName}`}
+        title={t('games.plate', { name: identity.name, console: consoleName })}
         status={
           <StatusLamp on tone="amber">
-            Standby
+            {t('games.standby')}
           </StatusLamp>
         }
       />
@@ -278,7 +310,7 @@ export function GameSetup({
               readout beside it read as a slab, not a control. */}
           <div className="grid grid-cols-[minmax(0,8rem)_1fr] items-center gap-3 sm:grid-cols-[minmax(0,10rem)_1fr]">
             <Readout
-              label="Your best"
+              label={t('games.yourBest')}
               value={best === undefined ? '—' : formatScore(best)}
               tone={best === undefined ? 'ink' : 'amber'}
               className="gap-2 p-3"
@@ -330,8 +362,9 @@ function SharePanel({
   /** 0..1. */
   cleared: number
 }) {
-  const line = shareLine(identity.name, score, cleared)
-  const text = shareText(identity, score, cleared)
+  const t = useT()
+  const line = shareLine(t, identity.name, score, cleared)
+  const text = shareText(t, identity, score, cleared)
   const [open, setOpen] = useState(true)
   const [status, setStatus] = useState<string | null>(null)
   const [canShare, setCanShare] = useState(false)
@@ -360,40 +393,40 @@ function SharePanel({
     try {
       await navigator.clipboard.writeText(text)
       track('share_copy', identity.game)
-      flash('Copied. Paste it anywhere.')
+      flash(t('games.copied'))
     } catch {
       // No clipboard permission (an insecure origin, an old browser): show the
       // text selected, so a long-press or Ctrl+C still gets it out.
       setManual(true)
-      flash('Select the text and copy it.')
+      flash(t('games.selectToCopy'))
     }
-  }, [flash, identity.game, text])
+  }, [flash, identity.game, text, t])
 
   const share = useCallback(async () => {
     track('share_open', identity.game)
     try {
       // The game's link once, as the url (DEC-035); the copied text has it too.
-      await navigator.share(shareData(gameShare(identity, score, cleared)))
+      await navigator.share(shareData(gameShare(t, identity, score, cleared)))
     } catch (error) {
       // Dismissed: the person's choice, nothing to say. Refused: copy
       // instead, which works or says why, rather than a button that did nothing.
       if (error instanceof DOMException && error.name === 'AbortError') return
       await copy()
     }
-  }, [identity, score, cleared, copy])
+  }, [identity, score, cleared, copy, t])
 
   if (!open) return null
 
   return (
     <div className="mf-panel p-4 sm:p-5">
       <div className="flex items-center justify-between gap-3">
-        <span className="mf-engraved">Send it</span>
+        <span className="mf-engraved">{t('games.sendIt')}</span>
         <button
           type="button"
           className="mf-btn mf-btn-ghost mf-btn-sm"
           onClick={() => setOpen(false)}
         >
-          Not now
+          {t('games.notNow')}
         </button>
       </div>
 
@@ -403,7 +436,7 @@ function SharePanel({
           readOnly
           rows={2}
           value={text}
-          aria-label="Your result, to copy"
+          aria-label={t('games.resultToCopy')}
           className="mf-input mt-3 w-full font-mono text-sm"
         />
       ) : (
@@ -413,7 +446,7 @@ function SharePanel({
       <div className="mt-4 flex flex-wrap gap-3">
         {canShare && (
           <button type="button" className="mf-btn mf-btn-primary" onClick={() => void share()}>
-            Share
+            {t('games.share')}
           </button>
         )}
         <button
@@ -421,7 +454,7 @@ function SharePanel({
           className={canShare ? 'mf-btn mf-btn-secondary' : 'mf-btn mf-btn-primary'}
           onClick={() => void copy()}
         >
-          Copy text
+          {t('games.copyText')}
         </button>
       </div>
 
@@ -471,6 +504,7 @@ export function GameOver({
   onAgain,
   onSetup,
 }: GameOverProps) {
+  const t = useT()
   const section = useRef<HTMLElement>(null)
   const heading = useRef<HTMLHeadingElement>(null)
 
@@ -484,7 +518,13 @@ export function GameOver({
 
   const firstRecord = report.isNewBest && report.previousBest === null
   const newBest = report.isNewBest && report.previousBest !== null
-  const stamp = newBest ? 'New best' : firstRecord ? 'First record' : quit ? 'Run ended' : overLabel
+  const stamp = newBest
+    ? t('games.newBest')
+    : firstRecord
+      ? t('games.firstRecord')
+      : quit
+        ? t('games.runEnded')
+        : overLabel
   const stampTone = report.isNewBest ? 'text-signal' : 'text-amber'
   const today = useMemo(() => new Date().toLocaleDateString('en-CA'), [])
   return (
@@ -493,7 +533,7 @@ export function GameOver({
       className="mf-instrument gm-cabinet p-5 sm:p-8"
       aria-labelledby="game-report-title"
     >
-      <PlateRow title={`${identity.name} · Run report`}>
+      <PlateRow title={t('games.reportPlate', { name: identity.name })}>
         <span className="font-mono text-sm text-muted tabular-nums">{today}</span>
       </PlateRow>
 
@@ -507,26 +547,27 @@ export function GameOver({
               {stamp}
             </span>
             <h2 id="game-report-title" ref={heading} tabIndex={-1} className="mf-engraved">
-              Score
+              {t('games.score')}
             </h2>
             <p className="mf-phosphor mt-3 font-mono text-readout-xl text-signal tabular-nums">
               {formatScore(score)}
             </p>
             <p className="mt-3 text-base text-ink sm:text-lead">{caption}</p>
             <p className="mt-2 text-sm text-muted">
-              {newBest && report.previousBest !== null && (
-                <>
-                  <strong className="text-signal">New best!</strong> Your previous best was{' '}
-                  {formatScore(report.previousBest)}.
-                </>
-              )}
-              {firstRecord && <>Your first recorded run. That is the number to beat.</>}
-              {!report.isNewBest && report.previousBest !== null && (
-                <>Your best is {formatScore(report.previousBest)}.</>
-              )}
-              {!report.isNewBest && report.previousBest === null && !report.banked && (
-                <>Nothing was answered, so this run was not counted.</>
-              )}
+              {newBest &&
+                report.previousBest !== null &&
+                renderRich(
+                  t.rich('games.newBestLine', { best: formatScore(report.previousBest) }),
+                  { b: { el: 'strong', class: 'text-signal' } },
+                )}
+              {firstRecord && t('games.firstRecordLine')}
+              {!report.isNewBest &&
+                report.previousBest !== null &&
+                t('games.bestLine', { best: formatScore(report.previousBest) })}
+              {!report.isNewBest &&
+                report.previousBest === null &&
+                !report.banked &&
+                t('games.notCounted')}
             </p>
           </Screen>
 
@@ -547,33 +588,36 @@ export function GameOver({
 
         <div className="grid content-start gap-5">
           {report.banked && (
-            <ul className="grid gap-3" aria-label="Banked">
+            <ul className="grid gap-3" aria-label={t('games.banked')}>
               <li className="mf-tape mf-slip flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <span className="text-lg font-semibold">+{formatScore(report.xp)} XP</span>
-                <span className="text-sm">
-                  Streak: {report.streak} {report.streak === 1 ? 'day' : 'days'}
+                <span className="text-lg font-semibold">
+                  {t('games.xpGain', { xp: formatScore(report.xp) })}
                 </span>
+                <span className="text-sm">{t('games.streak', { count: report.streak })}</span>
               </li>
-              {report.earned.map((achievement) => (
-                <li key={achievement.id} className="relative">
-                  <div className="mf-tape mf-slip grid grid-cols-[auto_1fr] items-center gap-3 pr-24">
-                    <span className="text-2xl" aria-hidden="true">
-                      {achievement.icon}
+              {report.earned.map((achievement) => {
+                const copy = achievementCopy(t, achievement)
+                return (
+                  <li key={achievement.id} className="relative">
+                    <div className="mf-tape mf-slip grid grid-cols-[auto_1fr] items-center gap-3 pr-24">
+                      <span className="text-2xl" aria-hidden="true">
+                        {achievement.icon}
+                      </span>
+                      <span className="grid gap-0.5 tracking-normal">
+                        <strong className="font-display text-base">{copy.title}</strong>
+                        <span className="font-body text-sm">{copy.description}</span>
+                      </span>
+                    </div>
+                    <span
+                      className="mf-stamp mf-stamp-in gm-stamp gm-stamp-sm absolute top-1/2 right-3 -translate-y-1/2 bg-panel text-signal"
+                      aria-hidden="true"
+                    >
+                      {t('games.received')}
                     </span>
-                    <span className="grid gap-0.5 tracking-normal">
-                      <strong className="font-display text-base">{achievement.title}</strong>
-                      <span className="font-body text-sm">{achievement.description}</span>
-                    </span>
-                  </div>
-                  <span
-                    className="mf-stamp mf-stamp-in gm-stamp gm-stamp-sm absolute top-1/2 right-3 -translate-y-1/2 bg-panel text-signal"
-                    aria-hidden="true"
-                  >
-                    Received
-                  </span>
-                  <span className="sr-only">Achievement earned.</span>
-                </li>
-              ))}
+                    <span className="sr-only">{t('games.achievementEarned')}</span>
+                  </li>
+                )
+              })}
             </ul>
           )}
 
@@ -587,16 +631,21 @@ export function GameOver({
                     <span className="tracking-code text-cyan">
                       {prettify(MORSE_ALPHABET[character] ?? '')}
                     </span>
-                    <span className="text-muted">×{misses}</span>
+                    <span className="text-muted">{t('games.misses', { count: misses })}</span>
                   </li>
                 ))}
               </ul>
               <p className="mt-3 text-sm leading-relaxed text-muted">
-                A game is a measurement, not a lesson.{' '}
-                <a href="/practice/" className="text-signal underline underline-offset-4">
-                  Practice
-                </a>{' '}
-                is where these get fixed: it waits for you, which is exactly what this does not.
+                {renderRich(
+                  t.rich('games.measurement'),
+                  {
+                    practice: {
+                      href: '/practice/',
+                      class: 'text-signal underline underline-offset-4',
+                    },
+                  },
+                  t,
+                )}
               </p>
             </div>
           )}
@@ -609,14 +658,14 @@ export function GameOver({
               onClick={onAgain}
               className="mf-btn mf-btn-primary mf-btn-lg flex-1"
             >
-              Again
+              {t('games.again')}
             </button>
             <button type="button" onClick={onSetup} className="mf-btn mf-btn-secondary mf-btn-lg">
-              Change setup
+              {t('games.changeSetup')}
             </button>
           </div>
 
-          <p className="text-sm text-muted">Saved to this browser only.</p>
+          <p className="text-sm text-muted">{t('games.savedLocally')}</p>
         </div>
       </div>
     </section>

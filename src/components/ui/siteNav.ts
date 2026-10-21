@@ -9,7 +9,8 @@
  * instead of leaving a dead link in it.
  */
 
-import { GROUP_LABELS, getPage } from '../../config/pages'
+import type { MessageKey } from '../../i18n/keys'
+import { translatorFor, type ServerTranslator } from '../../i18n/server'
 
 export interface NavLink {
   href: string
@@ -45,18 +46,20 @@ function existing(groups: NavGroup[], files: readonly string[]): NavGroup[] {
 }
 
 /**
- * A registry page as a link: label and hint come from `src/config/pages.ts`,
- * so the menu, the footer, the 404 and `llms.txt` all name a page the same
- * way. `label` overrides the registry's name where the bar needs a shorter one.
+ * A registry page as a link: label and hint come from `src/config/pages.ts`
+ * (in the page's language), so the menu, the footer, the 404 and `llms.txt`
+ * all name a page the same way. `label` overrides the registry's name where
+ * the bar needs a shorter one. `href` is the registry path here; `localize`
+ * turns it into the language's URL once the existence filter has run.
  */
-function linkTo(path: string, label?: string): NavLink {
-  const page = getPage(path)
-  return { href: page.path, label: label ?? page.navLabel, hint: page.hint }
+function linkTo(t: ServerTranslator, path: string, label?: MessageKey): NavLink {
+  const page = t.page(path)
+  return { href: page.key, label: label ? t.raw(label) : page.navLabel, hint: page.hint }
 }
 
 /** A column of the menu, titled from the registry's group names where one applies. */
-function column(title: string, paths: readonly string[]): NavGroup {
-  return { title, links: paths.map((path) => linkTo(path)) }
+function column(t: ServerTranslator, title: string, paths: readonly string[]): NavGroup {
+  return { title, links: paths.map((path) => linkTo(t, path)) }
 }
 
 /**
@@ -64,12 +67,14 @@ function column(title: string, paths: readonly string[]): NavGroup {
  * most fun and the most shareable things on the site. The bar uses one-word
  * labels; everything else is the registry's.
  */
-const PRIMARY: NavLink[] = [
-  linkTo('/learn/', 'Learn'),
-  linkTo('/practice/', 'Practice'),
-  linkTo('/telegraph/', 'Telegraph'),
-  linkTo('/daily/', 'Daily'),
-]
+function primary(t: ServerTranslator): NavLink[] {
+  return [
+    linkTo(t, '/learn/', 'nav.learn'),
+    linkTo(t, '/practice/', 'nav.practice'),
+    linkTo(t, '/telegraph/', 'nav.telegraph'),
+    linkTo(t, '/daily/', 'nav.daily'),
+  ]
+}
 
 /**
  * The menu's columns. Which page sits in which column is layout, so it lives
@@ -77,40 +82,39 @@ const PRIMARY: NavLink[] = [
  * gathers the three ways to compose Morse, which the registry files under
  * Practise and Look up, because the menu reads better in four columns.
  */
-const GROUPS: NavGroup[] = [
-  column(GROUP_LABELS.learn, ['/learn/', '/learn-morse-code-in-7-days/', '/tree/']),
-  column(GROUP_LABELS.practise, [
-    '/practice/',
-    '/copy/',
-    '/daily/',
-    '/challenge/',
-    '/games/signal-defender/',
-    '/games/morse-runner/',
-  ]),
-  column('Send', ['/telegraph/', '/message/', '/morse-code-translator/']),
-  column(GROUP_LABELS.lookup, [
-    '/morse-code-alphabet/',
-    '/words/',
-    '/morse-code-speed/',
-    '/how-to-learn-morse-code/',
-    '/blog/',
-    '/stats/',
-    '/privacy/',
-  ]),
-]
-
-export const PRIMARY_NAV: NavLink[] = PRIMARY.filter((link) => hasPage(link.href))
+function groups(t: ServerTranslator): NavGroup[] {
+  return [
+    column(t, t.groupLabel('learn'), ['/learn/', '/learn-morse-code-in-7-days/', '/tree/']),
+    column(t, t.groupLabel('practise'), [
+      '/practice/',
+      '/copy/',
+      '/daily/',
+      '/challenge/',
+      '/games/signal-defender/',
+      '/games/morse-runner/',
+    ]),
+    column(t, t('nav.send'), ['/telegraph/', '/message/', '/morse-code-translator/']),
+    column(t, t.groupLabel('lookup'), [
+      '/morse-code-alphabet/',
+      '/words/',
+      '/morse-code-speed/',
+      '/how-to-learn-morse-code/',
+      '/blog/',
+      '/stats/',
+      '/privacy/',
+    ]),
+  ]
+}
 
 /**
  * The boxed tiles at the top of the phone menu: the bar's four, plus the two a
  * phone otherwise had no short way to — progress was hidden below `lg`.
  */
-export const MENU_TILES: NavLink[] = [
-  ...PRIMARY,
-  linkTo('/challenge/'),
-  linkTo('/stats/', 'Progress'),
-].filter((link) => hasPage(link.href))
-export const NAV_GROUPS: NavGroup[] = existing(GROUPS, PAGE_FILES)
+function tiles(t: ServerTranslator): NavLink[] {
+  return [...primary(t), linkTo(t, '/challenge/'), linkTo(t, '/stats/', 'nav.progress')].filter(
+    (link) => hasPage(link.href),
+  )
+}
 
 /**
  * The lists under the phone menu's tiles: every group, minus the pages a tile
@@ -119,19 +123,60 @@ export const NAV_GROUPS: NavGroup[] = existing(GROUPS, PAGE_FILES)
  * twice in it now. Groups left empty are dropped.
  */
 export function phoneGroups(
-  groups: readonly NavGroup[] = NAV_GROUPS,
-  tiles: readonly NavLink[] = MENU_TILES,
+  navGroups: readonly NavGroup[],
+  menuTiles: readonly NavLink[],
 ): NavGroup[] {
-  const tiled = new Set(tiles.map((link) => link.href))
-  return groups
+  const tiled = new Set(menuTiles.map((link) => link.href))
+  return navGroups
     .map((group) => ({ ...group, links: group.links.filter((link) => !tiled.has(link.href)) }))
     .filter((group) => group.links.length > 0)
 }
 
-export const PHONE_GROUPS: NavGroup[] = phoneGroups()
+/** Links from registry paths to this language's URLs. */
+function localize(t: ServerTranslator, links: readonly NavLink[]): NavLink[] {
+  return links.map((link) => ({ ...link, href: t.href(link.href) }))
+}
+
+export interface SiteNav {
+  primary: NavLink[]
+  tiles: NavLink[]
+  groups: NavGroup[]
+  phoneGroups: NavGroup[]
+}
+
+const navs = new Map<string, SiteNav>()
+
+/** The whole navigation in one language, with every link pointing at that language's pages. */
+export function siteNav(t: ServerTranslator): SiteNav {
+  const cached = navs.get(t.locale.code)
+  if (cached) return cached
+  const shownGroups = existing(groups(t), PAGE_FILES)
+  const shownTiles = tiles(t)
+  const nav: SiteNav = {
+    primary: localize(
+      t,
+      primary(t).filter((link) => hasPage(link.href)),
+    ),
+    tiles: localize(t, shownTiles),
+    groups: shownGroups.map((group) => ({ ...group, links: localize(t, group.links) })),
+    phoneGroups: phoneGroups(shownGroups, shownTiles).map((group) => ({
+      ...group,
+      links: localize(t, group.links),
+    })),
+  }
+  navs.set(t.locale.code, nav)
+  return nav
+}
+
+// The English navigation, as the tests and the older call sites know it.
+const english = siteNav(translatorFor('en'))
+export const PRIMARY_NAV: NavLink[] = english.primary
+export const MENU_TILES: NavLink[] = english.tiles
+export const NAV_GROUPS: NavGroup[] = english.groups
+export const PHONE_GROUPS: NavGroup[] = english.phoneGroups
 
 /** Exposed for the test, which checks the filter against a fixed file list. */
-export const ALL_NAV_GROUPS: readonly NavGroup[] = GROUPS
+export const ALL_NAV_GROUPS: readonly NavGroup[] = groups(translatorFor('en'))
 export const filterExisting = existing
 
 /** Whether `href` is the page being rendered. Trailing slashes are site-wide. */

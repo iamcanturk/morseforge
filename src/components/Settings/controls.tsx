@@ -1,5 +1,8 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { Lamp } from '../ui/Lamp'
+import { useT } from '../../i18n/react'
+import type { Translator } from '../../i18n/translator'
+import { isCodeBinding } from '../../engine/keyEngine'
 
 /**
  * The settings screen's building blocks: a panel per subsystem, a row per
@@ -217,10 +220,12 @@ export function Slider({
 }
 
 /** Human-readable name for a key value, since " " and "Control" read badly. */
-export function keyName(key: string): string {
-  if (key === ' ') return 'Space'
-  if (key === 'Control') return 'Ctrl'
-  if (key === 'Escape') return 'Esc'
+export function keyName(t: Translator, key: string): string {
+  if (key === ' ') return t('settings.keySpace')
+  if (key === 'Control') return t('settings.keyCtrl')
+  if (key === 'ControlLeft') return t('settings.keyCtrlLeft')
+  if (key === 'ControlRight') return t('settings.keyCtrlRight')
+  if (key === 'Escape') return t('settings.keyEsc')
   if (key.startsWith('Arrow')) return key.slice('Arrow'.length)
   return key.length === 1 ? key.toUpperCase() : key
 }
@@ -233,12 +238,10 @@ export function keyName(key: string): string {
  * user's own making. The modifiers and lock keys are pressed as part of other
  * shortcuts, and the function keys belong to the browser and the system.
  */
-export function rejectKey(key: string): string | null {
-  if (key === 'Tab') {
-    return 'Tab moves between controls, so it cannot be a Morse key. Pick another key.'
-  }
+export function rejectKey(t: Translator, key: string): string | null {
+  if (key === 'Tab') return t('settings.tabRefused')
   if (UNBINDABLE.has(key) || /^F\d{1,2}$/.test(key)) {
-    return `${keyName(key)} belongs to the browser and other shortcuts, so it cannot be bound. Pick another key.`
+    return t('settings.keyRefused', { key: keyName(t, key) })
   }
   return null
 }
@@ -276,6 +279,7 @@ export function KeyCapture({
   label,
   conflict = false,
   takenBy,
+  ctrlSides = false,
 }: {
   value: string
   onChange: (next: string) => void
@@ -284,7 +288,14 @@ export function KeyCapture({
   conflict?: boolean
   /** Which other action a key is already bound to, if any: warned before it is taken. */
   takenBy?: (key: string) => string | null
+  /**
+   * Bind Ctrl as Left Ctrl or Right Ctrl, by `event.code` (DEC-055). Paddle
+   * bindings only: a USB paddle adapter types the two sides for the two
+   * paddles. Every other binding keeps Ctrl as one key.
+   */
+  ctrlSides?: boolean
 }) {
+  const t = useT()
   const [listening, setListening] = useState(false)
   const [message, setMessage] = useState('')
   const button = useRef<HTMLButtonElement>(null)
@@ -299,18 +310,18 @@ export function KeyCapture({
       if (event.key === 'Escape') {
         setMessage('')
       } else {
-        const problem = rejectKey(event.key)
+        const pressed =
+          ctrlSides && event.key === 'Control' && isCodeBinding(event.code) ? event.code : event.key
+        const problem = rejectKey(t, pressed)
         if (problem) {
           // Not bound; the old key stays, and the reason is said.
           setMessage(problem)
         } else {
-          const other = event.key === value ? null : (takenBy?.(event.key) ?? null)
+          const other = pressed === value ? null : (takenBy?.(pressed) ?? null)
           setMessage(
-            other
-              ? `${keyName(event.key)} is already bound to ${other}. Only one of them will work until you change one.`
-              : '',
+            other ? t('settings.keyTaken', { key: keyName(t, pressed), action: other }) : '',
           )
-          onChange(event.key)
+          onChange(pressed)
         }
       }
       setListening(false)
@@ -327,7 +338,7 @@ export function KeyCapture({
       window.removeEventListener('keydown', onKeyDown, { capture: true })
       window.removeEventListener('pointerdown', onPointerDown, { capture: true })
     }
-  }, [listening, onChange, takenBy, value])
+  }, [listening, onChange, takenBy, value, t, ctrlSides])
 
   return (
     <>
@@ -336,8 +347,8 @@ export function KeyCapture({
         type="button"
         aria-label={
           listening
-            ? `${label}. Press the new key, or Escape to keep ${keyName(value)}.`
-            : `${label}: ${keyName(value)}. Activate, then press a key to rebind.`
+            ? t('settings.captureListening', { label, key: keyName(t, value) })
+            : t('settings.captureIdle', { label, key: keyName(t, value) })
         }
         // Constant, so React never rewrites it: the row adds its own hint
         // to this list after render.
@@ -351,7 +362,7 @@ export function KeyCapture({
         className="pj-keycap w-full"
       >
         {listening && <Lamp on tone="amber" />}
-        {listening ? 'Press a key' : keyName(value)}
+        {listening ? t('settings.pressKey') : keyName(t, value)}
       </button>
       {/* Mounted for good, so a message is announced when it appears. */}
       <p
@@ -387,6 +398,7 @@ export function ConfirmDialog({
   actions: ReactNode
   children: ReactNode
 }) {
+  const t = useT()
   const dialog = useRef<HTMLDialogElement>(null)
   const titleId = useId()
 
@@ -410,7 +422,9 @@ export function ConfirmDialog({
       <div className="p-6 sm:p-8">
         <p className="flex items-center gap-2">
           <Lamp on tone={tone === 'danger' ? 'danger' : 'amber'} />
-          <span className="mf-engraved">{tone === 'danger' ? 'Cannot be undone' : 'Confirm'}</span>
+          <span className="mf-engraved">
+            {tone === 'danger' ? t('settings.cannotUndo') : t('settings.confirm')}
+          </span>
         </p>
         <h2 id={titleId} className="mt-3 font-display text-h3 font-bold text-ink">
           {title}

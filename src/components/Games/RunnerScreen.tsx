@@ -31,12 +31,13 @@ import {
 } from '../../game/runner'
 import { createRandom, seedFrom } from '../../game/random'
 import { KeyStation } from '../MorseKey/KeyStation'
+import { KeyingLead } from '../MorseKey/MorseKey'
 import { useMorseKey } from '../MorseKey/useMorseKey'
 import { useInView } from '../MorseKey/useInView'
 import { MORSE_ALPHABET } from '../../data/morseAlphabet'
-import { capitalise, numberWord } from '../../data/format'
 import { prettify } from '../../engine/morseEncoder'
-import { spokenCode } from './signalPiece'
+import { useT } from '../../i18n/react'
+import { renderRich } from '../../i18n/richReact'
 import { createSettingsStore, defaultSettings, type SettingsRecord } from '../../storage/settings'
 import { answer as recordAnswer, createProgressStore } from '../../storage/progress'
 import { createStatsStore } from '../../storage/stats'
@@ -84,6 +85,7 @@ const BURST_MS = 420
 const PREVIEW_GATES = [18, 44, 76] as const
 
 export function RunnerScreen({ identity }: { identity: GameIdentity }) {
+  const t = useT()
   const settingsStore = useMemo(() => createSettingsStore(), [])
   const progressStore = useMemo(() => createProgressStore(), [])
   const statsStore = useMemo(() => createStatsStore(), [])
@@ -178,7 +180,10 @@ export function RunnerScreen({ identity }: { identity: GameIdentity }) {
 
       if (cleared?.hinted) {
         // Through on the hint: the wrong send already counted against it.
-        setFeedback({ kind: 'hit', text: `${cleared.character} through on the hint, no points` })
+        setFeedback({
+          kind: 'hit',
+          text: t('runner.throughHint', { character: cleared.character }),
+        })
       } else if (cleared) {
         record(cleared.character, true)
         const burst: Burst = {
@@ -188,19 +193,22 @@ export function RunnerScreen({ identity }: { identity: GameIdentity }) {
         }
         setBursts((list) => [...list, burst])
         later(BURST_MS * 2, () => setBursts((list) => list.filter((entry) => entry !== burst)))
-        setFeedback({ kind: 'hit', text: `${cleared.character} cleared, +${burst.points}` })
+        setFeedback({
+          kind: 'hit',
+          text: t('runner.cleared', { character: cleared.character, points: burst.points }),
+        })
       } else {
         if (blamed) record(blamed.character, false)
         const code = hinted ? prettify(MORSE_ALPHABET[hinted.character] ?? '') : ''
         setFeedback({
           kind: 'miss',
           text: hinted
-            ? `${character} matched no gate. ${hinted.character} is ${code}`
-            : `${character} matched no gate`,
+            ? t('runner.noGateHint', { character, hinted: hinted.character, code })
+            : t('runner.noGate', { character }),
         })
       }
     },
-    [commit, record, later],
+    [commit, record, later, t],
   )
 
   // As on the telegraph (DEC-028): Space keys the run only while the cabinet
@@ -214,6 +222,8 @@ export function RunnerScreen({ identity }: { identity: GameIdentity }) {
     wordGapMs: settings.timing.wordGapMs,
     autoCommit: settings.timing.autoCommit,
     bindings: settings.keys,
+    keyer: settings.keyer.type,
+    swapPaddles: settings.keyer.swapPaddles,
     frequency: settings.audio.frequency,
     volume: settings.audio.enabled ? settings.audio.volume : 0,
     disabled: !running,
@@ -252,7 +262,7 @@ export function RunnerScreen({ identity }: { identity: GameIdentity }) {
       setStumbles((count) => count + 1)
       setFeedback({
         kind: 'miss',
-        text: `Hit the ${hit.map((gate) => gate.character).join(', ')} gate`,
+        text: t('runner.hitGate', { gates: hit.map((gate) => gate.character).join(', ') }),
       })
     }
     if (isOver(state)) finish(state)
@@ -276,14 +286,14 @@ export function RunnerScreen({ identity }: { identity: GameIdentity }) {
     return (
       <GameSetup
         identity={identity}
-        console="Sending console"
-        startLabel="Start running"
+        console={t('runner.console')}
+        startLabel={t('runner.start')}
         onStart={start}
         rules={[
-          'Gates come towards you, each showing one letter and not its code.',
-          'Key its code from memory before you reach the gate and you pass through.',
-          'Key a wrong one and the nearest gate shows its code. You can get through on the hint, but it scores nothing.',
-          `${capitalise(numberWord(STARTING_LIVES))} collisions and the run is over.`,
+          t('runner.ruleGates'),
+          t('runner.ruleKey'),
+          t('runner.ruleHint'),
+          t('runner.ruleLives', { lives: t.capitalise(t.numberWord(STARTING_LIVES)) }),
         ]}
         preview={
           <Track
@@ -298,17 +308,17 @@ export function RunnerScreen({ identity }: { identity: GameIdentity }) {
         }
         note={
           <p className="text-sm leading-relaxed text-muted">
-            Unless you pick another set, the gates use only the characters you have been taught. Tap
-            for a dot, hold for a dash: the same key as the{' '}
-            <a href="/telegraph/" className="text-signal underline underline-offset-4">
-              telegraph
-            </a>
-            . A character counts as soon as it matches a gate, or can no longer match one; only a
-            half-keyed character waits for the pause, and how long that is comes from your{' '}
-            <a href="/settings/" className="text-signal underline underline-offset-4">
-              settings
-            </a>
-            .
+            {renderRich(
+              t.rich('runner.note'),
+              {
+                telegraph: {
+                  href: '/telegraph/',
+                  class: 'text-signal underline underline-offset-4',
+                },
+                settings: { href: '/settings/', class: 'text-signal underline underline-offset-4' },
+              },
+              t,
+            )}
           </p>
         }
       />
@@ -321,21 +331,33 @@ export function RunnerScreen({ identity }: { identity: GameIdentity }) {
     return (
       <GameOver
         identity={identity}
-        overLabel="Run over"
+        overLabel={t('runner.runOver')}
         quit={game.quit}
         score={game.score}
         cleared={accuracy(game)}
-        caption={`${percent}% cleared · ${game.cleared} of ${game.cleared + game.stumbles} gates`}
+        caption={t('runner.caption', {
+          percent,
+          cleared: game.cleared,
+          gates: game.cleared + game.stumbles,
+        })}
         plates={[
-          { label: 'Distance', value: `${Math.round(game.distance)}\u00a0m` },
-          { label: 'Best streak', value: String(game.bestStreak) },
-          { label: 'XP', value: `+${formatScore(report.xp)}`, tone: 'amber' },
+          {
+            label: t('runner.distance'),
+            // A no-break space, so "120 m" never parts at a line end.
+            value: t('runner.metres', { metres: Math.round(game.distance) }).replace(' ', ' '),
+          },
+          { label: t('runner.bestStreak'), value: String(game.bestStreak) },
+          {
+            label: t('runner.xp'),
+            value: t('runner.plusXp', { xp: formatScore(report.xp) }),
+            tone: 'amber',
+          },
         ]}
         outcomes={game.outcomes}
-        stripCaption="Each lamp is one gate, in order. A ring is a collision."
+        stripCaption={t('runner.strip')}
         report={report}
         weakest={weakest(game)}
-        weakestLabel="What knocked you over"
+        weakestLabel={t('runner.knocked')}
         onAgain={start}
         onSetup={setup}
       />
@@ -351,30 +373,30 @@ export function RunnerScreen({ identity }: { identity: GameIdentity }) {
     <section
       ref={cabinet}
       className="mf-instrument gm-cabinet p-4 sm:p-6"
-      aria-label={`${identity.name}, running`}
+      aria-label={t('runner.running', { name: identity.name })}
     >
       <PlateRow
-        title={`${identity.name} · Sending`}
+        title={t('runner.sending', { name: identity.name })}
         status={
           <StatusLamp on tone={game.lives <= 1 ? 'danger' : 'signal'}>
-            On air
+            {t('runner.onAir')}
           </StatusLamp>
         }
       >
         <button type="button" onClick={quit} className="mf-btn mf-btn-danger mf-btn-sm">
-          End run
+          {t('runner.endRun')}
         </button>
       </PlateRow>
 
       <div className="mt-4 grid gap-4">
         <div className="gm-hud">
-          <HudCell label="Distance" sub="m">
+          <HudCell label={t('runner.distance')} sub={t('runner.metresUnit')}>
             {Math.round(game.distance)}
           </HudCell>
           <HudCell
-            label="Score"
+            label={t('runner.score')}
             tone={game.streak >= 5 ? 'amber' : undefined}
-            sub={`×${streakMultiplier(game.streak).toFixed(1)}`}
+            sub={t('runner.multiplier', { value: streakMultiplier(game.streak).toFixed(1) })}
           >
             {formatScore(game.score)}
           </HudCell>
@@ -402,7 +424,7 @@ export function RunnerScreen({ identity }: { identity: GameIdentity }) {
                 style={{ '--x': burst.x, '--y': LANE_Y - 0.22 } as CSSProperties}
               >
                 <span className="mf-rise block font-mono text-base text-amber">
-                  +{burst.points}
+                  {t('runner.points', { points: burst.points })}
                 </span>
               </span>
             </span>
@@ -411,13 +433,18 @@ export function RunnerScreen({ identity }: { identity: GameIdentity }) {
             className="gm-corner right-3 bottom-2 font-mono text-sm text-muted"
             aria-hidden="true"
           >
-            {game.speed.toFixed(1)} m/s
+            {t('runner.speed', { speed: game.speed.toFixed(1) })}
           </span>
           {/* Announced only when the next gate changes, not every metre. */}
           <span className="sr-only" aria-live="polite">
             {nearest
-              ? `Next gate: ${nearest.character}${nearest.hinted ? `, hint: ${spokenCode(MORSE_ALPHABET[nearest.character] ?? '')}` : ''}`
-              : 'Track clear'}
+              ? nearest.hinted
+                ? t('runner.nextGateHint', {
+                    character: nearest.character,
+                    code: t.spokenCode(MORSE_ALPHABET[nearest.character] ?? ''),
+                  })
+                : t('runner.nextGate', { character: nearest.character })
+              : t('runner.trackClear')}
           </span>
         </div>
 
@@ -434,7 +461,9 @@ export function RunnerScreen({ identity }: { identity: GameIdentity }) {
                   {feedback.text}
                 </span>
               ) : (
-                'Tap for a dot, hold for a dash. Key the code for the nearest gate.'
+                <>
+                  <KeyingLead paddles={key.paddles} /> {t('runner.keyNearest')}
+                </>
               )}
             </span>
           }

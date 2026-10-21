@@ -1,11 +1,7 @@
-import {
-  METHODS,
-  METHOD_IDS,
-  MIN_UNLOCK_ATTEMPTS,
-  type MethodId,
-  activeCharacters,
-} from '../../data/methods'
+import { METHODS, METHOD_IDS, type MethodId, activeCharacters } from '../../data/methods'
+import { useT } from '../../i18n/react'
 import { OptionGroup } from '../ui/OptionGroup'
+import { methodCopy, unlockRule } from './copy'
 
 /**
  * Choose a teaching order.
@@ -24,32 +20,37 @@ export function MethodPicker({
   unlocked: number
   onChange: (next: MethodId) => void
 }) {
+  const t = useT()
   const entry = METHODS[method]
   const characters = activeCharacters(entry, unlocked)
+  const copy = methodCopy(t, method)
+  const rule = unlockRule(t, method)
 
   return (
     <div>
       <h3 id="method-label" className="mf-engraved">
-        Teaching order
+        {t('methods.heading')}
       </h3>
 
       <OptionGroup
-        label="Teaching order"
+        label={t('methods.heading')}
         labelledBy="method-label"
         className="mt-3"
         columns={3}
         value={method}
         onChange={onChange}
-        options={METHOD_IDS.map((id) => ({
-          value: id,
-          title: METHODS[id].name,
-          hint: METHODS[id].summary,
-        }))}
+        options={METHOD_IDS.map((id) => {
+          const option = methodCopy(t, id)
+          return { value: id, title: option.name, hint: option.summary }
+        })}
       />
 
-      <p className="mt-3 text-sm text-muted">{entry.rationale}</p>
+      <p className="mt-3 text-sm text-muted">{copy.rationale}</p>
 
-      <p className="mt-3 flex flex-wrap items-center gap-1.5" aria-label="Your characters so far">
+      <p
+        className="mt-3 flex flex-wrap items-center gap-1.5"
+        aria-label={t('methods.yourCharacters')}
+      >
         {characters.map((character) => (
           <span key={character} className="mf-kbd">
             {character}
@@ -57,12 +58,7 @@ export function MethodPicker({
         ))}
       </p>
 
-      {entry.unlockAccuracy !== null && (
-        <p className="mt-2 text-sm text-muted">
-          More join after a session at {Math.round(entry.unlockAccuracy * 100)}% accuracy over at
-          least {MIN_UNLOCK_ATTEMPTS} answers, on the My method pool.
-        </p>
-      )}
+      {rule !== null && <p className="mt-2 text-sm text-muted">{rule}</p>}
     </div>
   )
 }
