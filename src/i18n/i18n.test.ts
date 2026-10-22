@@ -276,6 +276,7 @@ const EXTRACTED = [
   'components/Footer.astro',
   'components/ThemeToggle.astro',
   'components/ThemeMenu.astro',
+  'components/ConsentBar.astro',
   'components/Faq.astro',
   'components/Alphabet/Breadcrumbs.astro',
   'pages/practice.astro',

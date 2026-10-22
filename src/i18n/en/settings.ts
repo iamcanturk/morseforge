@@ -163,12 +163,23 @@ export const settings = namespace('settings', {
   exported: 'Saved {file}, with your {sections}.',
   unreadable: 'That file could not be opened, so nothing was changed.',
   erased:
-    'Erased. This browser holds no progress now, and every setting is back to its default except anonymous usage counts, which stay {state}, as you had them.',
+    'Erased. This browser holds no progress now, and every setting is back to its default except anonymous usage counts, which stay {state}, as you had them. Your Google Analytics choice is kept too.',
   on: 'on',
   offWord: 'off',
   counters: 'Anonymous usage counts',
   countersHint:
     'A tally of which screens get used: no identifier, no progress, nothing you typed. Never sent if your browser asks not to be tracked.',
+  // Google Analytics (TASK-039). One honest sentence, then where the choice stands.
+  ga: 'Google Analytics',
+  gaHint:
+    'Counts visits and which pages are used, with a cookie, and only while allowed here. Ad features stay off either way.',
+  gaAllowed: 'Allowed',
+  gaNotAllowed: 'Not allowed',
+  gaUndecided: 'Not chosen yet, so it is off.',
+  gaBrowserSignal:
+    'Off, because your browser asks sites not to track you. Allow it here only if you want to.',
+  gaNowAllowed: 'Google Analytics allowed. You can switch it off here at any time.',
+  gaNowOff: 'Google Analytics is off, and its cookies are deleted from this browser.',
   install: 'Install',
   installed: 'Installed. MorseForge now opens from your apps, and works offline.',
   notInstalled: 'Not installed. The button stays here if you change your mind.',
@@ -190,7 +201,7 @@ export const settings = namespace('settings', {
   eraseTitle: 'Erase everything in this browser?',
   exportFirst: 'Export a backup first',
   eraseKeeps:
-    'Your theme stays, and so does your choice about anonymous usage counts (now {state}).',
+    'Your theme stays, and so do your choices about anonymous usage counts (now {state}) and Google Analytics.',
   saved: 'Saved {file}',
   // Import and reset summaries
   notBackup: 'Nothing restored. This file is not a MorseForge backup, so nothing was changed.',

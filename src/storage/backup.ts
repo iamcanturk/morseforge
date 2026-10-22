@@ -262,7 +262,9 @@ export function importAll(
  * off and then erased their data would otherwise find them silently back on,
  * because the default is on, which is the opposite of what they asked for.
  * The choice holds no data about them, so keeping it erases nothing. (The
- * theme is kept too; it lives outside these stores.)
+ * theme is kept too; it lives outside these stores. So does the Google
+ * Analytics answer, in storage/consent.ts, for the same reason: erasing must
+ * not bring the question back, nor leave an old "yes" behind a reset.)
  */
 export function resetAll(stores: BackupStores = createBackupStores()): void {
   const { counters } = stores.settings.read()

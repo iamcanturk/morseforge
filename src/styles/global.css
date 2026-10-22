@@ -503,6 +503,13 @@
   }
 }
 
+@keyframes mf-consent-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}
+
 @keyframes mf-flash {
   0%,
   100% {
@@ -2018,5 +2025,120 @@
 
   .mf-prose li::marker {
     color: var(--color-signal-dim);
+  }
+
+  /* ---- Consent bar (TASK-039) -------------------------------------------
+
+     The Google Analytics question, as a strip of panel along the bottom of
+     the viewport. Fixed, so showing it moves nothing (CLS 0); the loader sets
+     html[data-consent="ask"] before the first paint, which reserves the same
+     height at the foot of the page and in the scroll padding, so the bar never
+     covers the end of a page or a focused control (WCAG 2.4.11). Under the
+     header (z 40), so the header menus open over it, and the dialogs sit in
+     the top layer above both.
+
+     One row from 40rem; on a phone the text takes the first line and the two
+     buttons share the second, equally. Same face, same size for both: a
+     brighter Accept would be the nudge this bar exists not to make. */
+  html[data-consent='ask'] {
+    --mf-consent-h: 7.75rem;
+    scroll-padding-bottom: calc(var(--mf-consent-h) + 1rem);
+  }
+
+  @media (min-width: 40rem) {
+    html[data-consent='ask'] {
+      --mf-consent-h: 4.5rem;
+    }
+  }
+
+  html[data-consent='ask'] body {
+    padding-bottom: var(--mf-consent-h);
+  }
+
+  .mf-consent:not([hidden]) {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 30;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem 1.25rem;
+    padding: 0.625rem max(1rem, env(safe-area-inset-right))
+      calc(0.625rem + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+    border-block-start: 1px solid var(--color-line-strong);
+    background: linear-gradient(180deg, var(--color-elevated), var(--color-panel));
+    box-shadow: 0 -10px 28px rgb(0 0 0 / 0.28);
+  }
+
+  /* On paper a black shadow reads as a smudge; a warm, faint one as an edge. */
+  [data-theme='light'] .mf-consent:not([hidden]) {
+    box-shadow: 0 -6px 18px rgb(80 56 20 / 0.1);
+  }
+
+  .mf-consent-text {
+    flex: 1 1 24rem;
+    max-inline-size: 44rem;
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.35;
+    color: var(--color-ink);
+  }
+
+  .mf-consent-title {
+    margin-inline-end: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    font-weight: 400;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    color: var(--color-brass);
+  }
+
+  .mf-consent-link {
+    margin-inline-start: 0.25rem;
+    color: var(--color-signal);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    white-space: nowrap;
+  }
+
+  .mf-consent-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 0.5rem;
+  }
+
+  .mf-consent-actions .mf-btn {
+    min-inline-size: 7rem;
+  }
+
+  @media (max-width: 39.99rem) {
+    .mf-consent-actions {
+      flex: 1 1 100%;
+    }
+
+    .mf-consent-actions .mf-btn {
+      flex: 1 1 0;
+    }
+  }
+
+  /* A short rise as it arrives, only where motion is allowed by both the OS
+     and Settings → Motion; otherwise it is simply there. */
+  @media (prefers-reduced-motion: no-preference) {
+    html:not([data-motion='reduce']) .mf-consent:not([hidden]) {
+      animation: mf-consent-in 220ms var(--ease-signal) both;
+    }
+  }
+
+  html[data-motion='full'] .mf-consent:not([hidden]) {
+    animation: mf-consent-in 220ms var(--ease-signal) both;
+  }
+
+  @media print {
+    .mf-consent {
+      display: none !important;
+    }
   }
 }

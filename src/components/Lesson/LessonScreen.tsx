@@ -586,7 +586,10 @@ export function LessonScreen({ nextSteps = [], dayTitles }: LessonScreenProps) {
     swapPaddles: settings.keyer.swapPaddles,
     frequency: settings.audio.frequency,
     volume: settings.audio.enabled ? settings.audio.volume : 0,
-    disabled: !sending || transitioning,
+    disabled: !sending,
+    // Moving on after a correct send: Space is still the key's, and does
+    // nothing, rather than scrolling the page behind the next step (TASK-040).
+    inert: transitioning,
     windowKeys: sendInView,
     commitWhen,
     onElement: (element) => {

@@ -107,3 +107,22 @@ export const format = namespace('format', {
   dashWord: 'dash',
   breakWord: 'break',
 })
+
+/**
+ * The Google Analytics consent bar (TASK-039). Short on purpose: what it is
+ * for, that it is off until the visitor chooses, and where the detail is.
+ * Accept and Reject are the same size and weight, so neither is a nudge.
+ */
+export const consent = namespace('consent', {
+  /** The bar's landmark name, for screen readers. */
+  region: 'Analytics consent',
+  title: 'Google Analytics',
+  body: 'Shows us which lessons get used. Off unless you accept.',
+  /** Link to the privacy page's section on GA. */
+  details: 'Details',
+  accept: 'Accept',
+  reject: 'Reject',
+  /** Announced after a choice, once the bar has gone. */
+  savedGranted: 'Google Analytics allowed. You can change this in Settings.',
+  savedDenied: 'Google Analytics not allowed. You can change this in Settings.',
+})

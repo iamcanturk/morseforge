@@ -12,6 +12,7 @@
  * pointer, or a gamepad without branching.
  */
 
+import { claimPress } from './keyClaims'
 import { dotDuration } from './timingEngine'
 
 export interface KeyEngineOptions {
@@ -128,6 +129,27 @@ export interface Keyer {
   release(timeStamp?: number, contact?: KeyContact): void
   /** Drop everything in flight (holds, elements, gap timers) without emitting it. */
   reset(): void
+}
+
+/**
+ * A stand-in for `keyer` that takes every press and does nothing with it.
+ *
+ * For an instrument that is on screen but locked for a moment, like the lesson
+ * while it moves on after a correct send. Bound through `bindKeyboard`, the
+ * presses it would have keyed are still claimed, so Space neither keys nor
+ * falls through to scroll the page behind the lock (TASK-040). A press aimed at
+ * a button or a field is left alone exactly as it is when keying.
+ */
+export function inertKeyer(keyer: Keyer): Keyer {
+  return {
+    kind: keyer.kind,
+    thresholds: keyer.thresholds,
+    isPressed: false,
+    configure: () => {},
+    press: () => {},
+    release: () => {},
+    reset: () => {},
+  }
 }
 
 /** Injectable clock + timer, so tests can drive time by hand. */
@@ -467,10 +489,12 @@ function isInteractive(target: EventTarget | null): boolean {
 /**
  * Wire a KeyEngine to the keyboard. Returns an unbind function.
  *
- * Three details that matter more than they look:
+ * Details that matter more than they look:
  * - `event.repeat` is ignored. Holding a key fires keydown repeatedly at the OS
  *   repeat rate, which would otherwise read as a burst of dots.
- * - Space is `preventDefault`ed while bound, or every hold also scrolls the page.
+ * - A keying press is claimed (`claimPress`), not just `preventDefault`ed: its
+ *   repeats and its keyup are cancelled too, until the key is let go. Cancelling
+ *   only the first keydown left every repeat to scroll the page through a dash.
  * - Events aimed at a button, a link or a field are left entirely alone. See
  *   `isInteractive`.
  * - The `cancel` binding (Esc by default) drops the hold and the gap timers,
@@ -521,7 +545,7 @@ export function bindKeyboard(
     if (isInteractive(e.target)) return
 
     if (closes) {
-      e.preventDefault()
+      claimPress(e)
       engine.press(e.timeStamp, closes)
       return
     }

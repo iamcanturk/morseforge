@@ -1,7 +1,9 @@
 /**
  * Anonymous usage counters (PROJECT.md §22).
  *
- * There is no backend and no analytics service. An event is a request to a URL
+ * This counter has no backend and no analytics service behind it. (Google
+ * Analytics is a separate thing, with its own consent and its own switch:
+ * ga.ts. Nothing here depends on it.) An event is a request to a URL
  * that nginx answers with `204 No Content` and nothing else — no PHP, no
  * database, no third party. The web server's own access log is the store, and
  * a scheduled script tallies it. That is the entire mechanism.

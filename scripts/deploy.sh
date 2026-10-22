@@ -64,4 +64,16 @@ if printf '%s' "$served" | grep -qiE '^user-agent: (GPTBot|ClaudeBot|CCBot|Googl
   echo "   Origin file is correct; see deploy/README.md."
 fi
 
+# The consent-gated Google Analytics loader (TASK-039) is in the build, but
+# the CSP lives in the CloudPanel vhost, which this script cannot apply. A
+# policy without googletagmanager.com blocks gtag silently for everyone who
+# accepts. Warn rather than fail, as above: the fix is a paste in CloudPanel.
+echo "==> Checking the Content-Security-Policy allows Google Analytics"
+csp=$(curl -sSI "$SITE_URL/" | grep -i '^content-security-policy:' || true)
+if [ -n "$csp" ] && ! printf '%s' "$csp" | grep -q 'googletagmanager.com'; then
+  echo "!! The live CSP does not allow Google Analytics, so gtag is blocked."
+  echo "   Paste deploy/cloudpanel-vhost.conf into CloudPanel → Vhost → Save."
+  echo "   See \"GA4: paste the vhost\" in deploy/README.md."
+fi
+
 echo "==> Deployed: ${SITE_URL}"

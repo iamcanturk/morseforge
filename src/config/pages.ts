@@ -394,15 +394,15 @@ export const PAGES = [
     path: '/privacy/',
     title: `Privacy — What MorseForge Stores and Sends${BRAND}`,
     description:
-      'No cookies, no accounts, no ad tracking. Your progress stays in your own browser. Exactly what is counted, why, and how to switch our own counter off.',
+      'No accounts, no ads, Google Analytics only if you accept. Progress stays in your browser. What is counted, and how to switch our own counter and GA off.',
     h1: 'Privacy',
     intro:
-      'MorseForge sets no cookies and has no accounts. Your progress stays in your own browser. This page lists exactly what is stored on your device, what is counted anonymously, and how to switch our own counter off.',
+      'MorseForge has no accounts and no ads, and your progress stays in your own browser. Google Analytics runs only if you accept it. This page lists exactly what is stored on your device, what is counted, and how to switch our own counter and Google Analytics off.',
     navLabel: 'Privacy',
-    hint: 'No cookies, and why',
+    hint: 'Consent-based analytics',
     group: 'lookup',
     llmsSummary:
-      'no cookies, no accounts, no ads, one cookieless analytics beacon from Cloudflare: what is stored and what is counted',
+      'no accounts, no ads; Google Analytics only with consent, alongside a cookieless Cloudflare beacon and a first-party counter: what is stored and what is counted',
     indexable: true,
     parent: null,
     markdown: null,

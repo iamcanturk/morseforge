@@ -190,11 +190,12 @@ describe('final copy with the bound values rendered', () => {
     expect(getPage('/challenge/').description).toContain('60-second Morse code test')
   })
 
-  it('only promises an off switch for our own counter, not the Cloudflare beacon', () => {
+  it('only promises off switches for our own counter and GA, not the Cloudflare beacon', () => {
     const privacy = getPage('/privacy/')
     for (const text of [privacy.description, privacy.intro]) {
-      expect(text).toContain('switch our own counter off')
-      expect(text).not.toMatch(/switch the counting off|turn it off/)
+      expect(text).toContain('switch our own counter and')
+      expect(text).toMatch(/and (GA|Google Analytics) off/)
+      expect(text).not.toMatch(/switch the counting off|turn it off|each count/)
     }
   })
 

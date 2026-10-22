@@ -72,9 +72,22 @@ export const AUTHOR_SAME_AS: readonly string[] = [
  * the PWA would go inconsistent offline.
  *
  * Cookieless and anonymous, which is what PROJECT.md §41 and §42 require —
- * progress never leaves the device.
+ * progress never leaves the device. It does not depend on the consent below:
+ * it sets nothing on the device, so there is nothing to consent to.
  */
 export const CF_ANALYTICS_TOKEN: string | null = '43d4ce9b115249e0b6f2bb3234c3c499'
+
+/**
+ * Google Analytics 4 measurement ID (TASK-039): property "MorseForge
+ * (morse.iamcanturk.dev)", web stream "MorseForge".
+ *
+ * Unlike the beacon above, GA4 sets cookies, so it runs only after the visitor
+ * accepts it: nothing from Google is requested, and no `_ga` cookie exists,
+ * until then (src/analytics/ga.ts, src/components/ConsentBar.astro). Public by
+ * design, like the token: it ships in the page. Null removes GA, the consent
+ * bar and the Settings control together.
+ */
+export const GA_MEASUREMENT_ID: string | null = 'G-8YYFW16VXX'
 
 /**
  * The entity every page is about, for schema.org `about` and `sameAs`.

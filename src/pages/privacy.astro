@@ -3,7 +3,7 @@ import '../styles/pkg-i.css'
 import BaseLayout from '../layouts/BaseLayout.astro'
 import PageShell from '../components/PageShell.astro'
 import { breadcrumbTrail, getPage } from '../config/pages'
-import { AUTHOR, SITE } from '../config/site'
+import { AUTHOR, GA_MEASUREMENT_ID, SITE } from '../config/site'
 import { breadcrumbs, webPage } from '../seo/schema'
 import { capitalise, numberWord } from '../data/format'
 import { ENDPOINT } from '../analytics/track'
@@ -11,15 +11,16 @@ import { ENDPOINT } from '../analytics/track'
 /**
  * The privacy page.
  *
- * There is no cookie banner on this site, and that is a considered position
- * rather than an omission: consent under ePrivacy is required for storing or
- * reading information on someone's device for non-essential purposes, and
- * nothing here does that. No cookies are set, ever. The only device storage is
- * the visitor's own progress, written when they use the app — which is the
- * service they came for.
+ * The site asks one question, and only about one thing: Google Analytics
+ * (TASK-039). It sets cookies, so under ePrivacy it needs consent, and it gets
+ * none of it without: nothing from Google loads until the visitor accepts.
+ * Everything else here needs no consent, because nothing else stores or reads
+ * information on the visitor's device for a purpose they did not ask for. The
+ * only other device storage is their own progress, written when they use the
+ * app, which is the service they came for.
  *
- * What *is* required is telling people what happens, which is this page.
- * A banner would have been theatre implying tracking that does not exist.
+ * What every part of it requires is telling people what happens, which is
+ * this page. If it ever stops matching the code, that is a bug.
  */
 const page = getPage('/privacy/')
 const trail = breadcrumbTrail(page.path)
@@ -29,14 +30,18 @@ const schema = [
   breadcrumbs(trail),
 ]
 
+/** GA's two cookies by name, so the page names the real ones. */
+const gaCookies = GA_MEASUREMENT_ID ? ['_ga', `_ga_${GA_MEASUREMENT_ID.replace(/^G-/, '')}`] : []
+
 /** The short version, as a ledger: what there is and is not, before the detail. */
 const ledger = [
-  { item: 'Cookies', value: 'None', on: false },
+  { item: 'Cookies', value: 'Only if you accept GA', on: false },
   { item: 'Accounts', value: 'None', on: false },
   { item: 'Advertising', value: 'None', on: false },
   { item: 'Your progress', value: 'Your browser only', on: true },
   { item: 'Page views', value: 'Cloudflare, cookieless', on: true },
   { item: 'Usage counts', value: 'Our own, no identifier', on: true },
+  { item: 'Google Analytics', value: 'Off until you accept', on: false },
 ]
 
 /** What sits in your browser's local storage, one entry per stored record. */
@@ -52,6 +57,11 @@ const stored = [
   { name: 'Your statistics', detail: 'sessions, streak, XP, achievements and best scores.' },
   { name: 'Your daily challenge results', detail: 'the last few weeks of them.' },
   { name: 'Your theme', detail: 'dark, light or following your system.' },
+  {
+    name: 'Your answer about Google Analytics',
+    detail:
+      'allowed or not, and when you chose. It is left out of backups, and erasing your data keeps it, so neither one brings the question back or carries a yes somewhere you did not give it.',
+  },
 ]
 ---
 
@@ -78,11 +88,11 @@ const stored = [
 
     <div class="mf-prose pi-manual mt-12">
       <p>
-        There is no consent banner, and that is deliberate. A banner is required when a site stores
-        or reads information on your device for something you did not ask for. This one stores only
-        the progress and settings you create by using it, and neither of the two counters described
-        below sets a cookie or keeps an identifier on your device. This page is the honest version
-        of the same obligation.
+        This site asks you one question, once: whether you allow Google Analytics. It stays off
+        until you answer, and nothing from Google is loaded before then. Everything else on this
+        page needs no permission, because none of it stores or reads anything on your device for a
+        purpose you did not ask for: your progress and settings are the service itself, and neither
+        of our own two counters sets a cookie or keeps an identifier on your device.
       </p>
 
       <section>
@@ -109,7 +119,10 @@ const stored = [
 
       <section>
         <h2>What is counted</h2>
-        <p>Two things, both of them counts rather than records of a person.</p>
+        <p>
+          Three things. The first two are counts rather than records of a person, and run without
+          asking. The third runs only if you accept it.
+        </p>
 
         <h3>Our own usage counter</h3>
         <p>
@@ -124,7 +137,7 @@ const stored = [
           access log is the only record, and a scheduled script turns those lines into daily totals.
           You can turn this counter off in <a href="/settings/">settings</a>, and it is never sent
           at all if your browser asks not to be tracked. That switch and that signal cover this
-          counter only, not the Cloudflare beacon below.
+          counter only, not the Cloudflare beacon below; Google Analytics has its own switch.
         </p>
 
         <h3>Cloudflare Web Analytics</h3>
@@ -135,10 +148,48 @@ const stored = [
           <a href="https://developers.cloudflare.com/web-analytics/" rel="noopener"
             >cookieless by design</a
           > and does not fingerprint you or follow you between sites. Cloudflare processes this on our
-          behalf, and it is the only third party this site contacts.
+          behalf. It does not depend on your answer about Google Analytics, because it sets nothing on
+          your device.
+        </p>
+
+        <h3 id="google-analytics">Google Analytics, only if you accept</h3>
+        <p>
+          Until you choose, a bar at the bottom of the page asks. Nothing from Google is loaded and
+          no Google cookie is set while it waits, and none if you reject. If your browser sends
+          Global Privacy Control or Do Not Track, that counts as a no and you are not asked at all.
         </p>
         <p>
-          It is not loaded on the <a href="/message/">secret message</a> page, because the message lives
+          If you accept, Google Analytics 4 records the pages you view (their address without
+          anything after a <code>#</code>), the page you came from, your browser, device type,
+          screen size and language, your approximate location (country and city, worked out from
+          your IP address, which Google Analytics does not store), and how you move through the
+          site: how long a visit lasts, scrolling, and links you follow out of it. It sets two
+          first-party cookies, {
+            gaCookies.map((name, index) => (
+              <>
+                {index > 0 && ' and '}
+                <code>{name}</code>
+              </>
+            ))
+          }, holding a random identifier so that visits from the same browser count as one visitor.
+          They expire 13 months after your last visit.
+        </p>
+        <p>
+          None of it is used for advertising. The advertising consent signals are always sent as
+          denied, and Google signals and ad personalisation are switched off in the code, so no
+          advertising profile is built from your visit. Google keeps the event-level data for 2
+          months and then deletes it; only aggregated totals outlive that. Google processes it on
+          our behalf, and it may be processed in the United States.
+        </p>
+        <p>
+          To withdraw, open <a href="/settings/#data">settings</a> and set Google Analytics to Not allowed.
+          That stops it on the page you are on, deletes its cookies from this browser, and it does not
+          load again. Your answer is kept in this browser only, so another browser, or one whose data
+          you have cleared, asks again.
+        </p>
+        <p>
+          Neither Google Analytics nor the Cloudflare beacon is loaded on the{' '}
+          <a href="/message/">secret message</a> page, and neither is the bar, because the message lives
           in that page's address and must not be sent anywhere.
         </p>
       </section>
@@ -148,11 +199,12 @@ const stored = [
         <p>
           Like every web server, ours records the address each request came from. That is
           unavoidable — it is how a reply finds its way back — and the log is what makes it possible
-          to see that a site is being attacked.
+          to see that a site is being attacked. If you allow Google Analytics, Google's servers see
+          it too, for the same reason, and use it only to estimate where you are.
         </p>
         <p>
-          The script that produces the visitor counts does not keep addresses. It hashes each one
-          with a secret that is regenerated every day and never stored, counts the hash, and
+          The script that produces our own visitor counts does not keep addresses. It hashes each
+          one with a secret that is regenerated every day and never stored, counts the hash, and
           discards it. Two visits on the same day collapse into one count; the same person tomorrow
           does not, so nobody can be followed across days — not even by us. The raw logs rotate
           daily and only the most recent few days exist on the server.
@@ -162,21 +214,24 @@ const stored = [
       <section>
         <h2>What there is none of</h2>
         <ul>
-          <li>No cookies. Not one, not even a "necessary" one.</li>
+          <li>
+            No cookies unless you accept Google Analytics, and then only its two. Not even a
+            "necessary" one otherwise.
+          </li>
           <li>No accounts, no email addresses, no names.</li>
-          <li>No advertising, no advertising networks, no data sold or shared.</li>
+          <li>No advertising, no advertising networks, no data sold or shared for advertising.</li>
           <li>
             No fonts and no images from anyone else's server — they are all served from this domain.
-            One script is not: Cloudflare's analytics beacon, described above. It is the only file
-            this site loads from anywhere else.
+            Two scripts are not, both described above: Cloudflare's analytics beacon, and Google's
+            analytics script once you have accepted it.
           </li>
-          <li>No profiling and no automated decisions about you.</li>
+          <li>No profiling for advertising and no automated decisions about you.</li>
         </ul>
         <p>
           You can check all of this rather than take our word for it: open your browser's developer
           tools on any page here and look at the cookie jar and the network tab. The{' '}
           <a href={SITE.repo} rel="noopener">whole source is public</a>, including the script that
-          processes the logs.
+          processes the logs and the one that asks about Google Analytics.
         </p>
       </section>
 
@@ -184,10 +239,12 @@ const stored = [
         <h2>Your rights</h2>
         <p>
           Under the GDPR you can ask what data is held about you, ask for it to be corrected or
-          deleted, and object to how it is processed. In practice there is very little to ask about:
-          we hold no account, no contact details and nothing that identifies you. Your progress is
-          already in your hands — deleting it is a button in{' '}
-          <a href="/settings/">settings</a> and needs nobody's permission.
+          deleted, object to how it is processed, and withdraw consent at any time, as easily as you
+          gave it. In practice there is very little to ask about: we hold no account, no contact
+          details and nothing that identifies you. Google Analytics data is tied to a random cookie,
+          not to your name, and its event-level data is deleted after 2 months. Your progress is
+          already in your hands — deleting it is a button in <a href="/settings/">settings</a> and needs
+          nobody's permission.
         </p>
         <p>
           For anything else, or to ask a question about this page, contact{' '}

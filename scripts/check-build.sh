@@ -91,6 +91,38 @@ else
 fi
 
 # --------------------------------------------------------------------------
+# Google Analytics stays behind consent (TASK-039)
+#
+# gtag.js may only ever be injected by the consent loader, after "Accept". A
+# <script src="…googletagmanager…"> in the static HTML would load it for
+# everyone, before any answer, and nothing in a unit test would notice. The
+# secret-message page must carry no GA code at all, not even the loader: its
+# message is in the URL fragment. The author's private tools carry none either.
+# --------------------------------------------------------------------------
+echo "Consent-gated analytics:"
+static_tags=$(grep -rlE '<script[^>]*src="https://www\.googletagmanager\.com' "$DIST" --include='*.html' || true)
+if [ -n "$static_tags" ]; then
+  fail "gtag.js is in the static HTML of: $(echo "$static_tags" | sed "s|$DIST/||" | tr '\n' ' ')"
+else
+  pass "no page loads gtag.js before consent"
+fi
+
+if grep -q 'id="mf-consent"' "$DIST/index.html" 2>/dev/null; then
+  pass "the consent bar and its loader are on /"
+else
+  fail "the consent bar is missing from / — GA could never be accepted"
+fi
+
+for page in message/index.html panel/index.html studio/index.html; do
+  [ -f "$DIST/$page" ] || continue
+  if grep -qE 'googletagmanager|gtag|morseforge_consent|mf-consent|G-[A-Z0-9]{10}' "$DIST/$page"; then
+    fail "$page carries Google Analytics code or the consent bar"
+  else
+    pass "$page has no Google Analytics code"
+  fi
+done
+
+# --------------------------------------------------------------------------
 # Crawler endpoints
 # --------------------------------------------------------------------------
 echo "Crawler endpoints:"

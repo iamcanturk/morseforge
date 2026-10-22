@@ -1,0 +1,57 @@
+---
+import { CONSENT_BAR_ID, CONSENT_STATUS_ID, consentScript } from '../analytics/ga'
+import { useTranslations } from '../i18n/server'
+
+/**
+ * The Google Analytics consent bar and the loader behind it (TASK-039).
+ *
+ * BaseLayout renders this only where GA may run at all: a production build,
+ * not `/message/`, not a private page. The markup ships hidden; the inline
+ * loader right after it shows the bar only when there is no answer yet, and it
+ * does so while the page is still being parsed, before the first paint. The
+ * bar is fixed to the viewport, so it moves nothing; the room it needs at the
+ * foot of the page is reserved from that same moment (`html[data-consent]` in
+ * global.css), so it never covers the last thing on a page either.
+ *
+ * First in the body, like GOV.UK's cookie banner, so a keyboard reaches it
+ * before the skip link instead of after the whole page. Nothing moves focus
+ * to it. Without JavaScript it stays hidden, and nothing loads anyway.
+ *
+ * The share cards are drawn on a canvas from data, not captured from the
+ * page, so the bar cannot end up in one; it is hidden in print as well.
+ */
+interface Props {
+  measurementId: string
+}
+
+const { measurementId } = Astro.props
+const t = useTranslations(Astro)
+const script = consentScript(measurementId, {
+  saved: { granted: t.raw('consent.savedGranted'), denied: t.raw('consent.savedDenied') },
+})
+---
+
+<section id={CONSENT_BAR_ID} class="mf-consent" aria-label={t('consent.region')} hidden>
+  <p class="mf-consent-text">
+    <strong class="mf-consent-title">{t('consent.title')}</strong>
+    <span>{t('consent.body')}</span>
+    <a href={`${t.href('/privacy/')}#google-analytics`} class="mf-consent-link"
+      >{t('consent.details')}</a
+    >
+  </p>
+  <div class="mf-consent-actions">
+    <button type="button" class="mf-btn mf-btn-secondary mf-btn-sm" data-consent-choice="granted"
+      >{t('consent.accept')}</button
+    >
+    <button type="button" class="mf-btn mf-btn-secondary mf-btn-sm" data-consent-choice="denied"
+      >{t('consent.reject')}</button
+    >
+  </div>
+</section>
+{
+  /* Outside the bar, so it is still in the page to speak after the bar hides.
+    Present and empty from the start: a live region created with its content
+    is often not registered in time, and the announcement is lost. */
+}
+<p id={CONSENT_STATUS_ID} class="sr-only" role="status"></p>
+<script is:inline set:html={script} />

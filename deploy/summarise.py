@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Tally nginx's access log into the summary the panel reads.
 
-There is no analytics service and no database behind morse.iamcanturk.dev.
-Event beacons are answered by nginx with `204 No Content` and nothing else,
-which means the access log already holds every number worth having. This turns
-that log into JSON.
+There is no analytics service and no database behind these numbers. (Google
+Analytics, which runs only for visitors who accept it, is separate and is not
+read here.) Event beacons are answered by nginx with `204 No Content` and
+nothing else, which means the access log already holds every number worth
+having. This turns that log into JSON.
 
 Two properties are load-bearing.
 

@@ -1470,6 +1470,13 @@ tree_opened
 
 Privacy-friendly analytics tercih edilmelidir.
 
+Uygulama (TASK-039): **onaylı (consent-based) analytics**.
+
+* Google Analytics 4 yalnızca ziyaretçi onay bandında "Accept" dedikten sonra yüklenir (Consent Mode v2, varsayılan red; reklam sinyalleri hiç açılmaz). Onaydan önce Google'a istek gitmez, `_ga` çerezi oluşmaz.
+* Global Privacy Control veya Do Not Track, soru sorulmadan "red" sayılır; tercih Ayarlar → Data'dan değiştirilebilir. Geri alma çerezleri de siler.
+* `/message/` sayfasında GA ve bant hiç yoktur (mesaj URL fragment'ında).
+* Cloudflare Web Analytics (çerezsiz) ve `/e/` sayacı onaydan bağımsız olarak aynen kalır; sayacın kendi anahtarı vardır.
+
 ---
 
 # 42. Privacy
@@ -1487,6 +1494,8 @@ Açıkça belirtilmeli:
 > Your progress is stored locally on your device.
 
 Kullanıcı hesabı olmadan kullanılabilmelidir.
+
+Çerez yalnızca kullanıcı Google Analytics'e onay verirse kurulur (§41). Onay kaydı (`morseforge_consent`) yedeğe girmez ve "Erase everything" onu silmez.
 
 ---
 

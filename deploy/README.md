@@ -246,6 +246,43 @@ page working.
 
 ---
 
+## GA4: paste the vhost before this release goes live
+
+The Google Analytics release (TASK-039) **needs the vhost re-applied**. Google
+Analytics loads only after a visitor accepts it in the consent bar, and the
+current Content-Security-Policy blocks every Google host, so without the new
+vhost an accepted visitor gets nothing but a CSP error in the console, and GA
+Realtime stays empty.
+
+Paste [`cloudpanel-vhost.conf`](cloudpanel-vhost.conf) into **CloudPanel →
+Sites → morse.iamcanturk.dev → Vhost → Save** before (or together with) the
+deploy. All five `Content-Security-Policy` lines (server level, `/panel/`,
+`/studio/`, `*.html` and `/`) carry the same additions, because of the
+inheritance trap described below:
+
+| Directive     | Added                                                                                          |
+| ------------- | ---------------------------------------------------------------------------------------------- |
+| `script-src`  | `https://www.googletagmanager.com`                                                             |
+| `connect-src` | `https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com` |
+| `img-src`     | `https://*.google-analytics.com https://*.googletagmanager.com`                                |
+
+Confirm after applying:
+
+```bash
+curl -sI https://morse.iamcanturk.dev/ | grep -io "content-security-policy.*" | tr ";" "\n" | grep -E "script-src|connect-src|img-src"
+```
+
+Each of the three lines should list the Google hosts above. Then, in a private
+window, accept the bar and watch **GA → Reports → Realtime**.
+
+Compared with iamcanturk.dev's `deploy/guvenlik-basliklari.conf`, this
+policy differs on purpose in two places: `img-src` names the two Google
+hosts instead of allowing every `https:` image, and `connect-src` allows
+`*.googletagmanager.com` rather than only `www.`, which is what Google's CSP
+guide lists for GA4. Both sites otherwise allow the same Google hosts.
+
+---
+
 ## The redesign release: operational notes
 
 What changes for the server, and what does not.

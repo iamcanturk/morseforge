@@ -4,6 +4,7 @@ import {
   DEFAULT_KEY_BINDINGS,
   bindKeyboard,
   contactFor,
+  inertKeyer,
   swapPaddles as swapPaddleKeys,
   type KeyBindings,
   type KeyEngineCallbacks,
@@ -12,6 +13,7 @@ import {
   type KeyerKind,
   type Paddle,
 } from '../../engine/keyEngine'
+import { claimPress } from '../../engine/keyClaims'
 import { createKeyer } from '../../engine/keyer'
 import { LiveDecoder } from '../../engine/morseDecoder'
 
@@ -55,6 +57,15 @@ export interface UseMorseKeyOptions {
   volume?: number
   /** Stop listening to the keyboard, e.g. while a dialog is open. */
   disabled?: boolean
+  /**
+   * Locked for a moment, e.g. while the lesson moves on after a correct send:
+   * nothing keys, but the instrument still owns its keys. A press that would
+   * have keyed (the key focused, or the instrument in view with focus on the
+   * page) is claimed and does nothing, so Space does not scroll the page
+   * behind the lock. `disabled` is for when the keys are not the
+   * instrument's at all. Default false.
+   */
+  inert?: boolean
   /**
    * Whether the keying key works from anywhere on the page (a `window`
    * listener). False leaves the page's own Space alone, e.g. while the
@@ -165,6 +176,7 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
     frequency = 600,
     volume = 0.15,
     disabled = false,
+    inert = false,
     windowKeys = true,
   } = options
 
@@ -377,6 +389,9 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
   useEffect(() => {
     const keyEngine = engine.current
     if (disabled || !windowKeys || !keyEngine) return
+    // Locked: the same binding over a keyer that does nothing, so the presses
+    // it would have keyed are claimed and go nowhere. No Esc or Finish.
+    if (inert) return bindKeyboard(inertKeyer(keyEngine), bindings, window)
     // Esc (the cancel binding) abandons the pending character, exactly as the
     // station's "Undo character" button does.
     const unbind = bindKeyboard(keyEngine, bindings, window, commitCharacter, cancelPending)
@@ -386,7 +401,7 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
       // dropped: a settings change between characters keeps its gap timers.
       if (keyEngine.isPressed) keyEngine.reset()
     }
-  }, [disabled, windowKeys, bindings, kind, commitCharacter, cancelPending])
+  }, [disabled, inert, windowKeys, bindings, kind, commitCharacter, cancelPending])
 
   useEffect(() => {
     return () => {
@@ -400,10 +415,10 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
   /** `timeStamp`: the input event's, so the hold is timed from the input (see KeyEngine). */
   const press = useCallback(
     (timeStamp?: number, contact?: KeyContact) => {
-      if (disabled) return
+      if (disabled || inert) return
       engine.current?.press(timeStamp, contact)
     },
-    [disabled],
+    [disabled, inert],
   )
 
   const release = useCallback((timeStamp?: number, contact?: KeyContact) => {
@@ -455,9 +470,10 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
       }
       if (event.key !== ' ' && event.key !== 'Enter') return
       // Auto-repeat would otherwise read as a burst of dots, exactly as it
-      // would through the window binding.
+      // would through the window binding. Claimed, so the repeats and the
+      // keyup are cancelled too while the key is held (see keyClaims).
       if (event.repeat) return
-      event.preventDefault()
+      claimPress(event)
       press(event.timeStamp)
     },
     onKeyUp: (event: React.KeyboardEvent) => {
@@ -512,7 +528,9 @@ export function useMorseKey(options: UseMorseKeyOptions = {}) {
         if (!contact) return
         event.preventDefault()
         event.stopPropagation()
-        if (!event.repeat) press(event.timeStamp, contact)
+        if (event.repeat) return
+        claimPress(event)
+        press(event.timeStamp, contact)
       },
       onKeyUp: (event) => {
         const contact = contactOf(event, false)

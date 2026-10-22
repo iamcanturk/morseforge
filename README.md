@@ -54,6 +54,7 @@ structured, you hear it as real CW tones, and you send it back with your own
 keyboard.
 
 No account. No ads. No server — your progress never leaves your device.
+Consent-based analytics: Google Analytics runs only if you accept it.
 
 <div align="center">
 
@@ -292,8 +293,8 @@ manual mode that removes the clock entirely.
 **The secret message never reaches a server.** It lives in the URL fragment,
 which browsers do not put in a request, strip from `Referer`, and which the
 cache ignores. Link-preview bots in chat apps fetch without it. The page also
-loads no analytics beacon, and the usage counter's events carry an event name and
-no URL or text. The one place the message does persist is your browser history,
+loads no analytics beacon, no Google Analytics and no consent bar, and the usage
+counter's events carry an event name and no URL or text. The one place the message does persist is your browser history,
 and the page says that too. Text from a link is rendered as text, never as HTML,
 and a 5 MB fragment is rejected before any decoding is attempted.
 
@@ -430,10 +431,13 @@ deploy/            The nginx vhost, and the server's notes
 **Stack:** [Astro 7](https://astro.build) (static output) · React 19 islands ·
 Tailwind 4 · TypeScript strict · Vitest · Web Audio API
 
-No backend and no database. Analytics are Cloudflare's cookieless Web Analytics
-and a small first-party counter of event names that you can switch off in
-Settings; what each one sees is spelled out on the
-[privacy page](https://morse.iamcanturk.dev/privacy/).
+No backend and no database. Analytics are consent-based: Google Analytics 4
+loads only after a visitor accepts it in a bar at the foot of the page (Consent
+Mode v2, ad signals always denied, and revocable in Settings, which also
+deletes its cookies). Independently of that answer, Cloudflare's cookieless Web
+Analytics counts page views, and a small first-party counter of event names
+runs until you switch it off in Settings. What each one sees is spelled out on
+the [privacy page](https://morse.iamcanturk.dev/privacy/).
 
 ---
 
@@ -505,6 +509,10 @@ Requires **Node 22.12 or newer**, which is Astro 7's own floor.
   must actually be fired from somewhere. A declared-but-unsent event is
   invisible: TypeScript is happy, every test passes, and the only symptom is a
   number that stays at zero, which looks exactly like nobody using the feature.
+- **Consent** — Google Analytics is loaded by an inline script, so the loader is
+  run in a sandbox against the pure decision and cookie functions it mirrors.
+  The build check fails if any page's static HTML loads gtag.js, if the consent
+  bar goes missing, or if `/message/` carries any GA code at all.
 - **Links** — every internal reference in the built output must resolve:
   9,692 of them across 88 pages in this build, checked against what the build
   actually produced.

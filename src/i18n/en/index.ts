@@ -7,7 +7,18 @@
  * and do not reach into another area's from a component.
  */
 
-import { crumbs, faq, footer, format, header, layout, nav, switcher, theme } from './chrome'
+import {
+  consent,
+  crumbs,
+  faq,
+  footer,
+  format,
+  header,
+  layout,
+  nav,
+  switcher,
+  theme,
+} from './chrome'
 import { challenge, methods, modes, practice, result, share } from './practice'
 import { lesson } from './lesson'
 import { achievements, nextAction, stats } from './stats'
@@ -27,6 +38,7 @@ export const EN_MESSAGES = {
   ...faq,
   ...crumbs,
   ...switcher,
+  ...consent,
   ...format,
   ...modes,
   ...methods,

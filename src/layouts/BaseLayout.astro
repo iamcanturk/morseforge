@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css'
+import ConsentBar from '../components/ConsentBar.astro'
 import Footer from '../components/Footer.astro'
 import Header from '../components/Header.astro'
 import {
@@ -8,10 +9,12 @@ import {
   AUTHOR_SAME_AS,
   AUTHOR_X_URL,
   CF_ANALYTICS_TOKEN,
+  GA_MEASUREMENT_ID,
   MORSE_CODE_ABOUT,
   SITE,
 } from '../config/site'
 import { findPage } from '../config/pages'
+import { gaAllowedOnPage } from '../analytics/ga'
 import { DEFAULT_OG_IMAGE, headMeta, jsonLd } from '../seo/head'
 import { hreflangLinks } from '../i18n/alternates'
 import { stripLocale } from '../i18n/locales'
@@ -53,10 +56,12 @@ export interface Props {
    */
   noindex?: boolean
   /**
-   * Load the analytics beacon on this page. Default true.
+   * Load analytics on this page: the Cloudflare beacon, and Google Analytics
+   * with its consent bar. Default true.
    *
-   * The beacon reports the page URL. `/message/` keeps its message in the URL
-   * fragment and promises that it is never sent anywhere, so it turns this off.
+   * Both report the page URL. `/message/` keeps its message in the URL
+   * fragment and promises that it is never sent anywhere, so it turns this
+   * off, and then neither the beacon, nor gtag, nor the bar is in the page.
    */
   analytics?: boolean
   /** `og:type`. Default `article` when `article` is given, else `website`. */
@@ -111,6 +116,20 @@ const markdown =
       ? markdownPathFor(path)
       : null
     : Astro.props.markdown
+
+/**
+ * Google Analytics, behind consent (src/analytics/ga.ts): the measurement ID
+ * when this page may carry the consent bar and its loader, else null. Never
+ * under `astro dev`, never with `analytics={false}`, never on a private page.
+ */
+const gaId = gaAllowedOnPage({
+  production: import.meta.env.PROD,
+  analytics,
+  private: isPrivate,
+  measurementId: GA_MEASUREMENT_ID,
+})
+  ? GA_MEASUREMENT_ID
+  : null
 
 const head = headMeta(
   {
@@ -359,6 +378,7 @@ const identityGraph = {
     }
   </head>
   <body class="flex min-h-dvh flex-col text-ink antialiased">
+    {gaId && <ConsentBar measurementId={gaId} />}
     {
       /* No bg-void on body: html paints the background, and body::before lays
         the office texture over it. A body background would hide that layer. */

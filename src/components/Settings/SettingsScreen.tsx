@@ -15,7 +15,9 @@ import {
   type SectionOutcome,
 } from './data'
 import { REFERENCE_WORD, TimingPreview } from './TimingPreview'
+import { CONSENT_EVENT, browserOptsOut, chooseAnalytics } from '../../analytics/ga'
 import { track } from '../../analytics/track'
+import { GA_MEASUREMENT_ID } from '../../config/site'
 import { METHODS, METHOD_IDS, type MethodId, activeCharacters } from '../../data/methods'
 import { formatSeconds } from '../../data/format'
 import { AudioEngine } from '../../engine/audioEngine'
@@ -37,6 +39,12 @@ import {
   importAll,
   resetAll,
 } from '../../storage/backup'
+import {
+  CONSENT_CHOICES,
+  type ConsentChoice,
+  type ConsentRecord,
+  createConsentStore,
+} from '../../storage/consent'
 import { type DailyRecord, createDailyStore, emptyDaily } from '../../storage/daily'
 import {
   type ProgressRecord,
@@ -148,6 +156,7 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
   const progressStore = useMemo(() => createProgressStore(), [])
   const statsStore = useMemo(() => createStatsStore(), [])
   const dailyStore = useMemo(() => createDailyStore(), [])
+  const consentStore = useMemo(() => createConsentStore(), [])
 
   // Defaults until mounted: the page is prerendered, where there is no
   // storage, and rendering stored values on the server would tear hydration.
@@ -176,6 +185,26 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
     (patch: (current: SettingsRecord) => SettingsRecord) => settingsStore.update(patch),
     [settingsStore],
   )
+
+  /* ---- Google Analytics consent (TASK-039) ---------------------------- */
+
+  // Its own record, outside settings and outside backups (storage/consent.ts).
+  // The consent bar writes it from an inline script and then fires
+  // CONSENT_EVENT, which a store subscription would not see in this tab.
+  const [consent, setConsent] = useState<ConsentRecord | null>(null)
+  const [optsOut, setOptsOut] = useState(false)
+
+  useEffect(() => {
+    const sync = () => setConsent(consentStore.read())
+    sync()
+    setOptsOut(browserOptsOut())
+    const unsubscribe = consentStore.subscribe(setConsent)
+    window.addEventListener(CONSENT_EVENT, sync)
+    return () => {
+      unsubscribe()
+      window.removeEventListener(CONSENT_EVENT, sync)
+    }
+  }, [consentStore])
 
   /* ---- Motion reaches CSS at once ------------------------------------- */
 
@@ -405,6 +434,20 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
       t('settings.erased', { state: kept.counters ? t('settings.on') : t('settings.offWord') }),
     )
   }, [settingsStore, stopSending, t])
+
+  const chooseGa = useCallback(
+    (choice: ConsentChoice) => {
+      // Stores the answer; "not allowed" also stops GA on this page and
+      // deletes its cookies at once, and "allowed" lets the loader start it.
+      setConsent(chooseAnalytics(choice, consentStore))
+      setOutcomes(null)
+      setNotice(choice === 'granted' ? t('settings.gaNowAllowed') : t('settings.gaNowOff'))
+    },
+    [consentStore, t],
+  )
+
+  /** Where the GA choice stands, when no answer has been stored to show it. */
+  const gaState = consent ? '' : optsOut ? t('settings.gaBrowserSignal') : t('settings.gaUndecided')
 
   /* ---- Section rail ---------------------------------------------------- */
 
@@ -1067,6 +1110,30 @@ export function SettingsScreen({ theme }: SettingsScreenProps) {
               onChange={(counters) => update((c) => ({ ...c, counters }))}
             />
           </Row>
+
+          {/* Separate from the counters above, which never set a cookie and
+              keep their own switch. Shown only when the site has a GA ID. */}
+          {GA_MEASUREMENT_ID && (
+            <Row
+              label={t('settings.ga')}
+              labelId="setting-ga"
+              hint={loaded ? `${t('settings.gaHint')} ${gaState}`.trim() : t('settings.gaHint')}
+            >
+              <Segmented
+                label={t('settings.ga')}
+                labelledBy="setting-ga"
+                size="sm"
+                block
+                value={loaded ? (consent?.analytics ?? (optsOut ? 'denied' : null)) : null}
+                options={CONSENT_CHOICES.map((choice) => ({
+                  value: choice,
+                  label:
+                    choice === 'granted' ? t('settings.gaAllowed') : t('settings.gaNotAllowed'),
+                }))}
+                onChange={chooseGa}
+              />
+            </Row>
+          )}
 
           {(install || platform === 'apple' || platform === 'standalone' || installNote) && (
             <Row

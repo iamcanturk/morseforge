@@ -21,6 +21,7 @@
 
 import { track } from '../../analytics/track'
 import { AudioEngine } from '../../engine/audioEngine'
+import { claimPress } from '../../engine/keyClaims'
 import { bindKeyboard, contactFor, swapPaddles } from '../../engine/keyEngine'
 import { createKeyer } from '../../engine/keyer'
 import { LiveDecoder } from '../../engine/morseDecoder'
@@ -478,7 +479,9 @@ export function mountStation(root: HTMLElement): () => void {
     if (!contact) return
     event.preventDefault()
     event.stopPropagation()
-    if (!event.repeat) engine.press(undefined, contact)
+    if (event.repeat) return
+    claimPress(event)
+    engine.press(undefined, contact)
   })
   key.addEventListener('keyup', (event) => {
     const contact = contactOf(event, false)
@@ -552,7 +555,9 @@ export function mountStation(root: HTMLElement): () => void {
       active === document.documentElement ||
       (active instanceof HTMLElement && active.id === 'main')
     if (!keysFromPage(event, pageKeys, { focusOnPage, inView })) return
-    event.preventDefault()
+    // Claimed: the repeats of this hold reach the face, not this listener,
+    // and would scroll the page through a dash if left alone (keyClaims).
+    claimPress(event)
     // Focus moves to the face without scrolling, so the release (and every
     // press after it) reaches the station's own listeners.
     root.focus({ preventScroll: true })
