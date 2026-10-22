@@ -4,7 +4,8 @@ import { siteNav } from './ui/siteNav'
 import Rich from './I18n/Rich.astro'
 import LocaleSwitcher from './I18n/LocaleSwitcher.astro'
 import { useTranslations } from '../i18n/server'
-import { AUTHOR, AUTHOR_X_URL, SITE } from '../config/site'
+import SocialIcon from './ui/SocialIcon.astro'
+import { AUTHOR, AUTHOR_PROFILES, SITE } from '../config/site'
 import { encode, prettify } from '../engine/morseEncoder'
 
 /**
@@ -15,7 +16,7 @@ import { encode, prettify } from '../engine/morseEncoder'
  * for a crawler this is a sitemap on every page.
  *
  * `rel="me"` marks the links that are the *same person* — the author's own site
- * and X profile — which is what IndieAuth and Mastodon read to verify identity.
+ * and profiles — which is what IndieAuth and Mastodon read to verify identity.
  * The repository link is a project, not an identity, so it deliberately does
  * not carry it.
  */
@@ -27,6 +28,8 @@ const signOff = prettify(encode(SIGN_OFF))
 
 const t = useTranslations(Astro)
 const { groups: NAV_GROUPS } = siteNav(t)
+
+const authorHost = new URL(AUTHOR.url).host
 
 /** The project row: engraved plate labels, each a 32px row, 44px under a finger (A-12). */
 const projectLink =
@@ -62,6 +65,37 @@ const projectLink =
         <span class="font-mono tracking-code text-signal-dim" aria-hidden="true">{signOff}</span>
         <span>{t('footer.signOff', { code: SIGN_OFF })}</span>
       </p>
+
+      {/* The author's profiles: the same accounts iamcanturk.dev links to. */}
+      <nav aria-label={t('footer.follow', { name: AUTHOR.name })} class="mt-6">
+        <p class="mf-engraved text-brass">{t('footer.follow', { name: AUTHOR.name })}</p>
+        <a
+          href={AUTHOR.url}
+          rel="me noopener"
+          class="mt-1 inline-flex min-h-11 items-center gap-2 rounded-control text-[15px] text-ink hover:text-signal"
+          aria-label={t('footer.site', { name: AUTHOR.name, host: authorHost })}
+        >
+          <SocialIcon name="site" />
+          {authorHost}
+        </a>
+        <ul class="-ml-2.5 flex flex-wrap items-center gap-1">
+          {
+            AUTHOR_PROFILES.map(({ network, url, icon }) => (
+              <li>
+                <a
+                  href={url}
+                  rel="me noopener"
+                  class="mf-icon-btn text-muted hover:text-signal"
+                  aria-label={t('footer.profile', { name: AUTHOR.name, network })}
+                  title={t('footer.profile', { name: AUTHOR.name, network })}
+                >
+                  <SocialIcon name={icon} />
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </nav>
     </div>
 
     <nav aria-label={t('footer.allPages')} class="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4">
@@ -97,10 +131,9 @@ const projectLink =
       >
         <a href={t.href('/settings/')} class={projectLink}>{t('footer.settings')}</a>
         <a href={t.href('/privacy/')} class={projectLink}>{t('footer.privacy')}</a>
-        <a href={SITE.repo} rel="noopener" class={projectLink}>{t('footer.source')}</a>
-        <a href={AUTHOR_X_URL} rel="me noopener" class={projectLink}>@{AUTHOR.x}</a>
-        <a href={AUTHOR.url} rel="me noopener" class={projectLink}>
-          {new URL(AUTHOR.url).host}
+        <a href={SITE.repo} rel="noopener" class={`${projectLink} gap-1.5 text-signal-dim`}>
+          <SocialIcon name="star" size={14} />
+          {t('footer.source')}
         </a>
       </nav>
       <LocaleSwitcher />

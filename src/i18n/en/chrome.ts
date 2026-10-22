@@ -21,7 +21,9 @@ export const header = namespace('header', {
   allTools: 'All tools',
   menu: 'Menu',
   settings: 'Settings',
-  source: 'Source on GitHub',
+  source: 'Star on GitHub',
+  /** The GitHub button's name and tooltip: "Star MorseForge on GitHub". */
+  github: 'Star {site} on GitHub',
   chipContinue: 'Continue',
   chipProgress: 'Progress',
   /** The streak as the chip shows it: "5d". */
@@ -51,7 +53,13 @@ export const footer = namespace('footer', {
   projectLinks: 'Project and author links',
   settings: 'Settings',
   privacy: 'Privacy',
-  source: 'Source on GitHub',
+  source: 'Star on GitHub',
+  /** Above the row of the author's profiles. */
+  follow: 'Follow {name}',
+  /** A profile link's name: "Can Türk on Instagram". */
+  profile: '{name} on {network}',
+  /** The author's own site, as a link name. */
+  site: '{name}: {host}',
   promises: 'No account · No ads · Works offline',
 })
 

@@ -15,6 +15,12 @@ master each character.
 [60-second challenge](https://morse.iamcanturk.dev/challenge/) &nbsp;·&nbsp;
 [Send a secret message](https://morse.iamcanturk.dev/message/)
 
+<br>
+
+<a href="docs/promo.mp4"><img src="docs/promo-preview.gif" alt="From the one-minute intro: the landing page's key sends E, T and A, then SOS is keyed on the brass telegraph and stamped SOS · PRIORITY." width="760"></a>
+
+<sub>▶ <a href="docs/promo.mp4">Watch the one-minute intro</a>, with sound. The app screens in it are the live site, keyed for real.</sub>
+
 <!--
   How the figures on this page were measured (build of 2026-10-21, after paddles and the i18n plumbing):
     tests        npx vitest run                  -> 2067 passed, 102 files
@@ -72,7 +78,7 @@ one. It is a design system rather than a skin — see
 | **[The tree](https://morse.iamcanturk.dev/tree/)**                                                                                                                                                | The real binary structure of Morse, drawn as a circuit board. Pick a node to hear it and drill it                                       |
 | **[60-second challenge](https://morse.iamcanturk.dev/challenge/)**                                                                                                                                | Seeded, so a link carries the same prompts in the same order. Scores on one link are comparable                                         |
 | **[Daily challenge](https://morse.iamcanturk.dev/daily/)**                                                                                                                                        | Eight lines a day, generated from the date. It says up front which characters and speed, and the share gives nothing away               |
-| **[Telegraph](https://morse.iamcanturk.dev/telegraph/)**                                                                                                                                          | A brass straight key, or iambic paddles on `[` and `]`, decoded live. A few words answer back                                          |
+| **[Telegraph](https://morse.iamcanturk.dev/telegraph/)**                                                                                                                                          | A brass straight key, or iambic paddles on `[` and `]`, decoded live. A few words answer back                                           |
 | **[Secret message](https://morse.iamcanturk.dev/message/)**                                                                                                                                       | Write a message, get a link that plays it in Morse. The message lives only in the URL fragment                                          |
 | **[Practice](https://morse.iamcanturk.dev/practice/)**                                                                                                                                            | Listening, sending and recognition, in three teaching orders, scored per skill                                                          |
 | **[Copy practice](https://morse.iamcanturk.dev/copy/)**                                                                                                                                           | Whole lines — code groups, words, on-air phrases, callsigns — graded character by character                                             |
@@ -578,6 +584,9 @@ on the web, mostly the kind that work without an account.
   <a href="https://iamcanturk.dev"><img src="https://img.shields.io/badge/website-iamcanturk.dev-00E88F?style=for-the-badge" alt="iamcanturk.dev"></a>
   <a href="https://x.com/iamcanturk"><img src="https://img.shields.io/badge/X-@iamcanturk-000000?style=for-the-badge&logo=x" alt="@iamcanturk on X"></a>
   <a href="https://github.com/iamcanturk"><img src="https://img.shields.io/badge/GitHub-iamcanturk-8B98A5?style=for-the-badge&logo=github" alt="iamcanturk on GitHub"></a>
+  <a href="https://www.linkedin.com/in/yusufcanturk/"><img src="https://img.shields.io/badge/LinkedIn-yusufcanturk-0A66C2?style=for-the-badge&logo=linkedin" alt="Can Türk on LinkedIn"></a>
+  <a href="https://www.instagram.com/iamcanturk.dev/"><img src="https://img.shields.io/badge/Instagram-@iamcanturk.dev-E4405F?style=for-the-badge&logo=instagram&logoColor=white" alt="@iamcanturk.dev on Instagram"></a>
+  <a href="https://www.youtube.com/@iamcanturk"><img src="https://img.shields.io/badge/YouTube-@iamcanturk-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="@iamcanturk on YouTube"></a>
 </p>
 
 If MorseForge is useful to you, a ⭐ or a link back to

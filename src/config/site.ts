@@ -35,13 +35,29 @@ export const AUTHOR_X_URL = `https://x.com/${AUTHOR.x}`
 export const AUTHOR_GITHUB_URL = `https://github.com/${AUTHOR.github}`
 
 /**
+ * The author's profiles, in the order the footer shows them. The URLs are the
+ * ones iamcanturk.dev itself links to, so the two sites name the same accounts.
+ */
+export const AUTHOR_PROFILES = [
+  { network: 'X', url: AUTHOR_X_URL, icon: 'x' },
+  { network: 'Instagram', url: 'https://www.instagram.com/iamcanturk.dev/', icon: 'instagram' },
+  { network: 'LinkedIn', url: 'https://www.linkedin.com/in/yusufcanturk/', icon: 'linkedin' },
+  { network: 'YouTube', url: 'https://www.youtube.com/@iamcanturk', icon: 'youtube' },
+  { network: 'TikTok', url: 'https://www.tiktok.com/@iamcanturk.dev', icon: 'tiktok' },
+  { network: 'GitHub', url: AUTHOR_GITHUB_URL, icon: 'github' },
+] as const
+
+/**
  * Every profile that is verifiably the same person, for schema.org `sameAs`.
  *
  * This is what lets a search engine or an LLM connect the site to a real author
  * with a track record, which is the E-E-A-T signal a brand-new domain has no
  * other way to earn.
  */
-export const AUTHOR_SAME_AS: readonly string[] = [AUTHOR.url, AUTHOR_X_URL, AUTHOR_GITHUB_URL]
+export const AUTHOR_SAME_AS: readonly string[] = [
+  AUTHOR.url,
+  ...AUTHOR_PROFILES.map((profile) => profile.url),
+]
 
 /**
  * Cloudflare Web Analytics beacon token.

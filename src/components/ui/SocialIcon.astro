@@ -1,0 +1,80 @@
+---
+/**
+ * Small line icons for the author's profiles and the repository.
+ *
+ * Drawn on one 24-unit grid with the same 1.8 stroke as the header's icons,
+ * so the footer row reads as one set. GitHub keeps its own mark (filled),
+ * because that is the shape people look for when they want the source.
+ * Decorative: the link around it carries the name.
+ */
+interface Props {
+  name: 'x' | 'instagram' | 'linkedin' | 'youtube' | 'tiktok' | 'github' | 'site' | 'star'
+  size?: number
+  class?: string
+}
+
+const { name, size = 18, class: className } = Astro.props
+---
+
+<svg
+  width={size}
+  height={size}
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="1.8"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+  aria-hidden="true"
+  class={className}
+>
+  {name === 'x' && <path d="M4.5 4.5 19.5 19.5M19.5 4.5 4.5 19.5" />}
+  {
+    name === 'instagram' && (
+      <>
+        <rect x="3.5" y="3.5" width="17" height="17" rx="5" />
+        <circle cx="12" cy="12" r="4" />
+        <circle cx="17.2" cy="6.8" r="0.6" fill="currentColor" stroke="none" />
+      </>
+    )
+  }
+  {
+    name === 'linkedin' && (
+      <>
+        <rect x="3.5" y="3.5" width="17" height="17" rx="3" />
+        <path d="M8 10.5V16.5M8 7.6V7.7M11.5 16.5V10.5M11.5 13.2C11.5 11.6 12.6 10.5 14 10.5S16.5 11.6 16.5 13.2V16.5" />
+      </>
+    )
+  }
+  {
+    name === 'youtube' && (
+      <>
+        <rect x="2.5" y="5.5" width="19" height="13" rx="4" />
+        <path d="M10.2 9.4V14.6L14.6 12Z" fill="currentColor" />
+      </>
+    )
+  }
+  {name === 'tiktok' && <path d="M13.5 3.5V15A3.5 3.5 0 1 1 10 11.5M13.5 3.5C14 6 16 7.8 18.5 8" />}
+  {
+    name === 'github' && (
+      <path
+        fill="currentColor"
+        stroke="none"
+        d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56v-2.15c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.96.1-.74.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.81 1.18 1.84 1.18 3.1 0 4.42-2.69 5.39-5.25 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"
+      />
+    )
+  }
+  {
+    name === 'site' && (
+      <>
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M3.5 12H20.5M12 3.5C14.3 6 15.4 9 15.4 12S14.3 18 12 20.5C9.7 18 8.6 15 8.6 12S9.7 6 12 3.5Z" />
+      </>
+    )
+  }
+  {
+    name === 'star' && (
+      <path d="M12 3.5 14.6 8.9 20.5 9.6 16.2 13.7 17.3 19.5 12 16.7 6.7 19.5 7.8 13.7 3.5 9.6 9.4 8.9Z" />
+    )
+  }
+</svg>

@@ -1,4 +1,5 @@
 ---
+import SocialIcon from './ui/SocialIcon.astro'
 import { Logo, LogoMark } from './brand/Logo'
 import ThemeMenu from './ThemeMenu.astro'
 import { isCurrent, siteNav } from './ui/siteNav'
@@ -269,6 +270,21 @@ const chip = {
         wide.addEventListener('change', render)
       </script>
 
+      {
+        /* The repository, one tap from every page: open source is half the
+          point, and a star is the cheapest way to say it helped. From sm up
+          only; on a phone the same link sits at the bottom of the menu. */
+      }
+      <a
+        href={SITE.repo}
+        rel="noopener"
+        aria-label={t('header.github', { site: SITE.name })}
+        title={t('header.github', { site: SITE.name })}
+        class="mf-icon-btn hidden sm:inline-grid"
+      >
+        <SocialIcon name="github" size={18} />
+      </a>
+
       <ThemeMenu />
 
       <a
@@ -377,7 +393,8 @@ const chip = {
               <a
                 href={SITE.repo}
                 rel="noopener"
-                class="mf-btn mf-btn-ghost mf-btn-sm -ml-3 min-h-11">{t('header.source')}</a
+                class="mf-btn mf-btn-ghost mf-btn-sm -ml-3 min-h-11 gap-2"
+                ><SocialIcon name="github" size={16} />{t('header.source')}</a
               >
             </div>
           </div>
