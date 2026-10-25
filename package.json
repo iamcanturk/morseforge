@@ -1,6 +1,6 @@
 {
   "name": "morseforge",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "private": true,
   "description": "Learn Morse. Build the Signal. A free, gamified Morse code trainer with a real CW audio engine, keyboard straight key, and a Signal Tree that lights up as you master each character.",
