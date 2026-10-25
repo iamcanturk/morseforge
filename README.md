@@ -23,8 +23,8 @@ master each character.
 
 <!--
   How the figures on this page were measured (build of 2026-10-21, after paddles and the i18n plumbing):
-    tests        npx vitest run                  -> 2067 passed, 102 files
-    pages, links node scripts/check-links.mjs dist -> 9692 internal references, 88 pages
+    tests        npx vitest run                  -> 2176 passed, 105 files
+    pages, links node scripts/check-links.mjs dist -> 9778 internal references, 88 pages
     sitemap      <loc> entries in dist/sitemap-0.xml -> 83 (the other 5 pages are noindex or private)
     words        dist/words/*/                   -> 22
     char pages   dist/morse-code-alphabet/*/     -> 36
@@ -36,7 +36,7 @@ master each character.
 -->
 
 [![Live](https://img.shields.io/badge/live-morse.iamcanturk.dev-00E88F?style=flat-square)](https://morse.iamcanturk.dev)
-[![Tests](https://img.shields.io/badge/tests-2067%20passing-00E88F?style=flat-square)](#testing)
+[![Tests](https://img.shields.io/badge/tests-2176%20passing-00E88F?style=flat-square)](#testing)
 [![License](https://img.shields.io/badge/license-MIT-8B98A5?style=flat-square)](LICENSE)
 [![Astro](https://img.shields.io/badge/Astro-7-8B98A5?style=flat-square)](https://astro.build)
 [![Node](https://img.shields.io/badge/node-%E2%89%A522.12-8B98A5?style=flat-square)](#running-it-locally)
@@ -467,7 +467,7 @@ Requires **Node 22.12 or newer**, which is Astro 7's own floor.
 
 ### Testing
 
-2,067 tests in 102 files, covering the parts where being wrong is silent:
+2,176 tests in 105 files, covering the parts where being wrong is silent:
 
 - **Timing** — sending PARIS once takes exactly `60/WPM` seconds, checked at
   5/12/20/35 WPM and under Farnsworth. Every speed readout depends on it.
@@ -514,7 +514,7 @@ Requires **Node 22.12 or newer**, which is Astro 7's own floor.
   The build check fails if any page's static HTML loads gtag.js, if the consent
   bar goes missing, or if `/message/` carries any GA code at all.
 - **Links** — every internal reference in the built output must resolve:
-  9,692 of them across 88 pages in this build, checked against what the build
+  9,778 of them across 88 pages in this build, checked against what the build
   actually produced.
 - **SEO** — on the built output: one visible H1, title and description within
   their limits, a self canonical, JSON-LD that parses, noindex pages kept out of
